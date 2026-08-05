@@ -6,13 +6,15 @@ import { usePathname } from 'next/navigation';
 const NAV = [
   { href: '/', label: 'Pedidos' },
   { href: '/productos', label: 'Productos' },
+  { href: '/promociones', label: 'Promociones' },
+  { href: '/inventario', label: 'Inventario' },
 ] as const;
 
 export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex rounded-full bg-slate-100 p-1">
+    <nav className="flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1">
       {NAV.map((item) => {
         const active = pathname === item.href;
         return (

@@ -191,6 +191,35 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['buildings']['Row']>;
         Relationships: [];
       };
+      inventory_movements: {
+        Row: {
+          id: string;
+          branch_id: string;
+          branch_product_id: string;
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          quantity: number;
+          notes: string | null;
+          order_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
+          branch_id: string;
+          branch_product_id: string;
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          quantity: number;
+        };
+        Update: Partial<Database['public']['Tables']['inventory_movements']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_movements_branch_product_id_fkey';
+            columns: ['branch_product_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       whatsapp_message_logs: {
         Row: {
           id: string;
@@ -263,6 +292,15 @@ export interface Database {
           branch_name: string;
           items: Json;
         }>;
+      };
+      record_inventory_movement: {
+        Args: {
+          p_branch_product_id: string;
+          p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          p_quantity: number;
+          p_notes: string | null;
+        };
+        Returns: Array<{ new_stock: number }>;
       };
     };
     Enums: Record<string, never>;

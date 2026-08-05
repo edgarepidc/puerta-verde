@@ -84,6 +84,25 @@ export {
   type ProductInput,
 } from './products';
 
+export {
+  validatePromotionInput,
+  PROMOTION_KINDS,
+  PROMOTION_KIND_LABELS,
+  type PromotionInput,
+  type PromotionKind,
+} from './promotions';
+
+export {
+  validateInventoryMovement,
+  INVENTORY_MOVEMENT_TYPES,
+  INVENTORY_MOVEMENT_LABELS,
+  MANUAL_INVENTORY_TYPES,
+  LOW_STOCK_THRESHOLD,
+  type InventoryMovementInput,
+  type InventoryMovementType,
+  type ManualInventoryMovementType,
+} from './inventory';
+
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';
