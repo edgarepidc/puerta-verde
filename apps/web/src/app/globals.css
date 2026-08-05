@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --pv-green-50: #f0fdf4;
+  --pv-green-100: #dcfce7;
+  --pv-green-600: #16a34a;
+  --pv-green-700: #15803d;
+  --pv-green-800: #166534;
+  --pv-green-900: #14532d;
+}
+
+body {
+  background: var(--pv-green-50);
+  color: #14532d;
+}

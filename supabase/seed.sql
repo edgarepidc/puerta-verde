@@ -1,0 +1,67 @@
+-- Demo seed: Puerta Verde en Residencial Las Palmas
+
+insert into public.organizations (id, name, slug, subscription_plan, subscription_status)
+values (
+  'a0000000-0000-4000-8000-000000000001',
+  'Puerta Verde',
+  'puerta-verde',
+  'pro',
+  'active'
+);
+
+insert into public.branches (id, organization_id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount)
+values (
+  'b0000000-0000-4000-8000-000000000001',
+  'a0000000-0000-4000-8000-000000000001',
+  'Puerta Verde — Torre A',
+  'puerta-verde-demo',
+  'Planta baja, Torre A, Residencial Las Palmas',
+  'Pasa por el local en planta baja. Horario: 8am – 8pm.',
+  0,
+  50
+);
+
+insert into public.buildings (id, branch_id, name)
+values
+  ('c0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Torre A'),
+  ('c0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Torre B');
+
+insert into public.units (building_id, identifier)
+select 'c0000000-0000-4000-8000-000000000001', lpad(n::text, 3, '0')
+from generate_series(101, 120) as n
+union all
+select 'c0000000-0000-4000-8000-000000000002', lpad(n::text, 3, '0')
+from generate_series(201, 215) as n;
+
+insert into public.product_categories (id, organization_id, name, sort_order)
+values
+  ('d0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Frutas', 1),
+  ('d0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000001', 'Verduras', 2),
+  ('d0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000001', 'Semillas y granos', 3);
+
+insert into public.products (id, organization_id, category_id, name, unit)
+values
+  ('e0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001', 'Aguacate Hass', 'kg'),
+  ('e0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001', 'Plátano dominico', 'kg'),
+  ('e0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000002', 'Jitomate saladette', 'kg'),
+  ('e0000000-0000-4000-8000-000000000004', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000002', 'Lechuga romana', 'piece'),
+  ('e0000000-0000-4000-8000-000000000005', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003', 'Chía orgánica', 'bag'),
+  ('e0000000-0000-4000-8000-000000000006', 'a0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003', 'Avena integral', 'bag');
+
+insert into public.branch_products (id, branch_id, product_id, price, stock)
+values
+  ('f0000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 89.00, 25),
+  ('f0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000002', 28.00, 40),
+  ('f0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000003', 35.00, 30),
+  ('f0000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000004', 18.00, 20),
+  ('f0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000005', 65.00, 15),
+  ('f0000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000006', 42.00, 12);
+
+insert into public.promotions (branch_id, title, body, kind, is_active)
+values (
+  'b0000000-0000-4000-8000-000000000001',
+  '2x1 en aguacate este viernes',
+  'Lleva 2 kg de aguacate Hass al precio de 1. Solo para vecinos del edificio.',
+  'banner',
+  true
+);
