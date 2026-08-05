@@ -10,6 +10,8 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+export const dynamic = 'force-dynamic';
+
 export default async function OrderTrackingPage({
   params,
 }: {

@@ -18,7 +18,9 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > packages/supabase/src/database.types.ts"
+    "db:types": "supabase gen types typescript --local > packages/supabase/src/database.types.ts",
+    "create:supabase": "bash scripts/create-supabase-project.sh",
+    "deploy:vercel": "bash scripts/deploy-vercel.sh"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

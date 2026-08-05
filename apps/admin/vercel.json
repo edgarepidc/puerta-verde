@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd ../.. && npm run build --workspace=@puertaverde/admin",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build --workspace=@puertaverde/admin",
+  "outputDirectory": "apps/admin/.next",
+  "framework": "nextjs"
+}

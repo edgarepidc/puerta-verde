@@ -2,6 +2,8 @@ import { createServerClient } from '@puertaverde/supabase/client';
 
 import { Storefront } from '@/components/Storefront';
 
+export const dynamic = 'force-dynamic';
+
 export default async function BranchStorePage({
   params,
 }: {
