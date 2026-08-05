@@ -27,10 +27,10 @@ values
   ('c0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Torre B');
 
 insert into public.units (building_id, identifier)
-select 'c0000000-0000-4000-8000-000000000001', lpad(n::text, 3, '0')
+select 'c0000000-0000-4000-8000-000000000001'::uuid, lpad(n::text, 3, '0')
 from generate_series(101, 120) as n
 union all
-select 'c0000000-0000-4000-8000-000000000002', lpad(n::text, 3, '0')
+select 'c0000000-0000-4000-8000-000000000002'::uuid, lpad(n::text, 3, '0')
 from generate_series(201, 215) as n;
 
 insert into public.product_categories (id, organization_id, name, sort_order)

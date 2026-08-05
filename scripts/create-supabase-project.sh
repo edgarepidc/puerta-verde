@@ -11,18 +11,16 @@ REGION="${PV_SUPABASE_REGION:-us-east-1}"
 echo "==> Puerta Verde — Crear proyecto Supabase"
 echo ""
 
-if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-  if [ -f "$HOME/.supabase/access-token" ]; then
-    export SUPABASE_ACCESS_TOKEN="$(cat "$HOME/.supabase/access-token")"
-    echo "✓ Token encontrado en ~/.supabase/access-token"
-  else
+if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ] && [ ! -f "$HOME/.supabase/access-token" ]; then
+  if ! npx supabase projects list -o json >/dev/null 2>&1; then
     echo "Autentícate en Supabase primero:"
     echo "  npx supabase login"
-    echo ""
-    echo "O exporta un token:"
-    echo "  export SUPABASE_ACCESS_TOKEN='...'  # https://supabase.com/dashboard/account/tokens"
     exit 1
   fi
+  echo "✓ Sesión Supabase CLI activa"
+elif [ -f "$HOME/.supabase/access-token" ]; then
+  export SUPABASE_ACCESS_TOKEN="$(cat "$HOME/.supabase/access-token")"
+  echo "✓ Token encontrado en ~/.supabase/access-token"
 fi
 
 echo "→ Listando organizaciones..."

@@ -1,6 +1,6 @@
 -- Puerta Verde: initial multi-tenant schema for grocery retail SaaS
 
-create extension if not exists "pgcrypto";
+create extension if not exists "pgcrypto" with schema extensions;
 
 -- Enums
 create type public.staff_role as enum ('owner', 'org_admin', 'branch_manager', 'staff');
@@ -158,7 +158,7 @@ create table public.orders (
   organization_id uuid not null references public.organizations (id) on delete restrict,
   customer_id uuid references public.customers (id) on delete set null,
   order_number bigint not null default nextval('public.order_number_seq'),
-  tracking_token text not null unique default encode(gen_random_bytes(16), 'hex'),
+  tracking_token text not null unique default encode(extensions.gen_random_bytes(16), 'hex'),
   customer_name text not null,
   customer_phone text not null,
   fulfillment_type public.fulfillment_type not null,
