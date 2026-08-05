@@ -13,6 +13,7 @@ import {
 } from '@puertaverde/shared';
 
 import type { StorefrontProduct } from '@/app/[slug]/page';
+import { BrandLogo } from '@/components/BrandLogo';
 
 interface Building {
   id: string;
@@ -150,9 +151,14 @@ export function Storefront({
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-green-100">
-        <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
-        <h1 className="mt-1 text-3xl font-bold text-[var(--pv-green-900)]">{branch.name}</h1>
-        <p className="mt-2 text-[var(--pv-green-800)]">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <BrandLogo href="/" imageClassName="h-14 w-auto" />
+          <div className="text-left sm:text-right">
+            <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
+            <h1 className="mt-1 text-2xl font-bold text-[var(--pv-green-900)]">{branch.name}</h1>
+          </div>
+        </div>
+        <p className="mt-4 text-[var(--pv-green-800)]">
           Pedido mínimo {formatMoney(Number(branch.minimum_order_amount))} · Entrega gratis para vecinos
         </p>
       </header>

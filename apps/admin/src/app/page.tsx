@@ -1,7 +1,6 @@
 import Link from 'next/link';
 
-import { BRAND_NAME } from '@puertaverde/shared';
-
+import { BrandLogo } from '@/components/BrandLogo';
 import { OrdersBoard } from '@/components/OrdersBoard';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
@@ -40,12 +39,15 @@ export default async function AdminHomePage() {
     <main className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="text-sm font-semibold text-[var(--pv-green-600)]">{BRAND_NAME}</p>
-            <h1 className="text-2xl font-bold text-slate-900">Panel de pedidos</h1>
+          <div className="flex items-center gap-4">
+            <BrandLogo href="/" imageClassName="h-12 w-auto" />
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Panel de pedidos</h1>
+              <p className="text-sm text-slate-500">Operación del día</p>
+            </div>
           </div>
           <Link
-            href="http://localhost:3001/puerta-verde-demo"
+            href={process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app/puerta-verde-demo'}
             className="rounded-full border border-green-200 px-4 py-2 text-sm font-medium text-[var(--pv-green-800)]"
           >
             Ver tienda pública

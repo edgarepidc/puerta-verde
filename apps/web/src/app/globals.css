@@ -10,6 +10,6 @@
 }
 
 body {
-  background: var(--pv-green-50);
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 45%, #f8fafc 100%);
   color: #14532d;
 }

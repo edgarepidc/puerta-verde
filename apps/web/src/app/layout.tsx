@@ -12,6 +12,10 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: 'Puerta Verde',
   description: 'Frescura de tu edificio a tu puerta',
+  icons: {
+    icon: '/brand/icon.png',
+    apple: '/brand/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
