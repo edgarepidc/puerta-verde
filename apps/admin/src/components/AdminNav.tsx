@@ -8,6 +8,7 @@ const NAV = [
   { href: '/productos', label: 'Productos' },
   { href: '/promociones', label: 'Promociones' },
   { href: '/inventario', label: 'Inventario' },
+  { href: '/configuracion', label: 'Configuración' },
 ] as const;
 
 export function AdminNav() {
@@ -16,7 +17,7 @@ export function AdminNav() {
   return (
     <nav className="flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1">
       {NAV.map((item) => {
-        const active = pathname === item.href;
+        const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
         return (
           <Link
             key={item.href}

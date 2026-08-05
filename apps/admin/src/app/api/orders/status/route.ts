@@ -4,7 +4,12 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import { buildOrderStatusMessage, sendTextMessage } from '@puertaverde/whatsapp';
 import type { OrderStatus } from '@puertaverde/shared';
 
+import { requireStaffApi } from '@/lib/auth';
+
 export async function PATCH(request: Request) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { orderId, status } = (await request.json()) as {
       orderId: string;

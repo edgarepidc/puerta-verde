@@ -53,6 +53,7 @@ export interface Database {
           unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
           image_url: string | null;
           is_active: boolean;
+          shelf_life_days: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -168,6 +169,7 @@ export interface Database {
           starts_at: string | null;
           ends_at: string | null;
           is_active: boolean;
+          discount_percent: number | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['promotions']['Row']> & {
@@ -201,6 +203,7 @@ export interface Database {
           notes: string | null;
           order_id: string | null;
           created_by: string | null;
+          expires_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
@@ -219,6 +222,37 @@ export interface Database {
             referencedColumns: ['id'];
           },
         ];
+      };
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          avatar_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string };
+        Update: Partial<Database['public']['Tables']['profiles']['Row']>;
+        Relationships: [];
+      };
+      staff_memberships: {
+        Row: {
+          id: string;
+          user_id: string;
+          organization_id: string;
+          branch_id: string | null;
+          role: 'owner' | 'org_admin' | 'branch_manager' | 'staff';
+          status: 'active' | 'inactive';
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['staff_memberships']['Row']> & {
+          user_id: string;
+          organization_id: string;
+          role: 'owner' | 'org_admin' | 'branch_manager' | 'staff';
+        };
+        Update: Partial<Database['public']['Tables']['staff_memberships']['Row']>;
+        Relationships: [];
       };
       whatsapp_message_logs: {
         Row: {
@@ -299,8 +333,13 @@ export interface Database {
           p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
           p_quantity: number;
           p_notes: string | null;
+          p_expires_at?: string | null;
         };
         Returns: Array<{ new_stock: number }>;
+      };
+      get_branch_discount_percent: {
+        Args: { p_branch_id: string };
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

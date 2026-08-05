@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { AdminNav } from '@/components/AdminNav';
+import { LogoutButton } from '@/components/LogoutButton';
+import { getStaffSession } from '@/lib/auth';
 
-export function AdminShell({
+export async function AdminShell({
   title,
   subtitle,
   children,
@@ -12,6 +15,11 @@ export function AdminShell({
   subtitle?: string;
   children: React.ReactNode;
 }) {
+  const staff = await getStaffSession();
+  if (!staff) {
+    redirect('/login');
+  }
+
   const storeUrl =
     process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app';
 
@@ -28,12 +36,16 @@ export function AdminShell({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <AdminNav />
+            <span className="hidden text-sm text-slate-500 sm:inline">
+              {staff.fullName ?? staff.email}
+            </span>
             <Link
-              href={`${storeUrl}/puerta-verde-demo`}
+              href={`${storeUrl}/${staff.branchSlug}`}
               className="rounded-full border border-green-200 px-4 py-2 text-sm font-medium text-[var(--pv-green-800)]"
             >
               Ver tienda
             </Link>
+            <LogoutButton />
           </div>
         </div>
       </header>

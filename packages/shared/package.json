@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/orders.test.ts src/products.test.ts src/promotions-inventory.test.ts"
+    "test": "tsx --test src/orders.test.ts src/products.test.ts src/promotions-inventory.test.ts src/storefront.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.3",

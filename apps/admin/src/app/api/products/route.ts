@@ -3,9 +3,13 @@ import { NextResponse } from 'next/server';
 import { validateProductInput, type ProductInput, type ProductUnit } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { requireStaffApi } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
@@ -24,6 +28,7 @@ export async function GET() {
             description,
             unit,
             is_active,
+            shelf_life_days,
             category_id,
             category:product_categories ( id, name )
           )
@@ -51,6 +56,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const body = (await request.json()) as ProductInput & { newCategoryName?: string };
@@ -86,6 +94,7 @@ export async function POST(request: Request) {
         name: body.name.trim(),
         description: body.description?.trim() || null,
         unit: body.unit,
+        shelf_life_days: body.shelfLifeDays ?? null,
         is_active: body.isActive,
       })
       .select('id')

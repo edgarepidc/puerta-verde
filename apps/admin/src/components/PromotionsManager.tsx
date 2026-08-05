@@ -15,6 +15,7 @@ interface PromotionRow {
   body: string | null;
   kind: PromotionKind;
   image_url: string | null;
+  discount_percent: number | null;
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
@@ -26,6 +27,7 @@ const emptyForm: PromotionInput = {
   body: '',
   kind: 'banner',
   imageUrl: '',
+  discountPercent: null,
   startsAt: '',
   endsAt: '',
   isActive: true,
@@ -77,6 +79,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
       body: row.body ?? '',
       kind: row.kind,
       imageUrl: row.image_url ?? '',
+      discountPercent: row.discount_percent ? Number(row.discount_percent) : null,
       startsAt: toLocalInput(row.starts_at),
       endsAt: toLocalInput(row.ends_at),
       isActive: row.is_active,
@@ -146,6 +149,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         body: row.body,
         kind: row.kind,
         imageUrl: row.image_url,
+        discountPercent: row.discount_percent ? Number(row.discount_percent) : null,
         startsAt: row.starts_at,
         endsAt: row.ends_at,
         isActive: !row.is_active,
@@ -210,6 +214,24 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
                 ))}
               </select>
             </label>
+            {form.kind === 'discount' && (
+              <label className="block text-sm md:col-span-2">
+                <span className="font-medium text-slate-700">Descuento (%)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  value={form.discountPercent ?? ''}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      discountPercent: e.target.value ? Number(e.target.value) : null,
+                    }))
+                  }
+                />
+              </label>
+            )}
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Imagen (URL opcional)</span>
               <input

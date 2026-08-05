@@ -3,9 +3,13 @@ import { NextResponse } from 'next/server';
 import { validateInventoryMovement, type InventoryMovementInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { requireStaffApi } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
@@ -28,6 +32,7 @@ export async function GET() {
           movement_type,
           quantity,
           notes,
+          expires_at,
           created_at,
           branch_product:branch_products (
             product:products ( name )
@@ -52,6 +57,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const body = (await request.json()) as InventoryMovementInput;
@@ -78,6 +86,7 @@ export async function POST(request: Request) {
       p_movement_type: body.movementType,
       p_quantity: body.quantity,
       p_notes: body.notes ?? null,
+      p_expires_at: body.expiresAt ?? null,
     });
 
     if (error) {

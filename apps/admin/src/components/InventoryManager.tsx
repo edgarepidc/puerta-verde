@@ -24,6 +24,7 @@ interface MovementRow {
   movement_type: InventoryMovementType;
   quantity: number;
   notes: string | null;
+  expires_at: string | null;
   created_at: string;
   branch_product: {
     product: { name: string } | null;
@@ -43,6 +44,7 @@ export function InventoryManager({
   const [movementType, setMovementType] = useState<ManualInventoryMovementType>('purchase');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +52,15 @@ export function InventoryManager({
     () => products.filter((p) => Number(p.stock) <= LOW_STOCK_THRESHOLD),
     [products],
   );
+
+  const expiringSoon = useMemo(() => {
+    const cutoff = Date.now() + 2 * 24 * 60 * 60 * 1000;
+    return movements.filter((m) => {
+      if (!m.expires_at || m.movement_type !== 'purchase') return false;
+      const expires = new Date(m.expires_at).getTime();
+      return expires <= cutoff && expires >= Date.now();
+    });
+  }, [movements]);
 
   async function refresh() {
     const response = await fetch('/api/inventory');
@@ -74,11 +85,13 @@ export function InventoryManager({
           movementType,
           quantity: signedQty,
           notes: notes || null,
+          expiresAt: movementType === 'purchase' && expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
       setNotes('');
+      setExpiresAt('');
       setQuantity(1);
       await refresh();
     } catch (err) {
@@ -90,6 +103,20 @@ export function InventoryManager({
 
   return (
     <div className="space-y-8">
+      {expiringSoon.length > 0 && (
+        <section className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+          <h2 className="font-semibold text-orange-900">Por caducar (48 h)</h2>
+          <ul className="mt-2 space-y-1 text-sm text-orange-800">
+            {expiringSoon.map((m) => (
+              <li key={m.id}>
+                {m.branch_product?.product?.name ?? 'Producto'} — caduca{' '}
+                {new Date(m.expires_at!).toLocaleString('es-MX')}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {lowStock.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <h2 className="font-semibold text-amber-900">Stock bajo</h2>
@@ -132,6 +159,20 @@ export function InventoryManager({
               ))}
             </select>
           </label>
+          {movementType === 'purchase' && (
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Caducidad (opcional)</span>
+              <input
+                type="datetime-local"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                Si lo dejas vacío, se calcula con los días de vida útil del producto.
+              </span>
+            </label>
+          )}
           <label className="block text-sm">
             <span className="font-medium text-slate-700">
               {movementType === 'adjustment' ? 'Ajuste (+/-)' : 'Cantidad'}

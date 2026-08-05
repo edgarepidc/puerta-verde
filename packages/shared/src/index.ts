@@ -26,6 +26,13 @@ export type ProductUnit = (typeof PRODUCT_UNITS)[number];
 export const STAFF_ROLES = ['owner', 'org_admin', 'branch_manager', 'staff'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
+export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  owner: 'Propietario',
+  org_admin: 'Administrador',
+  branch_manager: 'Gerente de sucursal',
+  staff: 'Personal',
+};
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Recibido',
   preparing: 'Preparando',
@@ -102,6 +109,17 @@ export {
   type InventoryMovementType,
   type ManualInventoryMovementType,
 } from './inventory';
+
+export {
+  applyDiscount,
+  formatProductQuantity,
+  getActiveDiscountPercent,
+  getDefaultQuantity,
+  getQuantityStep,
+  getStockStatus,
+  STOCK_STATUS_LABELS,
+  type StockStatus,
+} from './storefront';
 
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';

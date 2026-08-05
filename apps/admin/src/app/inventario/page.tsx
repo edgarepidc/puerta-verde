@@ -28,6 +28,7 @@ export default async function InventoryPage() {
         movement_type,
         quantity,
         notes,
+        expires_at,
         created_at,
         branch_product:branch_products (
           product:products ( name )
@@ -52,6 +53,7 @@ export default async function InventoryPage() {
           movement_type: InventoryMovementType;
           quantity: number;
           notes: string | null;
+          expires_at: string | null;
           created_at: string;
           branch_product: { product: { name: string } | null } | null;
         }>}

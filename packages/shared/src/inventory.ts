@@ -16,6 +16,7 @@ export interface InventoryMovementInput {
   movementType: ManualInventoryMovementType;
   quantity: number;
   notes?: string | null;
+  expiresAt?: string | null;
 }
 
 export function validateInventoryMovement(input: InventoryMovementInput): string | null {

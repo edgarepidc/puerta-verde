@@ -27,6 +27,7 @@ interface ProductRow {
     description: string | null;
     unit: ProductUnit;
     is_active: boolean;
+    shelf_life_days: number | null;
     category_id: string | null;
     category: { id: string; name: string } | null;
   };
@@ -40,6 +41,7 @@ const emptyForm: ProductInput & { newCategoryName: string } = {
   unit: 'kg',
   price: 0,
   stock: 0,
+  shelfLifeDays: null,
   isAvailable: true,
   isActive: true,
 };
@@ -89,6 +91,7 @@ export function ProductsManager({
       unit: row.product.unit,
       price: Number(row.price),
       stock: Number(row.stock),
+      shelfLifeDays: row.product.shelf_life_days ? Number(row.product.shelf_life_days) : null,
       isAvailable: row.is_available,
       isActive: row.product.is_active,
     });
@@ -277,6 +280,22 @@ export function ProductsManager({
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
                 value={form.stock}
                 onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Vida útil (días, opcional)</span>
+              <input
+                type="number"
+                min={1}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                placeholder="Ej. 3 para lechuga"
+                value={form.shelfLifeDays ?? ''}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    shelfLifeDays: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
               />
             </label>
             <label className="block text-sm md:col-span-2">

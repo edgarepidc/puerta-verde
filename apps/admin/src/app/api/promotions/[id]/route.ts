@@ -3,12 +3,16 @@ import { NextResponse } from 'next/server';
 import { validatePromotionInput, type PromotionInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { requireStaffApi } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = await params;
     const tenant = await getDefaultTenant();
@@ -26,6 +30,7 @@ export async function PATCH(
         body: body.body?.trim() || null,
         kind: body.kind,
         image_url: body.imageUrl?.trim() || null,
+        discount_percent: body.kind === 'discount' ? body.discountPercent ?? null : null,
         starts_at: body.startsAt || null,
         ends_at: body.endsAt || null,
         is_active: body.isActive,
@@ -50,6 +55,9 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = await params;
     const tenant = await getDefaultTenant();

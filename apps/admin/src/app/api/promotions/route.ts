@@ -3,9 +3,13 @@ import { NextResponse } from 'next/server';
 import { validatePromotionInput, type PromotionInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { requireStaffApi } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
@@ -30,6 +34,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const tenant = await getDefaultTenant();
     const body = (await request.json()) as PromotionInput;
@@ -47,6 +54,7 @@ export async function POST(request: Request) {
         body: body.body?.trim() || null,
         kind: body.kind,
         image_url: body.imageUrl?.trim() || null,
+        discount_percent: body.kind === 'discount' ? body.discountPercent ?? null : null,
         starts_at: body.startsAt || null,
         ends_at: body.endsAt || null,
         is_active: body.isActive,

@@ -25,6 +25,7 @@ export default async function PromotionsPage() {
           body: string | null;
           kind: PromotionKind;
           image_url: string | null;
+          discount_percent: number | null;
           starts_at: string | null;
           ends_at: string | null;
           is_active: boolean;
