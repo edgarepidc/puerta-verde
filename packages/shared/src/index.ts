@@ -79,6 +79,11 @@ export interface GuestCheckoutInput {
   }>;
 }
 
+export {
+  validateProductInput,
+  type ProductInput,
+} from './products';
+
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';

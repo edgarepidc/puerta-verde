@@ -1,6 +1,4 @@
-import Link from 'next/link';
-
-import { BrandLogo } from '@/components/BrandLogo';
+import { AdminShell } from '@/components/AdminShell';
 import { OrdersBoard } from '@/components/OrdersBoard';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
@@ -36,28 +34,8 @@ export default async function AdminHomePage() {
   }));
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <BrandLogo href="/" imageClassName="h-12 w-auto" />
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">Panel de pedidos</h1>
-              <p className="text-sm text-slate-500">Operación del día</p>
-            </div>
-          </div>
-          <Link
-            href={process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app/puerta-verde-demo'}
-            className="rounded-full border border-green-200 px-4 py-2 text-sm font-medium text-[var(--pv-green-800)]"
-          >
-            Ver tienda pública
-          </Link>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <OrdersBoard initialOrders={ordersWithBranch} />
-      </div>
-    </main>
+    <AdminShell title="Panel de pedidos" subtitle="Operación del día">
+      <OrdersBoard initialOrders={ordersWithBranch} />
+    </AdminShell>
   );
 }

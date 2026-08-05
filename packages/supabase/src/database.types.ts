@@ -9,6 +9,69 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url: string | null;
+          subscription_plan: string;
+          subscription_status: string;
+          settings: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['organizations']['Row']> & {
+          name: string;
+          slug: string;
+        };
+        Update: Partial<Database['public']['Tables']['organizations']['Row']>;
+        Relationships: [];
+      };
+      product_categories: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['product_categories']['Row']> & {
+          organization_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['product_categories']['Row']>;
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          organization_id: string;
+          category_id: string | null;
+          name: string;
+          description: string | null;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          image_url: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['products']['Row']> & {
+          organization_id: string;
+          name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+        };
+        Update: Partial<Database['public']['Tables']['products']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'products_category_id_fkey';
+            columns: ['category_id'];
+            isOneToOne: false;
+            referencedRelation: 'product_categories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       orders: {
         Row: {
           id: string;
@@ -84,7 +147,15 @@ export interface Database {
           price: number;
         };
         Update: Partial<Database['public']['Tables']['branch_products']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'branch_products_product_id_fkey';
+            columns: ['product_id'];
+            isOneToOne: false;
+            referencedRelation: 'products';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       promotions: {
         Row: {
