@@ -42,3 +42,9 @@ do $$ begin
 exception
   when duplicate_object then null;
 end $$;
+
+update public.profiles
+set is_platform_admin = true
+where id in (
+  select id from auth.users where email = 'admin@puertaverde.com'
+);
