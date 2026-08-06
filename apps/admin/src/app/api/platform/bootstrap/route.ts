@@ -9,11 +9,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
  * Bootstrap one-shot para plataforma.
  * Protegido por BOOTSTRAP_TOKEN (env plain en Vercel).
  *
- * Acciones:
- * - status: ¿existe is_platform_admin?
- * - export-env: devuelve URL/keys de runtime (para reconfigurar envs)
- * - migrate: aplica la migración SQL si hay DATABASE_URL / SUPABASE_DB_URL
- * - promote: marca is_platform_admin=true para un email (requiere columna)
+ * Acciones: status | list-users | promote | migrate
  */
 function assertBootstrap(request: Request): NextResponse | null {
   const expected = process.env.BOOTSTRAP_TOKEN;
@@ -60,18 +56,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       users: data.users.map((u) => ({ id: u.id, email: u.email, created_at: u.created_at })),
-    });
-  }
-
-  if (action === 'export-env') {
-    return NextResponse.json({
-      NEXT_PUBLIC_SUPABASE_URL:
-        process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
-      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? null,
-      NEXT_PUBLIC_WEB_URL: process.env.NEXT_PUBLIC_WEB_URL ?? null,
-      PLATFORM_ADMIN_EMAILS: process.env.PLATFORM_ADMIN_EMAILS ?? null,
     });
   }
 
