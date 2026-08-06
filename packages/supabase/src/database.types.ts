@@ -463,6 +463,18 @@ export interface Database {
           order_count: number;
         }>;
       };
+      get_profit_by_category: {
+        Args: { p_branch_id: string; p_days?: number };
+        Returns: Array<{
+          category_name: string;
+          product_count: number;
+          units_sold: number;
+          revenue: number;
+          cogs: number;
+          gross_profit: number;
+          gross_margin_percent: number;
+        }>;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

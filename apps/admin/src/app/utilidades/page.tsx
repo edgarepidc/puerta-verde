@@ -11,10 +11,11 @@ export default async function UtilidadesPage() {
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
 
-  const [{ data: margins }, { data: costs }, { data: summaryRows }] = await Promise.all([
+  const [{ data: margins }, { data: costs }, { data: summaryRows }, { data: categoryRows }] = await Promise.all([
     supabase.rpc('get_product_margins', { p_branch_id: tenant.branchId }),
     supabase.from('branch_operating_costs').select('*').eq('branch_id', tenant.branchId).order('created_at'),
     supabase.rpc('get_profit_summary', { p_branch_id: tenant.branchId, p_days: 30 }),
+    supabase.rpc('get_profit_by_category', { p_branch_id: tenant.branchId, p_days: 30 }),
   ]);
 
   return (
@@ -54,6 +55,15 @@ export default async function UtilidadesPage() {
           estimated_net_profit: number;
           order_count: number;
         }) ?? null}
+        initialCategories={(categoryRows ?? []) as Array<{
+          category_name: string;
+          product_count: number;
+          units_sold: number;
+          revenue: number;
+          cogs: number;
+          gross_profit: number;
+          gross_margin_percent: number;
+        }>}
       />
     </AdminShell>
   );

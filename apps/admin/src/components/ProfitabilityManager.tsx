@@ -15,6 +15,8 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { CostImportPanel } from '@/components/CostImportPanel';
+
 interface MarginRow {
   branch_product_id: string;
   product_name: string;
@@ -52,6 +54,16 @@ interface ProfitSummary {
   order_count: number;
 }
 
+interface CategoryProfitRow {
+  category_name: string;
+  product_count: number;
+  units_sold: number;
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  gross_margin_percent: number;
+}
+
 const emptyCost: OperatingCostInput = {
   name: '',
   costType: 'fixed',
@@ -65,14 +77,17 @@ export function ProfitabilityManager({
   initialMargins,
   initialCosts,
   initialSummary,
+  initialCategories,
 }: {
   initialMargins: MarginRow[];
   initialCosts: CostRow[];
   initialSummary: ProfitSummary | null;
+  initialCategories: CategoryProfitRow[];
 }) {
   const [margins, setMargins] = useState(initialMargins);
   const [costs, setCosts] = useState(initialCosts);
   const [summary, setSummary] = useState(initialSummary);
+  const [categories, setCategories] = useState(initialCategories);
   const [days, setDays] = useState(30);
   const [costForm, setCostForm] = useState(emptyCost);
   const [saving, setSaving] = useState(false);
@@ -89,20 +104,24 @@ export function ProfitabilityManager({
   }, [margins]);
 
   async function refreshAll() {
-    const [marginsRes, costsRes, profitRes] = await Promise.all([
+    const [marginsRes, costsRes, profitRes, categoriesRes] = await Promise.all([
       fetch('/api/margins'),
       fetch('/api/costs'),
       fetch(`/api/profit?days=${days}`),
+      fetch(`/api/profit/categories?days=${days}`),
     ]);
     const marginsPayload = await marginsRes.json();
     const costsPayload = await costsRes.json();
     const profitPayload = await profitRes.json();
+    const categoriesPayload = await categoriesRes.json();
     if (!marginsRes.ok) throw new Error(marginsPayload.error ?? 'Error márgenes');
     if (!costsRes.ok) throw new Error(costsPayload.error ?? 'Error costos');
     if (!profitRes.ok) throw new Error(profitPayload.error ?? 'Error utilidad');
+    if (!categoriesRes.ok) throw new Error(categoriesPayload.error ?? 'Error categorías');
     setMargins(marginsPayload.margins);
     setCosts(costsPayload.costs);
     setSummary(profitPayload.summary);
+    setCategories(categoriesPayload.categories);
   }
 
   async function addCost() {
@@ -185,6 +204,61 @@ export function ProfitabilityManager({
             variables {formatMoney(Number(summary.variable_costs))} · {summary.order_count} pedidos
           </p>
         )}
+      </section>
+
+      <CostImportPanel onImported={refreshAll} />
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="font-semibold text-slate-900">Utilidad por categoría</h2>
+          <p className="text-sm text-slate-500">
+            Ventas y margen bruto agrupados por categoría en los últimos {days} días.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-2">Categoría</th>
+                <th className="px-4 py-2">Productos</th>
+                <th className="px-4 py-2">Unidades</th>
+                <th className="px-4 py-2">Ingresos</th>
+                <th className="px-4 py-2">COGS</th>
+                <th className="px-4 py-2">Utilidad bruta</th>
+                <th className="px-4 py-2">Margen %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                    Sin ventas en el periodo seleccionado.
+                  </td>
+                </tr>
+              ) : (
+                categories.map((row) => (
+                  <tr key={row.category_name} className="border-t border-slate-100">
+                    <td className="px-4 py-2 font-medium">{row.category_name}</td>
+                    <td className="px-4 py-2">{row.product_count}</td>
+                    <td className="px-4 py-2">{Number(row.units_sold).toFixed(2)}</td>
+                    <td className="px-4 py-2">{formatMoney(Number(row.revenue))}</td>
+                    <td className="px-4 py-2">{formatMoney(Number(row.cogs))}</td>
+                    <td className="px-4 py-2 font-semibold text-slate-900">
+                      {formatMoney(Number(row.gross_profit))}
+                    </td>
+                    <td
+                      className={`px-4 py-2 font-semibold ${
+                        Number(row.gross_margin_percent) < 15 ? 'text-red-600' : 'text-green-700'
+                      }`}
+                    >
+                      {Number(row.gross_margin_percent).toFixed(1)}%
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
