@@ -314,8 +314,8 @@ export function Storefront({
       <div className="pv-ambient" aria-hidden />
       <div className="relative min-h-screen">
         <header className="pv-store-nav sticky top-0 z-40 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:py-4">
-            <BrandLogo href={`/${branch.slug}`} imageClassName="h-16 w-auto sm:h-20" priority />
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3">
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-20 w-auto sm:h-24" priority />
             <nav className="pv-store-nav__menu hidden md:flex" aria-label="Menú de la tienda">
               <a href="#inicio" className="pv-store-link">
                 Inicio
