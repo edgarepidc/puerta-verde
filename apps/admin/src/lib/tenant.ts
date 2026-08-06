@@ -93,7 +93,7 @@ export async function getDefaultTenant(): Promise<TenantContext> {
   }
 
   const admin = createAdminClient();
-  const branchSlug = process.env.DEFAULT_BRANCH_SLUG ?? 'puerta-verde-demo';
+  const branchSlug = process.env.DEFAULT_BRANCH_SLUG ?? 'tienda-citte';
 
   const { data: branch, error } = await admin
     .from('branches')
