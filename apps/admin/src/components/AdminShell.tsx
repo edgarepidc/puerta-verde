@@ -11,8 +11,8 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
 
 export async function AdminShell({
-  title,
-  subtitle,
+  title: _title,
+  subtitle: _subtitle,
   children,
 }: {
   title: string;
@@ -47,13 +47,7 @@ export async function AdminShell({
       <main className="relative min-h-screen">
         <header className="pv-glass-header sticky top-0 z-40">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <BrandLogo href="/" imageClassName="h-12 w-auto" />
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">{title}</h1>
-                {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
-              </div>
-            </div>
+            <BrandLogo href="/" imageClassName="h-16 w-auto sm:h-20" />
             <div className="flex flex-wrap items-center gap-3">
               <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
               <AdminNav />

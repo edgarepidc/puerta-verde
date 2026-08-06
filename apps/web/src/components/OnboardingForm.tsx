@@ -78,7 +78,7 @@ export function OnboardingForm() {
   return (
     <div className="pv-glass-panel w-full max-w-lg p-8 sm:p-10">
       <div className="mb-6 flex justify-center">
-        <BrandLogo href="/" imageClassName="h-14 w-auto" />
+        <BrandLogo href="/" imageClassName="h-20 w-auto" />
       </div>
       <h1 className="text-center text-2xl font-bold text-[var(--pv-green-900)]">
         Crea tu verdulería

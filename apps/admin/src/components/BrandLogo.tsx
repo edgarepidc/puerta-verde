@@ -15,15 +15,15 @@ interface BrandLogoProps {
 export function BrandLogo({
   href = '/',
   className = '',
-  imageClassName = 'h-12 w-auto',
+  imageClassName = 'h-16 w-auto',
   priority = false,
 }: BrandLogoProps) {
   const image = (
     <Image
       src={LOGO_SRC}
       alt={BRAND_NAME}
-      width={320}
-      height={160}
+      width={640}
+      height={320}
       priority={priority}
       className={imageClassName}
     />

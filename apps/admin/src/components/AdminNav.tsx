@@ -26,10 +26,10 @@ export function AdminNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+            className={`rounded-full px-4 py-2 text-sm transition ${
               active
-                ? 'bg-white/80 text-slate-900 shadow-sm backdrop-blur-sm'
-                : 'text-slate-600 hover:bg-white/40 hover:text-slate-900'
+                ? 'pv-nav-active'
+                : 'font-medium text-slate-600 hover:bg-white/50 hover:text-slate-900'
             }`}
           >
             {item.label}

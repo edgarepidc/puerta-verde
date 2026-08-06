@@ -50,7 +50,7 @@ export function LoginForm() {
       <main className="relative flex min-h-screen items-center justify-center px-4">
         <div className="pv-glass-panel w-full max-w-md p-8 sm:p-10">
           <div className="mb-6 flex justify-center">
-            <BrandLogo href="/" imageClassName="h-14 w-auto" />
+            <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
           </div>
           <h1 className="text-center text-xl font-bold text-slate-900">Acceso al panel</h1>
           <p className="mt-2 text-center text-sm text-slate-500">

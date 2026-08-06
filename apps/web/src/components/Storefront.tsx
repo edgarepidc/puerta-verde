@@ -236,7 +236,7 @@ export function Storefront({
       <main className="relative mx-auto max-w-6xl px-4 py-8">
       <header className="pv-glass-panel mb-8 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <BrandLogo href="/" imageClassName="h-14 w-auto" />
+          <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
           <div className="text-left sm:text-right">
             <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
             <h1 className="mt-1 text-2xl font-bold text-[var(--pv-green-900)]">{branch.name}</h1>

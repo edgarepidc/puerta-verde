@@ -14,6 +14,12 @@
   --color-pv-800: #166534;
   --color-pv-900: #14532d;
   --color-pv-950: #052e16;
+
+  --color-pv-accent: #e8a317;
+  --color-pv-accent-deep: #c4840a;
+  --color-pv-accent-soft: #fff4d6;
+  --color-pv-ink: #1c1917;
+  --color-pv-mist: #f7f5f1;
 }
 
 :root {
@@ -25,17 +31,25 @@
   --pv-green-800: #166534;
   --pv-green-900: #14532d;
 
-  --pv-glass-bg: rgba(255, 255, 255, 0.58);
-  --pv-glass-bg-strong: rgba(255, 255, 255, 0.78);
-  --pv-glass-border: rgba(255, 255, 255, 0.55);
-  --pv-glass-border-subtle: rgba(255, 255, 255, 0.35);
-  --pv-glass-shadow: 0 8px 32px rgba(20, 83, 45, 0.07), 0 2px 8px rgba(20, 83, 45, 0.04);
-  --pv-glass-shadow-lg: 0 20px 50px rgba(20, 83, 45, 0.1), 0 4px 16px rgba(20, 83, 45, 0.06);
+  /* Warm honey accent — ripe fruit / sunshine contrast to green */
+  --pv-accent: #e8a317;
+  --pv-accent-deep: #c4840a;
+  --pv-accent-soft: #fff4d6;
+  --pv-accent-glow: rgba(232, 163, 23, 0.28);
+  --pv-ink: #1c1917;
+  --pv-mist: #f7f5f1;
+
+  --pv-glass-bg: rgba(255, 255, 255, 0.62);
+  --pv-glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --pv-glass-border: rgba(255, 255, 255, 0.6);
+  --pv-glass-border-subtle: rgba(255, 255, 255, 0.4);
+  --pv-glass-shadow: 0 8px 32px rgba(28, 25, 23, 0.06), 0 2px 8px rgba(20, 83, 45, 0.04);
+  --pv-glass-shadow-lg: 0 20px 50px rgba(28, 25, 23, 0.08), 0 4px 16px rgba(20, 83, 45, 0.05);
   --pv-blur: 20px;
   --pv-blur-strong: 32px;
 }
 
-/* Ambient mesh background */
+/* Ambient mesh background — green + warm honey */
 .pv-ambient {
   position: fixed;
   inset: 0;
@@ -49,30 +63,32 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(134, 239, 172, 0.35), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(74, 222, 128, 0.22), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(187, 247, 212, 0.3), transparent 55%),
-    linear-gradient(165deg, #f0fdf6 0%, #ecfdf5 35%, #f8fafc 70%, #f0fdf4 100%);
+    radial-gradient(ellipse 70% 55% at 8% 5%, rgba(134, 239, 172, 0.32), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 92% 12%, rgba(232, 163, 23, 0.18), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 55% 95%, rgba(187, 247, 212, 0.28), transparent 55%),
+    linear-gradient(165deg, #f7f5f1 0%, #f0fdf6 40%, #faf8f4 70%, #ecfdf5 100%);
 }
 
 .pv-ambient::after {
   content: '';
   position: absolute;
-  width: 520px;
-  height: 520px;
-  top: -120px;
-  right: -80px;
+  width: 480px;
+  height: 480px;
+  top: -100px;
+  right: -60px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%);
+  background:
+    radial-gradient(circle, rgba(232, 163, 23, 0.16) 0%, transparent 55%),
+    radial-gradient(circle at 30% 70%, rgba(34, 197, 94, 0.1) 0%, transparent 60%);
   filter: blur(40px);
 }
 
 .pv-ambient--admin::before {
   background:
-    radial-gradient(ellipse 75% 55% at 5% 5%, rgba(148, 163, 184, 0.18), transparent 50%),
-    radial-gradient(ellipse 65% 50% at 95% 15%, rgba(134, 239, 172, 0.2), transparent 50%),
-    radial-gradient(ellipse 55% 40% at 40% 95%, rgba(187, 247, 212, 0.25), transparent 55%),
-    linear-gradient(160deg, #f8fafc 0%, #f0fdf4 40%, #f1f5f9 100%);
+    radial-gradient(ellipse 70% 50% at 4% 0%, rgba(148, 163, 184, 0.16), transparent 50%),
+    radial-gradient(ellipse 55% 45% at 96% 8%, rgba(232, 163, 23, 0.14), transparent 48%),
+    radial-gradient(ellipse 50% 40% at 40% 100%, rgba(187, 247, 212, 0.22), transparent 55%),
+    linear-gradient(160deg, #f7f5f1 0%, #f0fdf4 45%, #f4f1ea 100%);
 }
 
 /* Glass surfaces */
@@ -111,25 +127,25 @@
 }
 
 .pv-glass-header {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(var(--pv-blur)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
   border-bottom: 1px solid var(--pv-glass-border-subtle);
-  box-shadow: 0 4px 24px rgba(20, 83, 45, 0.04);
+  box-shadow: 0 4px 24px rgba(28, 25, 23, 0.04);
 }
 
 .pv-glass-nav {
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid var(--pv-glass-border-subtle);
 }
 
 .pv-glass-item {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.45);
 }
 
 /* Buttons */
@@ -153,20 +169,34 @@
   cursor: not-allowed;
 }
 
+.pv-btn-accent {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--pv-accent) 0%, var(--pv-accent-deep) 100%);
+  color: #1c1917;
+  font-weight: 600;
+  box-shadow: 0 4px 14px var(--pv-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.pv-btn-accent:hover:not(:disabled) {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
 .pv-btn-secondary {
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--pv-glass-border);
-  color: var(--pv-green-800);
+  border: 1px solid rgba(232, 163, 23, 0.25);
+  color: var(--pv-ink);
   font-weight: 500;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .pv-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.75);
-  border-color: var(--pv-glass-border);
+  background: rgba(255, 244, 214, 0.65);
+  border-color: rgba(232, 163, 23, 0.4);
 }
 
 .pv-btn-ghost {
@@ -188,24 +218,24 @@
 .pv-input {
   width: 100%;
   border-radius: 0.875rem;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   padding: 0.5rem 0.75rem;
-  color: var(--pv-green-900);
+  color: var(--pv-ink);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .pv-input:focus {
   outline: none;
-  border-color: rgba(34, 197, 94, 0.5);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
-  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(232, 163, 23, 0.55);
+  box-shadow: 0 0 0 3px var(--pv-accent-glow);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .pv-input::placeholder {
-  color: rgba(22, 101, 52, 0.45);
+  color: rgba(28, 25, 23, 0.4);
 }
 
 /* Pills / chips */
@@ -218,9 +248,9 @@
 }
 
 .pv-pill--active {
-  background: linear-gradient(135deg, var(--pv-green-600), var(--pv-green-700));
-  color: white;
-  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.25);
+  background: linear-gradient(135deg, var(--pv-accent), var(--pv-accent-deep));
+  color: #1c1917;
+  box-shadow: 0 2px 10px var(--pv-accent-glow);
 }
 
 .pv-pill--inactive {
@@ -235,9 +265,17 @@
   background: rgba(255, 255, 255, 0.7);
 }
 
+/* Nav active state */
+.pv-nav-active {
+  background: linear-gradient(135deg, var(--pv-accent) 0%, var(--pv-accent-deep) 100%);
+  color: #1c1917;
+  font-weight: 600;
+  box-shadow: 0 2px 10px var(--pv-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
 /* Modal */
 .pv-modal-overlay {
-  background: rgba(15, 23, 42, 0.25);
+  background: rgba(28, 25, 23, 0.28);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -245,11 +283,16 @@
 /* Promo banner glass */
 .pv-promo-banner {
   border-radius: 1.25rem;
-  background: linear-gradient(135deg, rgba(21, 128, 61, 0.92) 0%, rgba(22, 101, 52, 0.95) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(21, 128, 61, 0.94) 0%,
+    rgba(22, 101, 52, 0.9) 55%,
+    rgba(196, 132, 10, 0.85) 100%
+  );
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 12px 40px rgba(20, 83, 45, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 40px rgba(20, 83, 45, 0.18);
   color: white;
   overflow: hidden;
 }
@@ -265,7 +308,7 @@
 }
 
 .pv-callout--amber {
-  background: rgba(254, 243, 199, 0.55);
-  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(255, 244, 214, 0.7);
+  border-color: rgba(232, 163, 23, 0.4);
   color: #92400e;
 }

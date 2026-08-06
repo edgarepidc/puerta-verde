@@ -50,7 +50,7 @@ export default async function OrderTrackingPage({
       <div className="pv-ambient" aria-hidden />
       <main className="relative mx-auto max-w-xl px-6 py-12">
         <div className="mb-6 flex justify-center">
-          <BrandLogo href="/" imageClassName="h-12 w-auto" />
+          <BrandLogo href="/" imageClassName="h-20 w-auto" />
         </div>
         <div className="pv-glass-panel p-6">
         <p className="text-sm font-medium text-[var(--pv-green-600)]">{order.branch_name}</p>
