@@ -1,0 +1,271 @@
+/* Puerta Verde — Liquid Glass design system */
+
+@theme {
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --color-pv-50: #f0fdf6;
+  --color-pv-100: #dcfceb;
+  --color-pv-200: #bbf7d4;
+  --color-pv-300: #86efac;
+  --color-pv-400: #4ade80;
+  --color-pv-500: #22c55e;
+  --color-pv-600: #16a34a;
+  --color-pv-700: #15803d;
+  --color-pv-800: #166534;
+  --color-pv-900: #14532d;
+  --color-pv-950: #052e16;
+}
+
+:root {
+  --pv-green-50: #f0fdf6;
+  --pv-green-100: #dcfceb;
+  --pv-green-200: #bbf7d4;
+  --pv-green-600: #16a34a;
+  --pv-green-700: #15803d;
+  --pv-green-800: #166534;
+  --pv-green-900: #14532d;
+
+  --pv-glass-bg: rgba(255, 255, 255, 0.58);
+  --pv-glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --pv-glass-border: rgba(255, 255, 255, 0.55);
+  --pv-glass-border-subtle: rgba(255, 255, 255, 0.35);
+  --pv-glass-shadow: 0 8px 32px rgba(20, 83, 45, 0.07), 0 2px 8px rgba(20, 83, 45, 0.04);
+  --pv-glass-shadow-lg: 0 20px 50px rgba(20, 83, 45, 0.1), 0 4px 16px rgba(20, 83, 45, 0.06);
+  --pv-blur: 20px;
+  --pv-blur-strong: 32px;
+}
+
+/* Ambient mesh background */
+.pv-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pv-ambient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(134, 239, 172, 0.35), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 10%, rgba(74, 222, 128, 0.22), transparent 50%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(187, 247, 212, 0.3), transparent 55%),
+    linear-gradient(165deg, #f0fdf6 0%, #ecfdf5 35%, #f8fafc 70%, #f0fdf4 100%);
+}
+
+.pv-ambient::after {
+  content: '';
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  top: -120px;
+  right: -80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%);
+  filter: blur(40px);
+}
+
+.pv-ambient--admin::before {
+  background:
+    radial-gradient(ellipse 75% 55% at 5% 5%, rgba(148, 163, 184, 0.18), transparent 50%),
+    radial-gradient(ellipse 65% 50% at 95% 15%, rgba(134, 239, 172, 0.2), transparent 50%),
+    radial-gradient(ellipse 55% 40% at 40% 95%, rgba(187, 247, 212, 0.25), transparent 55%),
+    linear-gradient(160deg, #f8fafc 0%, #f0fdf4 40%, #f1f5f9 100%);
+}
+
+/* Glass surfaces */
+.pv-glass {
+  background: var(--pv-glass-bg);
+  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  border: 1px solid var(--pv-glass-border);
+  box-shadow: var(--pv-glass-shadow);
+}
+
+.pv-glass-strong {
+  background: var(--pv-glass-bg-strong);
+  backdrop-filter: blur(var(--pv-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--pv-blur-strong)) saturate(200%);
+  border: 1px solid var(--pv-glass-border);
+  box-shadow: var(--pv-glass-shadow-lg);
+}
+
+.pv-glass-card {
+  border-radius: 1.25rem;
+  background: var(--pv-glass-bg);
+  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  border: 1px solid var(--pv-glass-border);
+  box-shadow: var(--pv-glass-shadow);
+}
+
+.pv-glass-panel {
+  border-radius: 1.5rem;
+  background: var(--pv-glass-bg-strong);
+  backdrop-filter: blur(var(--pv-blur-strong)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--pv-blur-strong)) saturate(190%);
+  border: 1px solid var(--pv-glass-border);
+  box-shadow: var(--pv-glass-shadow-lg);
+}
+
+.pv-glass-header {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  border-bottom: 1px solid var(--pv-glass-border-subtle);
+  box-shadow: 0 4px 24px rgba(20, 83, 45, 0.04);
+}
+
+.pv-glass-nav {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--pv-glass-border-subtle);
+}
+
+.pv-glass-item {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Buttons */
+.pv-btn-primary {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--pv-green-600) 0%, var(--pv-green-700) 100%);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.pv-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 20px rgba(21, 128, 61, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.pv-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pv-btn-secondary {
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--pv-glass-border);
+  color: var(--pv-green-800);
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pv-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: var(--pv-glass-border);
+}
+
+.pv-btn-ghost {
+  border-radius: 9999px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #64748b;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.pv-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.5);
+  color: #0f172a;
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+/* Form controls */
+.pv-input {
+  width: 100%;
+  border-radius: 0.875rem;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 0.5rem 0.75rem;
+  color: var(--pv-green-900);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.pv-input:focus {
+  outline: none;
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.pv-input::placeholder {
+  color: rgba(22, 101, 52, 0.45);
+}
+
+/* Pills / chips */
+.pv-pill {
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.pv-pill--active {
+  background: linear-gradient(135deg, var(--pv-green-600), var(--pv-green-700));
+  color: white;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.25);
+}
+
+.pv-pill--inactive {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--pv-green-800);
+}
+
+.pv-pill--inactive:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* Modal */
+.pv-modal-overlay {
+  background: rgba(15, 23, 42, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Promo banner glass */
+.pv-promo-banner {
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, rgba(21, 128, 61, 0.92) 0%, rgba(22, 101, 52, 0.95) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 40px rgba(20, 83, 45, 0.2);
+  color: white;
+  overflow: hidden;
+}
+
+/* Info callout */
+.pv-callout {
+  border-radius: 0.875rem;
+  background: rgba(220, 252, 235, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  color: var(--pv-green-800);
+}
+
+.pv-callout--amber {
+  background: rgba(254, 243, 199, 0.55);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #92400e;
+}

@@ -120,14 +120,14 @@ export function SettingsManager({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Sucursal: {branch.name}</h2>
         <p className="mt-1 text-sm text-slate-500">Slug de tienda: /{branch.slug}</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Dirección</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={branch.address ?? ''}
               onChange={(e) => setBranch((b) => ({ ...b, address: e.target.value }))}
             />
@@ -135,7 +135,7 @@ export function SettingsManager({
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Instrucciones de recolección</span>
             <textarea
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               rows={2}
               value={branch.pickup_instructions ?? ''}
               onChange={(e) => setBranch((b) => ({ ...b, pickup_instructions: e.target.value }))}
@@ -147,7 +147,7 @@ export function SettingsManager({
               type="number"
               min={0}
               step={0.01}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={branch.delivery_fee}
               onChange={(e) => setBranch((b) => ({ ...b, delivery_fee: Number(e.target.value) }))}
             />
@@ -158,7 +158,7 @@ export function SettingsManager({
               type="number"
               min={0}
               step={0.01}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={branch.minimum_order_amount}
               onChange={(e) => setBranch((b) => ({ ...b, minimum_order_amount: Number(e.target.value) }))}
             />
@@ -168,13 +168,13 @@ export function SettingsManager({
           type="button"
           disabled={savingBranch}
           onClick={saveBranch}
-          className="mt-4 rounded-full bg-[var(--pv-green-700)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-4 pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
         >
           {savingBranch ? 'Guardando...' : 'Guardar sucursal'}
         </button>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Usuarios del panel</h2>
@@ -227,26 +227,26 @@ export function SettingsManager({
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <input
                 placeholder="Nombre completo"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="pv-input"
                 value={staffForm.fullName}
                 onChange={(e) => setStaffForm((f) => ({ ...f, fullName: e.target.value }))}
               />
               <input
                 type="email"
                 placeholder="Correo"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="pv-input"
                 value={staffForm.email}
                 onChange={(e) => setStaffForm((f) => ({ ...f, email: e.target.value }))}
               />
               <input
                 type="password"
                 placeholder="Contraseña (mín. 8)"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="pv-input"
                 value={staffForm.password}
                 onChange={(e) => setStaffForm((f) => ({ ...f, password: e.target.value }))}
               />
               <select
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="pv-input"
                 value={staffForm.role}
                 onChange={(e) => setStaffForm((f) => ({ ...f, role: e.target.value as StaffRole }))}
               >

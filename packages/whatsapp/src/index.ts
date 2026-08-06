@@ -1,4 +1,8 @@
-import { formatMoney, ORDER_STATUS_LABELS, type OrderStatus } from '@puertaverde/shared';
+import {
+  ORDER_STATUS_LABELS,
+  formatMoney,
+  type OrderStatus,
+} from '@puertaverde/shared';
 
 export interface WhatsAppConfig {
   phoneNumberId: string;
@@ -89,3 +93,6 @@ export function verifyWebhook(
   }
   return null;
 }
+
+export * from './inbound';
+export { verifyWebhookSignature } from './webhook';

@@ -324,6 +324,7 @@ export interface Database {
           external_message_id: string | null;
           status: string;
           error_message: string | null;
+          direction: 'inbound' | 'outbound';
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['whatsapp_message_logs']['Row']> & {
@@ -474,6 +475,31 @@ export interface Database {
           gross_profit: number;
           gross_margin_percent: number;
         }>;
+      };
+      resolve_whatsapp_organization: {
+        Args: { p_phone_number_id: string };
+        Returns: string | null;
+      };
+      get_orders_by_customer_phone: {
+        Args: { p_organization_id: string; p_phone: string; p_limit?: number };
+        Returns: Array<{
+          id: string;
+          order_number: number;
+          status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
+          total: number;
+          tracking_token: string;
+          created_at: string;
+          branch_name: string;
+          branch_slug: string;
+        }>;
+      };
+      get_customer_whatsapp_opt_in: {
+        Args: { p_organization_id: string; p_phone: string };
+        Returns: boolean;
+      };
+      set_customer_whatsapp_opt_in: {
+        Args: { p_organization_id: string; p_phone: string; p_opt_in: boolean };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;

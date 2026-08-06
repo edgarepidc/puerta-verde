@@ -2,6 +2,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { AdminShell } from '@/components/AdminShell';
 import { SettingsManager } from '@/components/SettingsManager';
+import { WhatsAppInbox } from '@/components/WhatsAppInbox';
 import { canManageStaff, getStaffSession } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
@@ -12,7 +13,7 @@ export default async function ConfiguracionPage() {
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
 
-  const [{ data: branch }, { data: memberships }] = await Promise.all([
+  const [{ data: branch }, { data: memberships }, { data: whatsappMessages }] = await Promise.all([
     supabase
       .from('branches')
       .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount')
@@ -23,6 +24,12 @@ export default async function ConfiguracionPage() {
       .select('id, user_id, role, status, branch_id, created_at')
       .eq('organization_id', tenant.organizationId)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('whatsapp_message_logs')
+      .select('id, direction, recipient_phone, template_key, body, status, created_at')
+      .eq('organization_id', tenant.organizationId)
+      .order('created_at', { ascending: false })
+      .limit(30),
   ]);
 
   const userIds = (memberships ?? []).map((row) => row.user_id);
@@ -42,12 +49,25 @@ export default async function ConfiguracionPage() {
 
   return (
     <AdminShell title="Configuración" subtitle={tenant.branchName}>
-      <SettingsManager
-        initialBranch={branch!}
-        initialStaff={staffRows}
-        canManage={staff ? canManageStaff(staff.role) : false}
-        currentUserId={staff?.userId ?? ''}
-      />
+      <div className="space-y-8">
+        <SettingsManager
+          initialBranch={branch!}
+          initialStaff={staffRows}
+          canManage={staff ? canManageStaff(staff.role) : false}
+          currentUserId={staff?.userId ?? ''}
+        />
+        <WhatsAppInbox
+          initialMessages={(whatsappMessages ?? []) as Array<{
+            id: string;
+            direction: 'inbound' | 'outbound';
+            recipient_phone: string;
+            template_key: string | null;
+            body: string;
+            status: string;
+            created_at: string;
+          }>}
+        />
+      </div>
     </AdminShell>
   );
 }

@@ -86,7 +86,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
   return (
     <div className="grid gap-4 overflow-x-auto lg:grid-cols-5">
       {COLUMNS.map((status) => (
-        <section key={status} className="min-w-[240px] rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <section key={status} className="pv-glass-card min-w-[240px] p-4">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
             {ORDER_STATUS_LABELS[status]}
           </h2>
@@ -98,7 +98,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                 | undefined;
 
               return (
-                <article key={order.id} className="rounded-xl border border-slate-200 p-3">
+                <article key={order.id} className="pv-glass-item rounded-xl p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-slate-900">#{order.order_number}</p>
@@ -116,7 +116,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                         type="button"
                         disabled={updatingId === order.id}
                         onClick={() => updateStatus(order.id, nextStatus)}
-                        className="rounded-full bg-[var(--pv-green-600)] px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                        className="pv-btn-primary px-3 py-1 text-xs disabled:opacity-50"
                       >
                         → {ORDER_STATUS_LABELS[nextStatus]}
                       </button>
@@ -127,7 +127,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                           type="button"
                           disabled={updatingId === order.id}
                           onClick={() => markPaid(order.id, 'cash')}
-                          className="rounded-full border border-slate-300 px-3 py-1 text-xs"
+                          className="pv-btn-ghost px-3 py-1 text-xs"
                         >
                           Efectivo
                         </button>
@@ -135,7 +135,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                           type="button"
                           disabled={updatingId === order.id}
                           onClick={() => markPaid(order.id, 'card_terminal')}
-                          className="rounded-full border border-slate-300 px-3 py-1 text-xs"
+                          className="pv-btn-ghost px-3 py-1 text-xs"
                         >
                           TPV
                         </button>

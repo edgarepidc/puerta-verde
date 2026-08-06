@@ -108,7 +108,7 @@ export function InventoryManager({
   return (
     <div className="space-y-8">
       {expiringSoon.length > 0 && (
-        <section className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+        <section className="pv-callout--amber rounded-2xl p-4">
           <h2 className="font-semibold text-orange-900">Por caducar (48 h)</h2>
           <ul className="mt-2 space-y-1 text-sm text-orange-800">
             {expiringSoon.map((m) => (
@@ -122,7 +122,7 @@ export function InventoryManager({
       )}
 
       {lowStock.length > 0 && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <section className="pv-callout--amber rounded-2xl p-4">
           <h2 className="font-semibold text-amber-900">Stock bajo</h2>
           <p className="mt-1 text-sm text-amber-800">
             {lowStock.map((p) => `${p.product.name} (${Number(p.stock)})`).join(' · ')}
@@ -130,7 +130,7 @@ export function InventoryManager({
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento</h2>
         <div className="mt-4">
           <ScalePanel
@@ -144,7 +144,7 @@ export function InventoryManager({
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Producto</span>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={branchProductId}
               onChange={(e) => setBranchProductId(e.target.value)}
             >
@@ -160,7 +160,7 @@ export function InventoryManager({
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Tipo</span>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={movementType}
               onChange={(e) => setMovementType(e.target.value as ManualInventoryMovementType)}
             >
@@ -178,7 +178,7 @@ export function InventoryManager({
                 type="number"
                 min={0}
                 step={0.01}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={unitCost}
                 onChange={(e) => setUnitCost(Number(e.target.value))}
               />
@@ -189,7 +189,7 @@ export function InventoryManager({
               <span className="font-medium text-slate-700">Caducidad (opcional)</span>
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
               />
@@ -205,7 +205,7 @@ export function InventoryManager({
             <input
               type="number"
               step="0.001"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
             />
@@ -213,7 +213,7 @@ export function InventoryManager({
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Notas</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               placeholder="Ej. Compra mercado central, merma por caducidad"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -225,7 +225,7 @@ export function InventoryManager({
           type="button"
           disabled={saving || !branchProductId}
           onClick={submitMovement}
-          className="mt-4 rounded-full bg-[var(--pv-green-600)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-4 pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
         >
           {saving ? 'Guardando...' : 'Registrar'}
         </button>
@@ -233,7 +233,7 @@ export function InventoryManager({
 
       <section>
         <h2 className="mb-4 text-lg font-semibold text-slate-900">Stock actual</h2>
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden pv-glass-card">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
@@ -265,7 +265,7 @@ export function InventoryManager({
 
       <section>
         <h2 className="mb-4 text-lg font-semibold text-slate-900">Historial reciente</h2>
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden pv-glass-card">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>

@@ -42,11 +42,13 @@ export default async function OrderTrackingPage({
   }>) ?? [];
 
   return (
-    <main className="mx-auto max-w-xl px-6 py-12">
-      <div className="mb-6 flex justify-center">
-        <BrandLogo href="/" imageClassName="h-12 w-auto" />
-      </div>
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-green-100">
+    <>
+      <div className="pv-ambient" aria-hidden />
+      <main className="relative mx-auto max-w-xl px-6 py-12">
+        <div className="mb-6 flex justify-center">
+          <BrandLogo href="/" imageClassName="h-12 w-auto" />
+        </div>
+        <div className="pv-glass-panel p-6">
         <p className="text-sm font-medium text-[var(--pv-green-600)]">{order.branch_name}</p>
         <h1 className="mt-1 text-2xl font-bold text-[var(--pv-green-900)]">
           Pedido #{order.order_number}
@@ -81,7 +83,7 @@ export default async function OrderTrackingPage({
           <span>{formatMoney(Number(order.total))}</span>
         </div>
 
-        <p className="mt-4 rounded-xl bg-green-50 p-3 text-sm text-[var(--pv-green-800)]">
+        <p className="pv-callout mt-4 p-3 text-sm">
           Pago al {order.fulfillment_type === 'delivery' ? 'entregar' : 'recoger'} con efectivo o TPV.
           Estado de pago: {order.payment_status === 'paid' ? 'Pagado' : 'Pendiente'}.
         </p>
@@ -91,5 +93,6 @@ export default async function OrderTrackingPage({
         </Link>
       </div>
     </main>
+    </>
   );
 }

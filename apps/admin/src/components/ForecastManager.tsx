@@ -70,7 +70,7 @@ export function ForecastManager({ initialForecast }: { initialForecast: Forecast
             type="number"
             min={1}
             max={30}
-            className="mt-1 block w-24 rounded-xl border border-slate-200 px-3 py-2"
+            className="pv-input mt-1 block w-24"
             value={horizonDays}
             onChange={(e) => setHorizonDays(Number(e.target.value))}
           />
@@ -87,14 +87,14 @@ export function ForecastManager({ initialForecast }: { initialForecast: Forecast
           type="button"
           disabled={loading}
           onClick={generateInsights}
-          className="rounded-full bg-[var(--pv-green-700)] px-4 py-2 text-sm font-semibold text-white"
+          className="pv-btn-primary px-4 py-2 text-sm"
         >
           {loading ? 'Analizando...' : 'Generar recomendaciones IA'}
         </button>
       </div>
 
       {insights && (
-        <section className="rounded-2xl border border-green-200 bg-green-50 p-5">
+        <section className="pv-callout rounded-2xl p-5">
           <h2 className="font-semibold text-green-900">Recomendaciones</h2>
           <p className="mt-2 whitespace-pre-line text-sm text-green-800">{insights}</p>
           <p className="mt-2 text-xs text-green-700">
@@ -103,7 +103,7 @@ export function ForecastManager({ initialForecast }: { initialForecast: Forecast
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="pv-glass-card">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Reposición sugerida</h2>
           <p className="text-sm text-slate-500">{urgent.length} productos requieren atención</p>

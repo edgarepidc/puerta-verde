@@ -45,51 +45,50 @@ export function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-        <div className="mb-6 flex justify-center">
-          <BrandLogo href="/" imageClassName="h-14 w-auto" />
+    <>
+      <div className="pv-ambient pv-ambient--admin" aria-hidden />
+      <main className="relative flex min-h-screen items-center justify-center px-4">
+        <div className="pv-glass-panel w-full max-w-md p-8 sm:p-10">
+          <div className="mb-6 flex justify-center">
+            <BrandLogo href="/" imageClassName="h-14 w-auto" />
+          </div>
+          <h1 className="text-center text-xl font-bold text-slate-900">Acceso al panel</h1>
+          <p className="mt-2 text-center text-sm text-slate-500">
+            Solo personal autorizado. Si no tienes cuenta, pide acceso al administrador.
+          </p>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <label className="block text-sm font-medium text-slate-700">
+              Correo
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                className="pv-input mt-1"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              Contraseña
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                className="pv-input mt-1"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <button type="submit" disabled={loading} className="pv-btn-primary w-full px-4 py-3">
+              {loading ? 'Entrando...' : 'Entrar'}
+            </button>
+          </form>
         </div>
-        <h1 className="text-center text-xl font-bold text-slate-900">Acceso al panel</h1>
-        <p className="mt-2 text-center text-sm text-slate-500">
-          Solo personal autorizado. Si no tienes cuenta, pide acceso al administrador.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <label className="block text-sm font-medium text-slate-700">
-            Correo
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Contraseña
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-full bg-[var(--pv-green-700)] px-4 py-3 font-semibold text-white disabled:opacity-50"
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

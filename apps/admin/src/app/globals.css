@@ -1,13 +1,7 @@
 @import "tailwindcss";
-
-:root {
-  --pv-green-50: #f0fdf4;
-  --pv-green-600: #16a34a;
-  --pv-green-800: #166534;
-  --pv-green-900: #14532d;
-}
+@import "@puertaverde/shared/theme.css";
 
 body {
-  background: #f8fafc;
   color: #0f172a;
+  min-height: 100vh;
 }

@@ -198,7 +198,7 @@ export function ProductsManager({
         </div>
         <div className="flex flex-wrap gap-3">
           <input
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm"
+            className="pv-input"
             placeholder="Buscar producto..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -206,7 +206,7 @@ export function ProductsManager({
           <button
             type="button"
             onClick={openCreate}
-            className="rounded-full bg-[var(--pv-green-600)] px-5 py-2 text-sm font-semibold text-white"
+            className="pv-btn-primary px-5 py-2 text-sm"
           >
             + Nuevo producto
           </button>
@@ -214,7 +214,7 @@ export function ProductsManager({
       </div>
 
       {showForm && (
-        <section className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+        <section className="pv-glass-card p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             {editing ? 'Editar producto' : 'Nuevo producto'}
           </h2>
@@ -222,7 +222,7 @@ export function ProductsManager({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Nombre</span>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
@@ -230,7 +230,7 @@ export function ProductsManager({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Categoría</span>
               <select
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.categoryId ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
               >
@@ -245,7 +245,7 @@ export function ProductsManager({
             <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Nueva categoría (opcional)</span>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 placeholder="Ej. Orgánicos"
                 value={form.newCategoryName}
                 onChange={(e) => setForm((f) => ({ ...f, newCategoryName: e.target.value }))}
@@ -254,7 +254,7 @@ export function ProductsManager({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Unidad</span>
               <select
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.unit}
                 onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value as ProductUnit }))}
               >
@@ -271,7 +271,7 @@ export function ProductsManager({
                 type="number"
                 min={0}
                 step="0.01"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value) }))}
               />
@@ -282,7 +282,7 @@ export function ProductsManager({
                 type="number"
                 min={0}
                 step={0.01}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.unitCost ?? 0}
                 onChange={(e) => setForm((f) => ({ ...f, unitCost: Number(e.target.value) }))}
               />
@@ -293,7 +293,7 @@ export function ProductsManager({
                 type="number"
                 min={0}
                 step="0.001"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.stock}
                 onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
               />
@@ -303,7 +303,7 @@ export function ProductsManager({
               <input
                 type="number"
                 min={1}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 placeholder="Ej. 3 para lechuga"
                 value={form.shelfLifeDays ?? ''}
                 onChange={(e) =>
@@ -318,7 +318,7 @@ export function ProductsManager({
               <span className="font-medium text-slate-700">Descripción</span>
               <textarea
                 rows={2}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.description ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
@@ -346,14 +346,14 @@ export function ProductsManager({
               type="button"
               disabled={saving}
               onClick={saveProduct}
-              className="rounded-full bg-[var(--pv-green-600)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button
               type="button"
               onClick={closeForm}
-              className="rounded-full border border-slate-200 px-5 py-2 text-sm font-medium"
+              className="pv-btn-secondary px-5 py-2 text-sm"
             >
               Cancelar
             </button>
@@ -361,7 +361,7 @@ export function ProductsManager({
         </section>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="pv-glass-card">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>

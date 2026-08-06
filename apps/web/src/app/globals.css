@@ -1,15 +1,7 @@
 @import "tailwindcss";
-
-:root {
-  --pv-green-50: #f0fdf4;
-  --pv-green-100: #dcfce7;
-  --pv-green-600: #16a34a;
-  --pv-green-700: #15803d;
-  --pv-green-800: #166534;
-  --pv-green-900: #14532d;
-}
+@import "@puertaverde/shared/theme.css";
 
 body {
-  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 45%, #f8fafc 100%);
-  color: #14532d;
+  color: var(--pv-green-900);
+  min-height: 100vh;
 }

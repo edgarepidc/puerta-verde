@@ -215,8 +215,10 @@ export function Storefront({
   const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-green-100">
+    <>
+      <div className="pv-ambient" aria-hidden />
+      <main className="relative mx-auto max-w-6xl px-4 py-8">
+      <header className="pv-glass-panel mb-8 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <BrandLogo href="/" imageClassName="h-14 w-auto" />
           <div className="text-left sm:text-right">
@@ -231,7 +233,7 @@ export function Storefront({
             : ' · Entrega para vecinos'}
         </p>
         {discountPromo && (
-          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          <p className="pv-callout--amber mt-2 px-3 py-2 text-sm font-medium">
             {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo hoy
           </p>
         )}
@@ -242,7 +244,7 @@ export function Storefront({
           {bannerPromos.map((promo) => (
             <article
               key={promo.id}
-              className="overflow-hidden rounded-2xl bg-[var(--pv-green-700)] text-white"
+              className="pv-promo-banner"
             >
               {promo.image_url && (
                 <div className="relative h-36 w-full">
@@ -271,7 +273,7 @@ export function Storefront({
             <input
               type="search"
               placeholder="Buscar fruta, verdura..."
-              className="w-full rounded-full border border-green-200 px-4 py-2 text-sm sm:max-w-xs"
+              className="pv-input w-full sm:max-w-xs"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -283,10 +285,8 @@ export function Storefront({
                 key={category}
                 type="button"
                 onClick={() => setCategoryFilter(category)}
-                className={`rounded-full px-3 py-1 text-sm font-medium ${
-                  categoryFilter === category
-                    ? 'bg-[var(--pv-green-700)] text-white'
-                    : 'bg-green-50 text-[var(--pv-green-800)]'
+                className={`pv-pill ${
+                  categoryFilter === category ? 'pv-pill--active' : 'pv-pill--inactive'
                 }`}
               >
                 {category === 'all' ? 'Todos' : category}
@@ -303,7 +303,7 @@ export function Storefront({
               const hasDiscount = discountPercent > 0 && salePrice < basePrice;
 
               return (
-                <article key={product.id} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-green-100">
+                <article key={product.id} className="pv-glass-card p-4">
                   {product.product.image_url && (
                     <div className="relative mb-3 h-32 w-full overflow-hidden rounded-xl">
                       <Image
@@ -352,7 +352,7 @@ export function Storefront({
                       type="button"
                       disabled={status === 'out'}
                       onClick={() => openPicker(product)}
-                      className="shrink-0 rounded-full bg-[var(--pv-green-600)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      className="pv-btn-primary shrink-0 px-4 py-2 text-sm disabled:cursor-not-allowed"
                     >
                       {status === 'out' ? 'Agotado' : 'Agregar'}
                     </button>
@@ -363,13 +363,13 @@ export function Storefront({
           </div>
 
           {filteredProducts.length === 0 && (
-            <p className="rounded-2xl bg-green-50 p-6 text-center text-sm text-[var(--pv-green-800)]">
+            <p className="pv-callout p-6 text-center text-sm">
               No hay productos con ese filtro. Prueba otra categoría o búsqueda.
             </p>
           )}
         </section>
 
-        <aside className="h-fit rounded-3xl bg-white p-5 shadow-sm ring-1 ring-green-100 lg:sticky lg:top-6">
+        <aside className="pv-glass-panel h-fit p-5 lg:sticky lg:top-6">
           <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
           {cart.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--pv-green-800)]">Agrega productos para continuar.</p>
@@ -389,14 +389,14 @@ export function Storefront({
           <div className="mt-6 space-y-3">
             <label className="block text-sm font-medium">Nombre</label>
             <input
-              className="w-full rounded-xl border border-green-200 px-3 py-2"
+              className="pv-input"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Tu nombre"
             />
             <label className="block text-sm font-medium">WhatsApp / teléfono</label>
             <input
-              className="w-full rounded-xl border border-green-200 px-3 py-2"
+              className="pv-input"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
               placeholder="55 1234 5678"
@@ -408,10 +408,10 @@ export function Storefront({
                   key={type}
                   type="button"
                   onClick={() => setFulfillmentType(type)}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                  className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
                     fulfillmentType === type
-                      ? 'bg-[var(--pv-green-700)] text-white'
-                      : 'bg-green-50 text-[var(--pv-green-800)]'
+                      ? 'pv-pill--active'
+                      : 'pv-pill--inactive'
                   }`}
                 >
                   {FULFILLMENT_LABELS[type]}
@@ -422,7 +422,7 @@ export function Storefront({
               <>
                 <label className="block text-sm font-medium">Departamento</label>
                 <select
-                  className="w-full rounded-xl border border-green-200 px-3 py-2"
+                  className="pv-input"
                   value={unitId}
                   onChange={(e) => setUnitId(e.target.value)}
                 >
@@ -439,13 +439,13 @@ export function Storefront({
                 </select>
               </>
             ) : (
-              <p className="rounded-xl bg-green-50 p-3 text-sm text-[var(--pv-green-800)]">
+              <p className="pv-callout p-3 text-sm">
                 {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
               </p>
             )}
             <label className="block text-sm font-medium">Notas</label>
             <textarea
-              className="w-full rounded-xl border border-green-200 px-3 py-2"
+              className="pv-input"
               rows={3}
               value={deliveryNotes}
               onChange={(e) => setDeliveryNotes(e.target.value)}
@@ -476,7 +476,7 @@ export function Storefront({
             type="button"
             disabled={submitting || cart.length === 0}
             onClick={submitOrder}
-            className="mt-4 w-full rounded-full bg-[var(--pv-green-700)] px-4 py-3 font-semibold text-white disabled:opacity-50"
+            className="pv-btn-primary mt-4 w-full px-4 py-3"
           >
             {submitting ? 'Enviando...' : 'Confirmar pedido'}
           </button>
@@ -484,8 +484,8 @@ export function Storefront({
       </div>
 
       {pickerProduct && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div className="pv-glass-panel w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">
               {pickerProduct.product.name}
             </h3>
@@ -499,7 +499,7 @@ export function Storefront({
                 min={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 step={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 max={Number(pickerProduct.stock)}
-                className="mt-1 w-full rounded-xl border border-green-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={pickerQty}
                 onChange={(e) => setPickerQty(Number(e.target.value))}
               />
@@ -508,14 +508,14 @@ export function Storefront({
               <button
                 type="button"
                 onClick={() => setPickerProduct(null)}
-                className="flex-1 rounded-full border border-green-200 px-4 py-2 text-sm font-medium"
+                className="pv-btn-secondary flex-1 px-4 py-2 text-sm"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={confirmPicker}
-                className="flex-1 rounded-full bg-[var(--pv-green-700)] px-4 py-2 text-sm font-semibold text-white"
+                className="pv-btn-primary flex-1 px-4 py-2 text-sm"
               >
                 Agregar
               </button>
@@ -524,5 +524,6 @@ export function Storefront({
         </div>
       )}
     </main>
+    </>
   );
 }

@@ -107,7 +107,7 @@ export function LotsManager({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Recibir lote (PTI)</h2>
         <p className="mt-1 text-sm text-slate-500">
           Registra entrada con código de lote, GTIN y trazabilidad PTI. Las ventas consumen lotes por FIFO (primero por caducar).
@@ -121,7 +121,7 @@ export function LotsManager({
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Producto</span>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={branchProductId}
               onChange={(e) => setBranchProductId(e.target.value)}
             >
@@ -136,7 +136,7 @@ export function LotsManager({
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Código de lote *</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={lotCode}
               onChange={(e) => setLotCode(e.target.value)}
               placeholder="LOTE-20250806-A"
@@ -148,7 +148,7 @@ export function LotsManager({
               type="number"
               min={0.001}
               step={0.001}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
             />
@@ -159,7 +159,7 @@ export function LotsManager({
               type="number"
               min={0}
               step={0.01}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={unitCost}
               onChange={(e) => setUnitCost(Number(e.target.value))}
             />
@@ -167,7 +167,7 @@ export function LotsManager({
           <label className="block text-sm">
             <span className="font-medium text-slate-700">GTIN (14 dígitos, PTI)</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={gtin}
               onChange={(e) => setGtin(e.target.value)}
               placeholder="01234567890123"
@@ -176,7 +176,7 @@ export function LotsManager({
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Proveedor</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={supplierName}
               onChange={(e) => setSupplierName(e.target.value)}
             />
@@ -185,7 +185,7 @@ export function LotsManager({
             <span className="font-medium text-slate-700">Fecha empaque</span>
             <input
               type="date"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={packDate}
               onChange={(e) => setPackDate(e.target.value)}
             />
@@ -194,7 +194,7 @@ export function LotsManager({
             <span className="font-medium text-slate-700">Caducidad</span>
             <input
               type="datetime-local"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
             />
@@ -202,7 +202,7 @@ export function LotsManager({
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Notas</span>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -212,17 +212,17 @@ export function LotsManager({
           type="button"
           disabled={saving}
           onClick={receiveLot}
-          className="mt-4 rounded-full bg-[var(--pv-green-700)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-4 pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
         >
           {saving ? 'Registrando...' : 'Registrar lote y entrada'}
         </button>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Trazabilidad</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            className="min-w-[200px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="min-w-[200px] flex-1 pv-input"
             placeholder="Buscar por código de lote"
             value={traceCode}
             onChange={(e) => setTraceCode(e.target.value)}
@@ -242,7 +242,7 @@ export function LotsManager({
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Lotes activos ({activeLots.length})</h2>
         <ul className="mt-4 divide-y divide-slate-100">
           {activeLots.map((lot) => (

@@ -173,20 +173,20 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-full bg-[var(--pv-green-600)] px-5 py-2 text-sm font-semibold text-white"
+          className="pv-btn-primary px-5 py-2 text-sm"
         >
           + Nueva promoción
         </button>
       </div>
 
       {showForm && (
-        <section className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+        <section className="pv-glass-card p-6">
           <h2 className="text-lg font-semibold">{editingId ? 'Editar promoción' : 'Nueva promoción'}</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Título</span>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               />
@@ -195,7 +195,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
               <span className="font-medium text-slate-700">Mensaje</span>
               <textarea
                 rows={3}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.body ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
               />
@@ -203,7 +203,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Tipo</span>
               <select
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.kind}
                 onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as PromotionKind }))}
               >
@@ -221,7 +221,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
                   type="number"
                   min={1}
                   max={100}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  className="pv-input mt-1"
                   value={form.discountPercent ?? ''}
                   onChange={(e) =>
                     setForm((f) => ({
@@ -235,7 +235,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Imagen (URL opcional)</span>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.imageUrl ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
               />
@@ -244,7 +244,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
               <span className="font-medium text-slate-700">Inicio (opcional)</span>
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.startsAt ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
               />
@@ -253,7 +253,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
               <span className="font-medium text-slate-700">Fin (opcional)</span>
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="pv-input mt-1"
                 value={form.endsAt ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
               />
@@ -273,11 +273,11 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
               type="button"
               disabled={saving}
               onClick={save}
-              className="rounded-full bg-[var(--pv-green-600)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
-            <button type="button" onClick={closeForm} className="rounded-full border border-slate-200 px-5 py-2 text-sm">
+            <button type="button" onClick={closeForm} className="pv-btn-secondary px-5 py-2 text-sm">
               Cancelar
             </button>
           </div>
@@ -288,8 +288,8 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         {promotions.map((promo) => (
           <article
             key={promo.id}
-            className={`rounded-2xl border p-5 shadow-sm ${
-              promo.is_active ? 'border-green-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-80'
+            className={`pv-glass-card p-5 ${
+              promo.is_active ? 'border-green-200/50' : 'opacity-80'
             }`}
           >
             <div className="flex items-start justify-between gap-3">

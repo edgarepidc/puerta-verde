@@ -85,7 +85,7 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="pv-glass-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Importar costos desde Excel</h2>

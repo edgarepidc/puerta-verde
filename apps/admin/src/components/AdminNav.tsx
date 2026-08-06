@@ -18,7 +18,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex max-w-full overflow-x-auto rounded-full bg-slate-100 p-1">
+    <nav className="pv-glass-nav flex max-w-full overflow-x-auto rounded-full p-1">
       {NAV.map((item) => {
         const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
         return (
@@ -27,8 +27,8 @@ export function AdminNav() {
             href={item.href}
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               active
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white/80 text-slate-900 shadow-sm backdrop-blur-sm'
+                : 'text-slate-600 hover:bg-white/40 hover:text-slate-900'
             }`}
           >
             {item.label}

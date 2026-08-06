@@ -169,7 +169,7 @@ export function ProfitabilityManager({
             { label: 'Utilidad bruta', value: formatMoney(Number(summary.gross_profit)) },
             { label: 'Utilidad estimada', value: formatMoney(Number(summary.estimated_net_profit)) },
           ].map((card) => (
-            <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={card.label} className="pv-glass-card p-4">
               <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{card.value}</p>
             </div>
@@ -177,7 +177,7 @@ export function ProfitabilityManager({
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="pv-glass-card p-5">
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
             <span className="font-medium text-slate-700">Periodo de análisis (días)</span>
@@ -185,7 +185,7 @@ export function ProfitabilityManager({
               type="number"
               min={1}
               max={90}
-              className="mt-1 block w-24 rounded-xl border border-slate-200 px-3 py-2"
+              className="pv-input mt-1 block w-24"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
             />
@@ -208,7 +208,7 @@ export function ProfitabilityManager({
 
       <CostImportPanel onImported={refreshAll} />
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="pv-glass-card">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Utilidad por categoría</h2>
           <p className="text-sm text-slate-500">
@@ -261,7 +261,7 @@ export function ProfitabilityManager({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="pv-glass-card">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-semibold text-slate-900">Márgenes por producto</h2>
           <p className="text-sm text-slate-500">
@@ -310,7 +310,7 @@ export function ProfitabilityManager({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Costos fijos y variables</h2>
         <p className="mt-1 text-sm text-slate-500">
           Ej. renta (fijo mensual), bolsas (variable por pedido), nómina (fijo mensual).
@@ -346,7 +346,7 @@ export function ProfitabilityManager({
         <div className="mt-6 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-2">
           <input
             placeholder="Nombre (ej. Renta local)"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="pv-input"
             value={costForm.name}
             onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
           />
@@ -355,12 +355,12 @@ export function ProfitabilityManager({
             min={0}
             step={0.01}
             placeholder="Monto"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="pv-input"
             value={costForm.amount}
             onChange={(e) => setCostForm((f) => ({ ...f, amount: Number(e.target.value) }))}
           />
           <select
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="pv-input"
             value={costForm.costType}
             onChange={(e) => setCostForm((f) => ({ ...f, costType: e.target.value as OperatingCostType }))}
           >
@@ -371,7 +371,7 @@ export function ProfitabilityManager({
             ))}
           </select>
           <select
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="pv-input"
             value={costForm.period}
             onChange={(e) => setCostForm((f) => ({ ...f, period: e.target.value as OperatingCostPeriod }))}
           >

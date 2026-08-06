@@ -12,7 +12,7 @@ export function ScalePanel({
   const { connected, error, lastLine, connect, disconnect } = useSerialScale(onWeight);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <div className="pv-glass-item rounded-xl p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-slate-900">Báscula USB / serial</p>

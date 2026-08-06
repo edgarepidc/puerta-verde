@@ -60,6 +60,7 @@ export async function PATCH(request: Request) {
         external_message_id: result.messageId ?? null,
         status: result.ok ? 'sent' : 'failed',
         error_message: result.error ?? null,
+        direction: 'outbound',
       });
     }
 
