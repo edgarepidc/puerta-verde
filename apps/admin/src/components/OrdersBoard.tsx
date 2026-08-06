@@ -24,7 +24,7 @@ interface OrderRow {
   branch: { name: string; slug: string } | { name: string; slug: string }[] | null;
 }
 
-const COLUMNS: OrderStatus[] = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+const COLUMNS = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'] as const;
 
 const COLUMN_META: Record<
   (typeof COLUMNS)[number],
