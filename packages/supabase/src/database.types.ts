@@ -138,6 +138,8 @@ export interface Database {
           product_id: string;
           price: number;
           stock: number;
+          avg_unit_cost: number;
+          last_unit_cost: number | null;
           is_available: boolean;
           created_at: string;
           updated_at: string;
@@ -205,6 +207,7 @@ export interface Database {
           created_by: string | null;
           expires_at: string | null;
           lot_id: string | null;
+          unit_cost: number | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
@@ -223,6 +226,27 @@ export interface Database {
             referencedColumns: ['id'];
           },
         ];
+      };
+      branch_operating_costs: {
+        Row: {
+          id: string;
+          branch_id: string;
+          name: string;
+          cost_type: 'fixed' | 'variable';
+          period: 'monthly' | 'daily' | 'per_order';
+          amount: number;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['branch_operating_costs']['Row']> & {
+          branch_id: string;
+          name: string;
+          cost_type: 'fixed' | 'variable';
+          amount: number;
+        };
+        Update: Partial<Database['public']['Tables']['branch_operating_costs']['Row']>;
+        Relationships: [];
       };
       product_lots: {
         Row: {
@@ -369,8 +393,9 @@ export interface Database {
           p_quantity: number;
           p_notes: string | null;
           p_expires_at?: string | null;
+          p_unit_cost?: number | null;
         };
-        Returns: Array<{ new_stock: number }>;
+        Returns: Array<{ new_stock: number; new_avg_unit_cost: number }>;
       };
       get_branch_discount_percent: {
         Args: { p_branch_id: string };
@@ -405,6 +430,37 @@ export interface Database {
           forecast_demand: number;
           suggested_reorder: number;
           days_until_stockout: number | null;
+        }>;
+      };
+      get_product_margins: {
+        Args: { p_branch_id: string };
+        Returns: Array<{
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          sale_price: number;
+          avg_unit_cost: number;
+          last_unit_cost: number | null;
+          margin_amount: number;
+          margin_percent: number;
+          stock: number;
+          inventory_value_cost: number;
+          inventory_value_sale: number;
+        }>;
+      };
+      get_profit_summary: {
+        Args: { p_branch_id: string; p_days?: number };
+        Returns: Array<{
+          period_days: number;
+          revenue: number;
+          cogs: number;
+          gross_profit: number;
+          gross_margin_percent: number;
+          fixed_costs: number;
+          variable_costs: number;
+          operating_costs_total: number;
+          estimated_net_profit: number;
+          order_count: number;
         }>;
       };
     };

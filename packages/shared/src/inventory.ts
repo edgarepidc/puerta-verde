@@ -15,6 +15,7 @@ export interface InventoryMovementInput {
   branchProductId: string;
   movementType: ManualInventoryMovementType;
   quantity: number;
+  unitCost?: number | null;
   notes?: string | null;
   expiresAt?: string | null;
 }
@@ -23,6 +24,11 @@ export function validateInventoryMovement(input: InventoryMovementInput): string
   if (!input.branchProductId) return 'Selecciona un producto.';
   if (!MANUAL_INVENTORY_TYPES.includes(input.movementType)) {
     return 'Tipo de movimiento inválido.';
+  }
+  if (input.movementType === 'purchase') {
+    if (input.unitCost == null || input.unitCost < 0) {
+      return 'El costo de compra es obligatorio en entradas.';
+    }
   }
   if (input.movementType === 'adjustment') {
     if (input.quantity === 0) return 'El ajuste no puede ser cero.';

@@ -45,6 +45,7 @@ export function InventoryManager({
   const [branchProductId, setBranchProductId] = useState('');
   const [movementType, setMovementType] = useState<ManualInventoryMovementType>('purchase');
   const [quantity, setQuantity] = useState(1);
+  const [unitCost, setUnitCost] = useState(0);
   const [notes, setNotes] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [saving, setSaving] = useState(false);
@@ -86,6 +87,7 @@ export function InventoryManager({
           branchProductId,
           movementType,
           quantity: signedQty,
+          unitCost: movementType === 'purchase' ? unitCost : null,
           notes: notes || null,
           expiresAt: movementType === 'purchase' && expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
@@ -169,6 +171,19 @@ export function InventoryManager({
               ))}
             </select>
           </label>
+          {movementType === 'purchase' && (
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Costo de compra (por unidad) *</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                value={unitCost}
+                onChange={(e) => setUnitCost(Number(e.target.value))}
+              />
+            </label>
+          )}
           {movementType === 'purchase' && (
             <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Caducidad (opcional)</span>

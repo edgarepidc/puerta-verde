@@ -39,6 +39,7 @@ export function LotsManager({
   const [branchProductId, setBranchProductId] = useState('');
   const [lotCode, setLotCode] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [unitCost, setUnitCost] = useState(0);
   const [gtin, setGtin] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [packDate, setPackDate] = useState('');
@@ -72,6 +73,7 @@ export function LotsManager({
           branchProductId,
           lotCode,
           quantity,
+          unitCost: unitCost > 0 ? unitCost : null,
           gtin: gtin || null,
           supplierName: supplierName || null,
           packDate: packDate || null,
@@ -149,6 +151,17 @@ export function LotsManager({
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Costo de compra (por unidad) *</span>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+              value={unitCost}
+              onChange={(e) => setUnitCost(Number(e.target.value))}
             />
           </label>
           <label className="block text-sm">

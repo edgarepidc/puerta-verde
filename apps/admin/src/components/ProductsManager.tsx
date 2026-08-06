@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import {
+  calcMarginPercent,
   formatMoney,
   PRODUCT_UNIT_LABELS,
   PRODUCT_UNITS,
@@ -20,6 +21,8 @@ interface ProductRow {
   id: string;
   price: number;
   stock: number;
+  avg_unit_cost: number;
+  last_unit_cost: number | null;
   is_available: boolean;
   product: {
     id: string;
@@ -40,6 +43,7 @@ const emptyForm: ProductInput & { newCategoryName: string } = {
   newCategoryName: '',
   unit: 'kg',
   price: 0,
+  unitCost: 0,
   stock: 0,
   shelfLifeDays: null,
   isAvailable: true,
@@ -90,6 +94,7 @@ export function ProductsManager({
       newCategoryName: '',
       unit: row.product.unit,
       price: Number(row.price),
+      unitCost: Number(row.avg_unit_cost),
       stock: Number(row.stock),
       shelfLifeDays: row.product.shelf_life_days ? Number(row.product.shelf_life_days) : null,
       isAvailable: row.is_available,
@@ -272,6 +277,17 @@ export function ProductsManager({
               />
             </label>
             <label className="block text-sm">
+              <span className="font-medium text-slate-700">Costo de compra</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                value={form.unitCost ?? 0}
+                onChange={(e) => setForm((f) => ({ ...f, unitCost: Number(e.target.value) }))}
+              />
+            </label>
+            <label className="block text-sm">
               <span className="font-medium text-slate-700">Stock</span>
               <input
                 type="number"
@@ -352,6 +368,8 @@ export function ProductsManager({
               <th className="px-4 py-3 font-medium">Producto</th>
               <th className="px-4 py-3 font-medium">Categoría</th>
               <th className="px-4 py-3 font-medium">Precio</th>
+              <th className="px-4 py-3 font-medium">Costo</th>
+              <th className="px-4 py-3 font-medium">Margen</th>
               <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium">Tienda</th>
               <th className="px-4 py-3 font-medium">Acciones</th>
@@ -370,6 +388,10 @@ export function ProductsManager({
                   {row.product.category?.name ?? '—'}
                 </td>
                 <td className="px-4 py-3 font-medium">{formatMoney(Number(row.price))}</td>
+                <td className="px-4 py-3">{formatMoney(Number(row.avg_unit_cost))}</td>
+                <td className="px-4 py-3">
+                  {calcMarginPercent(Number(row.price), Number(row.avg_unit_cost)).toFixed(1)}%
+                </td>
                 <td className="px-4 py-3">{Number(row.stock)}</td>
                 <td className="px-4 py-3">
                   <button
@@ -406,7 +428,7 @@ export function ProductsManager({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No hay productos que coincidan.
                 </td>
               </tr>

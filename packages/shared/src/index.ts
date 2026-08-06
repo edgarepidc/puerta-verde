@@ -128,6 +128,19 @@ export {
   type PtiLabelInput,
 } from './scale';
 
+export {
+  calcMarginAmount,
+  calcMarginPercent,
+  validateOperatingCostInput,
+  OPERATING_COST_TYPES,
+  OPERATING_COST_PERIODS,
+  OPERATING_COST_TYPE_LABELS,
+  OPERATING_COST_PERIOD_LABELS,
+  type OperatingCostInput,
+  type OperatingCostType,
+  type OperatingCostPeriod,
+} from './profitability';
+
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';

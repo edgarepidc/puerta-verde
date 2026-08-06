@@ -6,6 +6,7 @@ export interface ProductInput {
   categoryId?: string | null;
   unit: ProductUnit;
   price: number;
+  unitCost?: number | null;
   stock: number;
   shelfLifeDays?: number | null;
   isAvailable: boolean;

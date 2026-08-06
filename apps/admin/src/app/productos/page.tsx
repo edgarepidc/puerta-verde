@@ -17,6 +17,8 @@ export default async function ProductsPage() {
         id,
         price,
         stock,
+        avg_unit_cost,
+        last_unit_cost,
         is_available,
         product:products (
           id,
@@ -48,6 +50,8 @@ export default async function ProductsPage() {
           id: string;
           price: number;
           stock: number;
+          avg_unit_cost: number;
+          last_unit_cost: number | null;
           is_available: boolean;
           product: {
             id: string;

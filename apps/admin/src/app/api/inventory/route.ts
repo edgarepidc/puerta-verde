@@ -87,14 +87,18 @@ export async function POST(request: Request) {
       p_quantity: body.quantity,
       p_notes: body.notes ?? null,
       p_expires_at: body.expiresAt ?? null,
+      p_unit_cost: body.unitCost ?? null,
     });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    const row = data?.[0] as { new_stock: number } | undefined;
-    return NextResponse.json({ newStock: row?.new_stock ?? null });
+    const row = data?.[0] as { new_stock: number; new_avg_unit_cost: number } | undefined;
+    return NextResponse.json({
+      newStock: row?.new_stock ?? null,
+      newAvgUnitCost: row?.new_avg_unit_cost ?? null,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al registrar movimiento' },

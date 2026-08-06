@@ -32,7 +32,19 @@ test('validateInventoryMovement requires product', () => {
       branchProductId: '',
       movementType: 'purchase',
       quantity: 5,
+      unitCost: 10,
     }),
     'Selecciona un producto.',
+  );
+});
+
+test('validateInventoryMovement requires unit cost on purchase', () => {
+  assert.equal(
+    validateInventoryMovement({
+      branchProductId: 'abc',
+      movementType: 'purchase',
+      quantity: 5,
+    }),
+    'El costo de compra es obligatorio en entradas.',
   );
 });

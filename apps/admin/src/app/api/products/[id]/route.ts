@@ -62,13 +62,25 @@ export async function PATCH(
       return NextResponse.json({ error: productError.message }, { status: 400 });
     }
 
+    const branchUpdates: {
+      price: number;
+      stock: number;
+      is_available: boolean;
+      avg_unit_cost?: number;
+      last_unit_cost?: number;
+    } = {
+      price: body.price,
+      stock: body.stock,
+      is_available: body.isAvailable,
+    };
+    if (body.unitCost != null && body.unitCost >= 0) {
+      branchUpdates.avg_unit_cost = body.unitCost;
+      branchUpdates.last_unit_cost = body.unitCost;
+    }
+
     const { error: branchError } = await supabase
       .from('branch_products')
-      .update({
-        price: body.price,
-        stock: body.stock,
-        is_available: body.isAvailable,
-      })
+      .update(branchUpdates)
       .eq('id', body.branchProductId)
       .eq('branch_id', tenant.branchId);
 

@@ -21,6 +21,8 @@ export async function GET() {
           id,
           price,
           stock,
+          avg_unit_cost,
+          last_unit_cost,
           is_available,
           product:products (
             id,
@@ -111,6 +113,8 @@ export async function POST(request: Request) {
         product_id: product.id,
         price: body.price,
         stock: body.stock,
+        avg_unit_cost: body.unitCost ?? 0,
+        last_unit_cost: body.unitCost ?? null,
         is_available: body.isAvailable,
       })
       .select('id')

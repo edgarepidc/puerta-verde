@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       supplierName?: string | null;
       packDate?: string | null;
       expiresAt?: string | null;
+      unitCost?: number | null;
       notes?: string | null;
     };
 
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
       p_expires_at: body.expiresAt ?? null,
       p_pti_label: ptiLabel || null,
       p_notes: body.notes ?? null,
+      p_unit_cost: body.unitCost ?? null,
     });
 
     if (error) {
