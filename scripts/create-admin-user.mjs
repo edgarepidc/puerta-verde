@@ -12,7 +12,7 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const email = process.env.ADMIN_EMAIL;
 const password = process.env.ADMIN_PASSWORD;
 const fullName = process.env.ADMIN_NAME ?? 'Administrador';
-const branchSlug = process.env.DEFAULT_BRANCH_SLUG ?? 'puerta-verde-demo';
+const branchSlug = process.env.DEFAULT_BRANCH_SLUG ?? 'tienda-citte';
 
 if (!url || !serviceKey || !email || !password) {
   console.error('Faltan variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAIL, ADMIN_PASSWORD');

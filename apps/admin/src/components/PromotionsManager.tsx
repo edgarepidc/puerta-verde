@@ -51,8 +51,26 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [broadcastingId, setBroadcastingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function uploadImage(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/promotions/upload', { method: 'POST', body });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo subir');
+      setForm((f) => ({ ...f, imageUrl: payload.url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const activeCount = useMemo(
     () => promotions.filter((p) => p.is_active).length,
@@ -249,14 +267,42 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
                 />
               </label>
             )}
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Imagen (URL opcional)</span>
-              <input
-                className="pv-input mt-1"
-                value={form.imageUrl ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-              />
-            </label>
+            <div className="space-y-2 text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Imagen del carrusel</span>
+              <p className="text-xs text-slate-500">
+                Ideal horizontal (16:9). Aparece en la tienda como banner principal.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="pv-btn-secondary cursor-pointer px-4 py-2 text-sm">
+                  {uploading ? 'Subiendo...' : 'Subir imagen'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadImage(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <input
+                  className="pv-input min-w-[220px] flex-1"
+                  placeholder="o pega una URL"
+                  value={form.imageUrl ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                />
+              </div>
+              {form.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.imageUrl}
+                  alt="Vista previa"
+                  className="mt-2 h-36 w-full max-w-md rounded-xl object-cover"
+                />
+              )}
+            </div>
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Inicio (opcional)</span>
               <input
@@ -305,10 +351,15 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         {promotions.map((promo) => (
           <article
             key={promo.id}
-            className={`pv-glass-card p-5 ${
+            className={`pv-glass-card overflow-hidden ${
               promo.is_active ? 'border-green-200/50' : 'opacity-80'
             }`}
           >
+            {promo.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={promo.image_url} alt="" className="h-36 w-full object-cover" />
+            )}
+            <div className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase text-[var(--pv-green-600)]">
@@ -344,6 +395,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
               <button type="button" onClick={() => remove(promo.id, promo.title)} className="text-red-600 hover:underline">
                 Eliminar
               </button>
+            </div>
             </div>
           </article>
         ))}

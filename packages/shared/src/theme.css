@@ -63,6 +63,37 @@
   box-shadow: var(--pv-glass-shadow);
 }
 
+/* Status column cards — left accent like Veka */
+.pv-glass-card-accent {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.pv-glass-card-accent-orange {
+  border-left-color: #c4783a;
+  background: color-mix(in srgb, #c4783a 8%, #ffffff);
+}
+
+.pv-glass-card-accent-blue {
+  border-left-color: #2563eb;
+  background: color-mix(in srgb, #2563eb 8%, #ffffff);
+}
+
+.pv-glass-card-accent-teal {
+  border-left-color: #0d9488;
+  background: color-mix(in srgb, #0d9488 8%, #ffffff);
+}
+
+.pv-glass-card-accent-purple {
+  border-left-color: #7c3aed;
+  background: color-mix(in srgb, #7c3aed 8%, #ffffff);
+}
+
+.pv-glass-card-accent-green {
+  border-left-color: #15803d;
+  background: color-mix(in srgb, #15803d 8%, #ffffff);
+}
+
 .pv-glass-panel {
   border-radius: 1.5rem;
   background: var(--pv-glass-bg-strong);
@@ -221,4 +252,24 @@
   background: #fffbeb;
   border: 1px solid rgba(251, 191, 36, 0.35);
   color: #92400e;
+}
+
+/* Storefront nav + hero */
+.pv-store-link {
+  border-radius: 9999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pv-store-link:hover {
+  background: #f1f5f9;
+  color: var(--pv-green-800);
+}
+
+.pv-hero-carousel {
+  box-shadow: var(--pv-glass-shadow-lg);
+  border: 1px solid var(--pv-glass-border);
 }

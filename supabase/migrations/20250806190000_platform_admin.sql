@@ -25,13 +25,26 @@ $$;
 
 grant execute on function public.is_platform_admin() to authenticated;
 
--- Platform admins can read all orgs/branches for the control panel
-create policy "platform admin read organizations"
-  on public.organizations
-  for select to authenticated
-  using (public.is_platform_admin());
+do $$ begin
+  create policy "platform admin read organizations"
+    on public.organizations
+    for select to authenticated
+    using (public.is_platform_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy "platform admin read branches"
-  on public.branches
-  for select to authenticated
-  using (public.is_platform_admin());
+do $$ begin
+  create policy "platform admin read branches"
+    on public.branches
+    for select to authenticated
+    using (public.is_platform_admin());
+exception
+  when duplicate_object then null;
+end $$;
+
+update public.profiles
+set is_platform_admin = true
+where id in (
+  select id from auth.users where email = 'admin@puertaverde.com'
+);
