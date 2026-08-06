@@ -253,3 +253,23 @@
   border: 1px solid rgba(251, 191, 36, 0.35);
   color: #92400e;
 }
+
+/* Storefront nav + hero */
+.pv-store-link {
+  border-radius: 9999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pv-store-link:hover {
+  background: #f1f5f9;
+  color: var(--pv-green-800);
+}
+
+.pv-hero-carousel {
+  box-shadow: var(--pv-glass-shadow-lg);
+  border: 1px solid var(--pv-glass-border);
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -13,9 +14,11 @@ import {
   getDefaultQuantity,
   getQuantityStep,
   getStockStatus,
+  ORDER_STATUS_LABELS,
   PRODUCT_UNIT_LABELS,
   STOCK_STATUS_LABELS,
   type FulfillmentType,
+  type OrderStatus,
   type ProductUnit,
   type PromotionKind,
   validateGuestCheckout,
@@ -23,6 +26,7 @@ import {
 
 import type { StorefrontProduct } from '@/app/[slug]/page';
 import { BrandLogo } from '@/components/BrandLogo';
+import { PromoCarousel, type CarouselSlide } from '@/components/PromoCarousel';
 
 interface Building {
   id: string;
@@ -32,6 +36,7 @@ interface Building {
 
 interface BranchInfo {
   id: string;
+  organization_id: string;
   name: string;
   slug: string;
   pickup_instructions: string | null;
@@ -56,6 +61,22 @@ interface CartItem {
   price: number;
   quantity: number;
 }
+
+interface LookupOrder {
+  orderNumber: number;
+  status: OrderStatus;
+  total: number;
+  trackingToken: string;
+  createdAt: string;
+  branchName: string;
+}
+
+const DEFAULT_HERO: CarouselSlide = {
+  id: 'default-hero',
+  title: 'Frescos del día, a tu puerta',
+  body: 'Frutas y verduras seleccionadas. Pide en minutos y recibe en tu edificio.',
+  imageUrl: '/brand/store-hero-default.jpg',
+};
 
 export function Storefront({
   branch,
@@ -82,6 +103,11 @@ export function Storefront({
   const [paymentPreference, setPaymentPreference] = useState<'on_delivery' | 'online'>('on_delivery');
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [foundOrders, setFoundOrders] = useState<LookupOrder[]>([]);
 
   const discountPercent = useMemo(() => getActiveDiscountPercent(promotions), [promotions]);
 
@@ -110,6 +136,34 @@ export function Storefront({
   );
   const deliveryFee = fulfillmentType === 'delivery' ? Number(branch.delivery_fee) : 0;
   const total = subtotal + deliveryFee;
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const carouselSlides = useMemo<CarouselSlide[]>(() => {
+    const fromPromos = promotions
+      .filter((p) => (p.kind === 'banner' || p.kind === 'bundle') && p.image_url)
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        body: p.body,
+        imageUrl: p.image_url as string,
+      }));
+    if (fromPromos.length > 0) return fromPromos;
+
+    const textPromo = promotions.find((p) => p.kind === 'banner' || p.kind === 'bundle');
+    if (textPromo) {
+      return [
+        {
+          id: textPromo.id,
+          title: textPromo.title,
+          body: textPromo.body,
+          imageUrl: DEFAULT_HERO.imageUrl,
+        },
+      ];
+    }
+    return [DEFAULT_HERO];
+  }, [promotions]);
+
+  const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
 
   function effectivePrice(basePrice: number): number {
     return applyDiscount(basePrice, discountPercent);
@@ -123,41 +177,33 @@ export function Storefront({
     setPickerQty(getDefaultQuantity(unit));
   }
 
-  function addToCart(product: StorefrontProduct, quantity: number) {
-    const unit = product.product.unit as ProductUnit;
-    const price = effectivePrice(Number(product.price));
+  function confirmPicker() {
+    if (!pickerProduct) return;
+    const unit = pickerProduct.product.unit as ProductUnit;
+    const qty = Number(pickerQty);
+    if (!Number.isFinite(qty) || qty <= 0) return;
+    const price = effectivePrice(Number(pickerProduct.price));
     setCart((current) => {
-      const existing = current.find((item) => item.branchProductId === product.id);
+      const existing = current.find((item) => item.branchProductId === pickerProduct.id);
       if (existing) {
         return current.map((item) =>
-          item.branchProductId === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+          item.branchProductId === pickerProduct.id
+            ? { ...item, quantity: item.quantity + qty, price }
             : item,
         );
       }
       return [
         ...current,
         {
-          branchProductId: product.id,
-          name: product.product.name,
+          branchProductId: pickerProduct.id,
+          name: pickerProduct.product.name,
           unit,
           price,
-          quantity,
+          quantity: qty,
         },
       ];
     });
     setPickerProduct(null);
-  }
-
-  function confirmPicker() {
-    if (!pickerProduct) return;
-    const maxStock = Number(pickerProduct.stock);
-    if (pickerQty > maxStock) {
-      setError(`Solo hay ${formatProductQuantity(maxStock, pickerProduct.product.unit as ProductUnit)} disponibles.`);
-      return;
-    }
-    setError(null);
-    addToCart(pickerProduct, pickerQty);
   }
 
   async function submitOrder() {
@@ -194,6 +240,7 @@ export function Storefront({
           fulfillmentType,
           unitId: fulfillmentType === 'delivery' ? unitId : null,
           deliveryNotes,
+          paymentPreference,
           items: cart.map((item) => ({
             branchProductId: item.branchProductId,
             quantity: item.quantity,
@@ -201,24 +248,12 @@ export function Storefront({
         }),
       });
       const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? 'No se pudo crear el pedido');
-      }
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo crear el pedido');
 
-      if (paymentPreference === 'online') {
-        const payResponse = await fetch('/api/orders/pay', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trackingToken: payload.trackingToken }),
-        });
-        const payPayload = await payResponse.json();
-        if (!payResponse.ok) throw new Error(payPayload.error ?? 'No se pudo iniciar el pago en línea');
-        if (payPayload.url) {
-          window.location.href = payPayload.url;
-          return;
-        }
+      if (payload.checkoutUrl) {
+        window.location.href = payload.checkoutUrl;
+        return;
       }
-
       router.push(`/pedido/${payload.trackingToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar pedido');
@@ -227,297 +262,366 @@ export function Storefront({
     }
   }
 
-  const bannerPromos = promotions.filter((p) => p.kind === 'banner' || p.kind === 'bundle');
-  const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
+  async function searchOrders() {
+    setLookupLoading(true);
+    setLookupError(null);
+    try {
+      const response = await fetch('/api/orders/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lookupPhone, branchSlug: branch.slug }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo buscar');
+      setFoundOrders(payload.orders ?? []);
+      if (!(payload.orders ?? []).length) {
+        setLookupError('No encontramos pedidos con ese teléfono.');
+      }
+    } catch (err) {
+      setFoundOrders([]);
+      setLookupError(err instanceof Error ? err.message : 'Error al buscar');
+    } finally {
+      setLookupLoading(false);
+    }
+  }
 
   return (
     <>
       <div className="pv-ambient" aria-hidden />
-      <main className="relative mx-auto max-w-6xl px-4 py-8">
-      <header className="pv-glass-panel mb-8 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
-            <h1 className="mt-1 text-2xl font-bold text-[var(--pv-green-900)]">{branch.name}</h1>
-          </div>
-        </div>
-        <p className="mt-4 text-[var(--pv-green-800)]">
-          Pedido mínimo {formatMoney(Number(branch.minimum_order_amount))}
-          {Number(branch.delivery_fee) > 0
-            ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
-            : ' · Entrega para vecinos'}
-        </p>
-        {discountPromo && (
-          <p className="pv-callout--amber mt-2 px-3 py-2 text-sm font-medium">
-            {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo hoy
-          </p>
-        )}
-      </header>
-
-      {bannerPromos.length > 0 && (
-        <section className="mb-8 grid gap-4 md:grid-cols-2">
-          {bannerPromos.map((promo) => (
-            <article
-              key={promo.id}
-              className="pv-promo-banner"
-            >
-              {promo.image_url && (
-                <div className="relative h-36 w-full">
-                  <Image
-                    src={promo.image_url}
-                    alt={promo.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <div className="p-5">
-                <h2 className="text-lg font-semibold">{promo.title}</h2>
-                {promo.body && <p className="mt-2 text-sm text-green-50">{promo.body}</p>}
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
-
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Catálogo</h2>
-            <input
-              type="search"
-              placeholder="Buscar fruta, verdura..."
-              className="pv-input w-full sm:max-w-xs"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setCategoryFilter(category)}
-                className={`pv-pill ${
-                  categoryFilter === category ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
-              >
-                {category === 'all' ? 'Todos' : category}
+      <div className="relative min-h-screen">
+        <header className="pv-store-nav sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-12 w-auto sm:h-14" />
+            <nav className="hidden items-center gap-1 md:flex">
+              <a href="#inicio" className="pv-store-link">
+                Inicio
+              </a>
+              <a href="#catalogo" className="pv-store-link">
+                Catálogo
+              </a>
+              <button type="button" onClick={() => setOrdersOpen(true)} className="pv-store-link">
+                Mis pedidos
               </button>
-            ))}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredProducts.map((product) => {
-              const unit = product.product.unit as ProductUnit;
-              const status = getStockStatus(Number(product.stock), true);
-              const basePrice = Number(product.price);
-              const salePrice = effectivePrice(basePrice);
-              const hasDiscount = discountPercent > 0 && salePrice < basePrice;
-
-              return (
-                <article key={product.id} className="pv-glass-card p-4">
-                  {product.product.image_url && (
-                    <div className="relative mb-3 h-32 w-full overflow-hidden rounded-xl">
-                      <Image
-                        src={product.product.image_url}
-                        alt={product.product.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs uppercase tracking-wide text-[var(--pv-green-600)]">
-                          {product.product.category?.name ?? 'General'}
-                        </p>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            status === 'out'
-                              ? 'bg-red-100 text-red-700'
-                              : status === 'low'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {STOCK_STATUS_LABELS[status]}
-                        </span>
-                      </div>
-                      <h3 className="font-semibold text-[var(--pv-green-900)]">{product.product.name}</h3>
-                      <p className="text-sm text-[var(--pv-green-800)]">
-                        {hasDiscount ? (
-                          <>
-                            <span className="mr-2 text-slate-400 line-through">
-                              {formatMoney(basePrice)}
-                            </span>
-                            <span className="font-semibold text-red-700">{formatMoney(salePrice)}</span>
-                          </>
-                        ) : (
-                          formatMoney(basePrice)
-                        )}{' '}
-                        / {PRODUCT_UNIT_LABELS[unit]}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={status === 'out'}
-                      onClick={() => openPicker(product)}
-                      className="pv-btn-primary shrink-0 px-4 py-2 text-sm disabled:cursor-not-allowed"
-                    >
-                      {status === 'out' ? 'Agotado' : 'Agregar'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {filteredProducts.length === 0 && (
-            <p className="pv-callout p-6 text-center text-sm">
-              No hay productos con ese filtro. Prueba otra categoría o búsqueda.
-            </p>
-          )}
-        </section>
-
-        <aside className="pv-glass-panel h-fit p-5 lg:sticky lg:top-6">
-          <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
-          {cart.length === 0 ? (
-            <p className="mt-4 text-sm text-[var(--pv-green-800)]">Agrega productos para continuar.</p>
-          ) : (
-            <ul className="mt-4 space-y-2 text-sm">
-              {cart.map((item) => (
-                <li key={item.branchProductId} className="flex justify-between gap-3">
-                  <span>
-                    {item.name} × {formatProductQuantity(item.quantity, item.unit)}
-                  </span>
-                  <span>{formatMoney(item.price * item.quantity)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-6 space-y-3">
-            <label className="block text-sm font-medium">Nombre</label>
-            <input
-              className="pv-input"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Tu nombre"
-            />
-            <label className="block text-sm font-medium">WhatsApp / teléfono</label>
-            <input
-              className="pv-input"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="55 1234 5678"
-            />
-            <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['delivery', 'pickup'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setFulfillmentType(type)}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                    fulfillmentType === type
-                      ? 'pv-pill--active'
-                      : 'pv-pill--inactive'
-                  }`}
-                >
-                  {FULFILLMENT_LABELS[type]}
-                </button>
-              ))}
+              <a href="#pedido" className="pv-store-link">
+                Carrito
+              </a>
+            </nav>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOrdersOpen(true)}
+                className="pv-btn-ghost px-3 py-2 text-xs sm:text-sm md:hidden"
+              >
+                Pedidos
+              </button>
+              <a href="#pedido" className="pv-btn-primary px-3 py-2 text-xs sm:px-4 sm:text-sm">
+                Carrito{cartCount > 0 ? ` (${cartCount})` : ''}
+              </a>
             </div>
-            {fulfillmentType === 'delivery' ? (
-              <>
-                <label className="block text-sm font-medium">Departamento</label>
-                <select
-                  className="pv-input"
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
-                >
-                  <option value="">Selecciona tu depto</option>
-                  {buildings.map((building) => (
-                    <optgroup key={building.id} label={building.name}>
-                      {building.units.map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {building.name} — {unit.identifier}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <p className="pv-callout p-3 text-sm">
-                {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <section id="inicio" className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
+                <h1 className="text-2xl font-bold text-[var(--pv-green-900)] sm:text-3xl">
+                  {branch.name}
+                </h1>
+              </div>
+              <p className="text-sm text-slate-600">
+                Mínimo {formatMoney(Number(branch.minimum_order_amount))}
+                {Number(branch.delivery_fee) > 0
+                  ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
+                  : ' · Entrega a vecinos'}
+              </p>
+            </div>
+
+            <PromoCarousel slides={carouselSlides} />
+
+            {discountPromo && (
+              <p className="pv-callout--amber px-4 py-3 text-sm font-medium">
+                {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo
               </p>
             )}
-            <label className="block text-sm font-medium">Forma de pago</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentPreference('on_delivery')}
-                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  paymentPreference === 'on_delivery' ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
-              >
-                Al entregar
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentPreference('online')}
-                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  paymentPreference === 'online' ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
-              >
-                Pagar en línea
-              </button>
-            </div>
-            <label className="block text-sm font-medium">Notas</label>
-            <textarea
-              className="pv-input"
-              rows={3}
-              value={deliveryNotes}
-              onChange={(e) => setDeliveryNotes(e.target.value)}
-              placeholder="Ej. sin cebolla, entregar después de las 6pm"
-            />
-          </div>
+          </section>
 
-          <div className="mt-6 space-y-1 border-t border-green-100 pt-4 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatMoney(subtotal)}</span>
-            </div>
-            {deliveryFee > 0 && (
-              <div className="flex justify-between">
-                <span>Envío</span>
-                <span>{formatMoney(deliveryFee)}</span>
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1.7fr_1fr]">
+            <section id="catalogo" className="space-y-4 scroll-mt-24">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Catálogo</h2>
+                <input
+                  type="search"
+                  placeholder="Buscar fruta, verdura..."
+                  className="pv-input w-full sm:max-w-xs"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-            )}
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span>{formatMoney(total)}</span>
+
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setCategoryFilter(category)}
+                    className={`pv-pill ${
+                      categoryFilter === category ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    {category === 'all' ? 'Todos' : category}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {filteredProducts.map((product) => {
+                  const unit = product.product.unit as ProductUnit;
+                  const status = getStockStatus(Number(product.stock), true);
+                  const basePrice = Number(product.price);
+                  const salePrice = effectivePrice(basePrice);
+                  const hasDiscount = discountPercent > 0 && salePrice < basePrice;
+
+                  return (
+                    <article
+                      key={product.id}
+                      className="pv-glass-card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div className="relative h-36 w-full bg-gradient-to-br from-green-50 to-emerald-100">
+                        {product.product.image_url ? (
+                          <Image
+                            src={product.product.image_url}
+                            alt={product.product.name}
+                            fill
+                            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_30%_30%,#bbf7d4,transparent_55%),radial-gradient(circle_at_70%_70%,#86efac,transparent_50%)]" />
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs uppercase tracking-wide text-[var(--pv-green-600)]">
+                            {product.product.category?.name ?? 'General'}
+                          </p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              status === 'out'
+                                ? 'bg-red-100 text-red-700'
+                                : status === 'low'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-green-100 text-green-800'
+                            }`}
+                          >
+                            {STOCK_STATUS_LABELS[status]}
+                          </span>
+                        </div>
+                        <h3 className="mt-1 font-semibold text-[var(--pv-green-900)]">
+                          {product.product.name}
+                        </h3>
+                        <div className="mt-3 flex items-end justify-between gap-3">
+                          <p className="text-sm text-[var(--pv-green-800)]">
+                            {hasDiscount ? (
+                              <>
+                                <span className="mr-2 text-slate-400 line-through">
+                                  {formatMoney(basePrice)}
+                                </span>
+                                <span className="font-semibold text-red-700">
+                                  {formatMoney(salePrice)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-semibold">{formatMoney(basePrice)}</span>
+                            )}{' '}
+                            / {PRODUCT_UNIT_LABELS[unit]}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={status === 'out'}
+                            onClick={() => openPicker(product)}
+                            className="pv-btn-primary shrink-0 px-3 py-2 text-xs disabled:cursor-not-allowed sm:text-sm"
+                          >
+                            {status === 'out' ? 'Agotado' : 'Agregar'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {filteredProducts.length === 0 && (
+                <p className="pv-callout p-6 text-center text-sm">
+                  No hay productos con ese filtro. Prueba otra categoría o búsqueda.
+                </p>
+              )}
+            </section>
+
+            <aside id="pedido" className="pv-glass-panel h-fit scroll-mt-24 p-5 lg:sticky lg:top-24">
+              <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
+              {cart.length === 0 ? (
+                <p className="mt-4 text-sm text-[var(--pv-green-800)]">
+                  Agrega productos del catálogo para continuar.
+                </p>
+              ) : (
+                <ul className="mt-4 space-y-2 text-sm">
+                  {cart.map((item) => (
+                    <li key={item.branchProductId} className="flex justify-between gap-3">
+                      <span>
+                        {item.name} × {formatProductQuantity(item.quantity, item.unit)}
+                      </span>
+                      <span>{formatMoney(item.price * item.quantity)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-6 space-y-3">
+                <label className="block text-sm font-medium">Nombre</label>
+                <input
+                  className="pv-input"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Tu nombre"
+                />
+                <label className="block text-sm font-medium">WhatsApp / teléfono</label>
+                <input
+                  className="pv-input"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="55 1234 5678"
+                />
+                <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['delivery', 'pickup'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFulfillmentType(type)}
+                      className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        fulfillmentType === type ? 'pv-pill--active' : 'pv-pill--inactive'
+                      }`}
+                    >
+                      {FULFILLMENT_LABELS[type]}
+                    </button>
+                  ))}
+                </div>
+                {fulfillmentType === 'delivery' ? (
+                  <>
+                    <label className="block text-sm font-medium">Departamento</label>
+                    <select
+                      className="pv-input"
+                      value={unitId}
+                      onChange={(e) => setUnitId(e.target.value)}
+                    >
+                      <option value="">Selecciona tu depto</option>
+                      {buildings.map((building) => (
+                        <optgroup key={building.id} label={building.name}>
+                          {building.units.map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                              {building.name} — {unit.identifier}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <p className="pv-callout p-3 text-sm">
+                    {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
+                  </p>
+                )}
+                <label className="block text-sm font-medium">Forma de pago</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPreference('on_delivery')}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      paymentPreference === 'on_delivery' ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    Al entregar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPreference('online')}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      paymentPreference === 'online' ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    Pagar en línea
+                  </button>
+                </div>
+                <label className="block text-sm font-medium">Notas</label>
+                <textarea
+                  className="pv-input"
+                  rows={3}
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="Ej. sin cebolla, entregar después de las 6pm"
+                />
+              </div>
+
+              <div className="mt-6 space-y-1 border-t border-green-100 pt-4 text-sm">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatMoney(subtotal)}</span>
+                </div>
+                {deliveryFee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Envío</span>
+                    <span>{formatMoney(deliveryFee)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Total</span>
+                  <span>{formatMoney(total)}</span>
+                </div>
+              </div>
+
+              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+              <button
+                type="button"
+                disabled={submitting || cart.length === 0}
+                onClick={submitOrder}
+                className="pv-btn-primary mt-4 w-full px-4 py-3"
+              >
+                {submitting
+                  ? 'Enviando...'
+                  : paymentPreference === 'online'
+                    ? 'Continuar al pago'
+                    : 'Confirmar pedido'}
+              </button>
+            </aside>
+          </div>
+        </main>
+
+        <footer className="mt-10 border-t border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-[var(--pv-green-900)]">{branch.org_name}</p>
+              <p>{branch.name}</p>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <a href="#catalogo" className="hover:text-[var(--pv-green-700)]">
+                Catálogo
+              </a>
+              <button
+                type="button"
+                onClick={() => setOrdersOpen(true)}
+                className="hover:text-[var(--pv-green-700)]"
+              >
+                Mis pedidos
+              </button>
+              <a href="#pedido" className="hover:text-[var(--pv-green-700)]">
+                Carrito
+              </a>
             </div>
           </div>
-
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-
-          <button
-            type="button"
-            disabled={submitting || cart.length === 0}
-            onClick={submitOrder}
-            className="pv-btn-primary mt-4 w-full px-4 py-3"
-          >
-            {submitting ? 'Enviando...' : paymentPreference === 'online' ? 'Continuar al pago' : 'Confirmar pedido'}
-          </button>
-        </aside>
+        </footer>
       </div>
 
       {pickerProduct && (
@@ -527,7 +631,11 @@ export function Storefront({
               {pickerProduct.product.name}
             </h3>
             <p className="mt-1 text-sm text-[var(--pv-green-800)]">
-              Disponible: {formatProductQuantity(Number(pickerProduct.stock), pickerProduct.product.unit as ProductUnit)}
+              Disponible:{' '}
+              {formatProductQuantity(
+                Number(pickerProduct.stock),
+                pickerProduct.product.unit as ProductUnit,
+              )}
             </p>
             <label className="mt-4 block text-sm font-medium">
               Cantidad ({PRODUCT_UNIT_LABELS[pickerProduct.product.unit as ProductUnit]})
@@ -560,7 +668,68 @@ export function Storefront({
           </div>
         </div>
       )}
-    </main>
+
+      {ordersOpen && (
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div className="pv-glass-panel w-full max-w-md p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">Mis pedidos</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Consulta con el mismo teléfono del pedido. Sin crear cuenta.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrdersOpen(false)}
+                className="text-slate-500 hover:text-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+            <label className="mt-4 block text-sm font-medium">
+              Teléfono / WhatsApp
+              <input
+                className="pv-input mt-1"
+                value={lookupPhone}
+                onChange={(e) => setLookupPhone(e.target.value)}
+                placeholder="55 1234 5678"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={lookupLoading}
+              onClick={searchOrders}
+              className="pv-btn-primary mt-3 w-full px-4 py-2.5 text-sm disabled:opacity-50"
+            >
+              {lookupLoading ? 'Buscando...' : 'Buscar pedidos'}
+            </button>
+            {lookupError && <p className="mt-3 text-sm text-red-600">{lookupError}</p>}
+            <ul className="mt-4 space-y-3">
+              {foundOrders.map((order) => (
+                <li key={order.trackingToken} className="pv-glass-item rounded-xl p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900">#{order.orderNumber}</p>
+                      <p className="text-xs text-slate-500">
+                        {ORDER_STATUS_LABELS[order.status]} ·{' '}
+                        {new Date(order.createdAt).toLocaleDateString('es-MX')}
+                      </p>
+                    </div>
+                    <span className="font-medium">{formatMoney(Number(order.total))}</span>
+                  </div>
+                  <Link
+                    href={`/pedido/${order.trackingToken}`}
+                    className="mt-2 inline-block text-[var(--pv-green-700)] hover:underline"
+                  >
+                    Ver seguimiento →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </>
   );
 }
