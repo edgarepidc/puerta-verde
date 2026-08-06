@@ -47,7 +47,7 @@ export async function AdminShell({
       <main className="relative min-h-screen">
         <header className="pv-glass-header sticky top-0 z-40">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-            <BrandLogo href="/" imageClassName="h-24 w-auto sm:h-28" />
+            <BrandLogo href="/" imageClassName="h-28 w-auto sm:h-32" />
             <div className="flex flex-wrap items-center gap-3">
               <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
               <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />

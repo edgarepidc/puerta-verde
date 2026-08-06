@@ -9,12 +9,26 @@ const dmSans = DM_Sans({
   weight: ['400', '500', '600', '700'],
 });
 
+const BRAND_TAGLINE = 'La frescura de la central a tu puerta';
+
 export const metadata: Metadata = {
   title: 'Puerta Verde',
-  description: 'Frescura de tu edificio a tu puerta',
+  description: BRAND_TAGLINE,
   icons: {
     icon: '/brand/icon.png',
     apple: '/brand/icon.png',
+  },
+  openGraph: {
+    title: 'Puerta Verde',
+    description: BRAND_TAGLINE,
+    siteName: 'Puerta Verde',
+    locale: 'es_MX',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Puerta Verde',
+    description: BRAND_TAGLINE,
   },
 };
 

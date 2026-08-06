@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -108,6 +108,16 @@ export function Storefront({
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [foundOrders, setFoundOrders] = useState<LookupOrder[]>([]);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [orderPulse, setOrderPulse] = useState(false);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cartListRef = useRef<HTMLUListElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    };
+  }, []);
 
   const discountPercent = useMemo(() => getActiveDiscountPercent(promotions), [promotions]);
 
@@ -183,6 +193,7 @@ export function Storefront({
     const qty = Number(pickerQty);
     if (!Number.isFinite(qty) || qty <= 0) return;
     const price = effectivePrice(Number(pickerProduct.price));
+    const addedId = pickerProduct.id;
     setCart((current) => {
       const existing = current.find((item) => item.branchProductId === pickerProduct.id);
       if (existing) {
@@ -204,6 +215,19 @@ export function Storefront({
       ];
     });
     setPickerProduct(null);
+    setHighlightId(addedId);
+    setOrderPulse(true);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => {
+      setHighlightId(null);
+      setOrderPulse(false);
+    }, 1600);
+    requestAnimationFrame(() => {
+      document.getElementById('pedido')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      cartListRef.current
+        ?.querySelector(`[data-cart-id="${addedId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   }
 
   async function submitOrder() {
@@ -290,8 +314,8 @@ export function Storefront({
       <div className="pv-ambient" aria-hidden />
       <div className="relative min-h-screen">
         <header className="pv-store-nav sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-            <BrandLogo href={`/${branch.slug}`} imageClassName="h-12 w-auto sm:h-14" />
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:py-4">
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-16 w-auto sm:h-20" priority />
             <nav className="hidden items-center gap-1 md:flex">
               <a href="#inicio" className="pv-store-link">
                 Inicio
@@ -459,20 +483,31 @@ export function Storefront({
               )}
             </section>
 
-            <aside id="pedido" className="pv-glass-panel h-fit scroll-mt-24 p-5 lg:sticky lg:top-24">
+            <aside
+              id="pedido"
+              className={`pv-glass-panel h-fit scroll-mt-24 p-5 lg:sticky lg:top-24 ${
+                orderPulse ? 'pv-order-panel--pulse' : ''
+              }`}
+            >
               <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
               {cart.length === 0 ? (
                 <p className="mt-4 text-sm text-[var(--pv-green-800)]">
                   Agrega productos del catálogo para continuar.
                 </p>
               ) : (
-                <ul className="mt-4 space-y-2 text-sm">
+                <ul ref={cartListRef} className="mt-4 space-y-2 text-sm">
                   {cart.map((item) => (
-                    <li key={item.branchProductId} className="flex justify-between gap-3">
+                    <li
+                      key={item.branchProductId}
+                      data-cart-id={item.branchProductId}
+                      className={`flex justify-between gap-3 rounded-xl px-2.5 py-2 ${
+                        highlightId === item.branchProductId ? 'pv-cart-item--flash' : ''
+                      }`}
+                    >
                       <span>
                         {item.name} × {formatProductQuantity(item.quantity, item.unit)}
                       </span>
-                      <span>{formatMoney(item.price * item.quantity)}</span>
+                      <span className="font-medium">{formatMoney(item.price * item.quantity)}</span>
                     </li>
                   ))}
                 </ul>
