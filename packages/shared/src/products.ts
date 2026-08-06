@@ -4,6 +4,7 @@ export interface ProductInput {
   name: string;
   description?: string | null;
   categoryId?: string | null;
+  imageUrl?: string | null;
   unit: ProductUnit;
   price: number;
   unitCost?: number | null;

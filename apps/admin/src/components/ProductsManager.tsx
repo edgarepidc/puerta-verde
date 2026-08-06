@@ -29,6 +29,7 @@ interface ProductRow {
     name: string;
     description: string | null;
     unit: ProductUnit;
+    image_url: string | null;
     is_active: boolean;
     shelf_life_days: number | null;
     category_id: string | null;
@@ -41,6 +42,7 @@ const emptyForm: ProductInput & { newCategoryName: string } = {
   description: '',
   categoryId: '',
   newCategoryName: '',
+  imageUrl: '',
   unit: 'kg',
   price: 0,
   unitCost: 0,
@@ -65,6 +67,7 @@ export function ProductsManager({
   const [editing, setEditing] = useState<{ productId: string; branchProductId: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
 
@@ -77,6 +80,23 @@ export function ProductsManager({
       return name.includes(q) || category.includes(q);
     });
   }, [products, filter]);
+
+  async function uploadImage(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch('/api/products/upload', { method: 'POST', body });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo subir');
+      setForm((f) => ({ ...f, imageUrl: payload.url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -92,6 +112,7 @@ export function ProductsManager({
       description: row.product.description ?? '',
       categoryId: row.product.category_id ?? '',
       newCategoryName: '',
+      imageUrl: row.product.image_url ?? '',
       unit: row.product.unit,
       price: Number(row.price),
       unitCost: Number(row.avg_unit_cost),
@@ -126,6 +147,7 @@ export function ProductsManager({
       const payload = {
         ...form,
         categoryId: form.categoryId || null,
+        imageUrl: form.imageUrl?.trim() || null,
         newCategoryName: form.newCategoryName.trim() || undefined,
       };
 
@@ -173,6 +195,7 @@ export function ProductsManager({
         name: row.product.name,
         description: row.product.description,
         categoryId: row.product.category_id,
+        imageUrl: row.product.image_url,
         unit: row.product.unit,
         price: Number(row.price),
         stock: Number(row.stock),
@@ -323,6 +346,44 @@ export function ProductsManager({
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
             </label>
+            <div className="md:col-span-2 space-y-2">
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Foto del producto</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  disabled={uploading || saving}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadImage(file);
+                  }}
+                  className="pv-input mt-1 file:mr-3 file:rounded-full file:border-0 file:bg-[var(--pv-green-100)] file:px-3 file:py-1 file:text-sm file:font-semibold file:text-[var(--pv-green-900)]"
+                />
+              </label>
+              {uploading ? (
+                <p className="text-xs text-slate-500">Subiendo imagen…</p>
+              ) : null}
+              {form.imageUrl ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.imageUrl}
+                    alt="Vista previa del producto"
+                    className="h-20 w-20 rounded-xl object-cover ring-1 ring-slate-200"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving || uploading}
+                    onClick={() => setForm((f) => ({ ...f, imageUrl: '' }))}
+                    className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Quitar foto
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">JPG, PNG, WEBP o GIF · máx. 5 MB</p>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -344,7 +405,7 @@ export function ProductsManager({
           <div className="mt-4 flex gap-3">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || uploading}
               onClick={saveProduct}
               className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
             >
@@ -379,10 +440,26 @@ export function ProductsManager({
             {filtered.map((row) => (
               <tr key={row.id} className="border-t border-slate-100">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{row.product.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {PRODUCT_UNIT_LABELS[row.product.unit]}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    {row.product.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={row.product.image_url}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-slate-200"
+                      />
+                    ) : (
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[10px] font-semibold text-slate-400 ring-1 ring-slate-200">
+                        —
+                      </span>
+                    )}
+                    <div>
+                      <p className="font-medium text-slate-900">{row.product.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {PRODUCT_UNIT_LABELS[row.product.unit]}
+                      </p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-slate-600">
                   {row.product.category?.name ?? '—'}
