@@ -261,13 +261,6 @@
   box-shadow: 0 1px 0 rgba(22, 163, 74, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
-.pv-store-nav::after {
-  content: '';
-  display: block;
-  height: 3px;
-  background: linear-gradient(90deg, var(--pv-green-600) 0%, var(--pv-green-700) 45%, #86efac 100%);
-}
-
 .pv-store-nav__menu {
   display: flex;
   align-items: center;

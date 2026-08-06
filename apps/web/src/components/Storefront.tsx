@@ -26,6 +26,7 @@ import {
 
 import type { StorefrontProduct } from '@/app/[slug]/page';
 import { BrandLogo } from '@/components/BrandLogo';
+import { CartBasketIcon } from '@/components/CartBasketIcon';
 import { PromoCarousel, type CarouselSlide } from '@/components/PromoCarousel';
 
 interface Building {
@@ -103,6 +104,7 @@ export function Storefront({
   const [paymentPreference, setPaymentPreference] = useState<'on_delivery' | 'online'>('on_delivery');
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
+  const [pickerMode, setPickerMode] = useState<'add' | 'edit'>('add');
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [lookupPhone, setLookupPhone] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -183,8 +185,36 @@ export function Storefront({
     const unit = product.product.unit as ProductUnit;
     const status = getStockStatus(Number(product.stock), true);
     if (status === 'out') return;
+    setPickerMode('add');
     setPickerProduct(product);
     setPickerQty(getDefaultQuantity(unit));
+  }
+
+  function openEditCartItem(item: CartItem) {
+    const product = products.find((row) => row.id === item.branchProductId);
+    if (!product) return;
+    setPickerMode('edit');
+    setPickerProduct(product);
+    setPickerQty(item.quantity);
+  }
+
+  function removeFromCart(branchProductId: string) {
+    setCart((current) => current.filter((item) => item.branchProductId !== branchProductId));
+    if (highlightId === branchProductId) setHighlightId(null);
+  }
+
+  function adjustCartQty(branchProductId: string, delta: number) {
+    setCart((current) =>
+      current.flatMap((item) => {
+        if (item.branchProductId !== branchProductId) return [item];
+        const step = getQuantityStep(item.unit);
+        const next = Number((item.quantity + delta * step).toFixed(3));
+        if (next <= 0) return [];
+        const product = products.find((row) => row.id === branchProductId);
+        const maxStock = product ? Number(product.stock) : next;
+        return [{ ...item, quantity: Math.min(next, maxStock) }];
+      }),
+    );
   }
 
   function confirmPicker() {
@@ -194,12 +224,17 @@ export function Storefront({
     if (!Number.isFinite(qty) || qty <= 0) return;
     const price = effectivePrice(Number(pickerProduct.price));
     const addedId = pickerProduct.id;
+    const mode = pickerMode;
     setCart((current) => {
       const existing = current.find((item) => item.branchProductId === pickerProduct.id);
       if (existing) {
         return current.map((item) =>
           item.branchProductId === pickerProduct.id
-            ? { ...item, quantity: item.quantity + qty, price }
+            ? {
+                ...item,
+                quantity: mode === 'edit' ? qty : item.quantity + qty,
+                price,
+              }
             : item,
         );
       }
@@ -215,6 +250,7 @@ export function Storefront({
       ];
     });
     setPickerProduct(null);
+    setPickerMode('add');
     setHighlightId(addedId);
     setOrderPulse(true);
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
@@ -314,7 +350,7 @@ export function Storefront({
       <div className="pv-ambient" aria-hidden />
       <div className="relative min-h-screen">
         <header className="pv-store-nav sticky top-0 z-40 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3">
             <BrandLogo href={`/${branch.slug}`} imageClassName="h-20 w-auto sm:h-24" priority />
             <nav className="pv-store-nav__menu hidden md:flex" aria-label="Menú de la tienda">
               <a href="#inicio" className="pv-store-link">
@@ -326,7 +362,8 @@ export function Storefront({
               <button type="button" onClick={() => setOrdersOpen(true)} className="pv-store-link">
                 Mis pedidos
               </button>
-              <a href="#pedido" className="pv-store-link">
+              <a href="#pedido" className="pv-store-link inline-flex items-center gap-1.5">
+                <CartBasketIcon className="h-4 w-4" />
                 Carrito
               </a>
             </nav>
@@ -338,8 +375,17 @@ export function Storefront({
               >
                 Pedidos
               </button>
-              <a href="#pedido" className="pv-btn-primary px-3 py-2 text-xs sm:px-4 sm:text-sm">
-                Carrito{cartCount > 0 ? ` (${cartCount})` : ''}
+              <a
+                href="#pedido"
+                className="pv-btn-primary relative inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:px-4 sm:text-sm"
+              >
+                <CartBasketIcon className="h-4 w-4" tone="onPrimary" />
+                <span>Carrito</span>
+                {cartCount > 0 ? (
+                  <span className="ml-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums sm:text-xs">
+                    {cartCount}
+                  </span>
+                ) : null}
               </a>
             </div>
           </div>
@@ -489,25 +535,88 @@ export function Storefront({
                 orderPulse ? 'pv-order-panel--pulse' : ''
               }`}
             >
-              <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 ring-1 ring-green-100">
+                  <CartBasketIcon className="h-8 w-8" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
+                  <p className="text-xs text-slate-500">
+                    {cart.length === 0
+                      ? 'Aún vacío'
+                      : `${cart.length} producto${cart.length === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+              </div>
               {cart.length === 0 ? (
-                <p className="mt-4 text-sm text-[var(--pv-green-800)]">
-                  Agrega productos del catálogo para continuar.
-                </p>
+                <div className="mt-5 rounded-2xl border border-dashed border-green-200 bg-green-50/50 px-4 py-6 text-center">
+                  <CartBasketIcon className="mx-auto h-14 w-14 opacity-80" />
+                  <p className="mt-3 text-sm text-[var(--pv-green-800)]">
+                    Agrega productos del catálogo para continuar.
+                  </p>
+                </div>
               ) : (
                 <ul ref={cartListRef} className="mt-4 space-y-2 text-sm">
                   {cart.map((item) => (
                     <li
                       key={item.branchProductId}
                       data-cart-id={item.branchProductId}
-                      className={`flex justify-between gap-3 rounded-xl px-2.5 py-2 ${
+                      className={`rounded-xl border border-green-100/80 bg-white px-2.5 py-2.5 ${
                         highlightId === item.branchProductId ? 'pv-cart-item--flash' : ''
                       }`}
                     >
-                      <span>
-                        {item.name} × {formatProductQuantity(item.quantity, item.unit)}
-                      </span>
-                      <span className="font-medium">{formatMoney(item.price * item.quantity)}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-[var(--pv-green-900)]">{item.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {formatMoney(item.price)} / {PRODUCT_UNIT_LABELS[item.unit]}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.branchProductId)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          aria-label={`Quitar ${item.name}`}
+                          title="Quitar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50">
+                          <button
+                            type="button"
+                            onClick={() => adjustCartQty(item.branchProductId, -1)}
+                            className="px-2.5 py-1 text-base font-semibold text-slate-600 hover:text-[var(--pv-green-800)]"
+                            aria-label="Disminuir cantidad"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[3.5rem] px-1 text-center text-xs font-medium tabular-nums text-slate-700">
+                            {formatProductQuantity(item.quantity, item.unit)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => adjustCartQty(item.branchProductId, 1)}
+                            className="px-2.5 py-1 text-base font-semibold text-slate-600 hover:text-[var(--pv-green-800)]"
+                            aria-label="Aumentar cantidad"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditCartItem(item)}
+                            className="text-xs font-semibold text-[var(--pv-green-700)] hover:underline"
+                          >
+                            Editar
+                          </button>
+                          <span className="font-semibold tabular-nums text-[var(--pv-green-900)]">
+                            {formatMoney(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -663,9 +772,11 @@ export function Storefront({
         <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
           <div className="pv-glass-panel w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">
-              {pickerProduct.product.name}
+              {pickerMode === 'edit' ? 'Editar cantidad' : pickerProduct.product.name}
             </h3>
             <p className="mt-1 text-sm text-[var(--pv-green-800)]">
+              {pickerMode === 'edit' ? pickerProduct.product.name : null}
+              {pickerMode === 'edit' ? ' · ' : null}
               Disponible:{' '}
               {formatProductQuantity(
                 Number(pickerProduct.stock),
@@ -687,17 +798,33 @@ export function Storefront({
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => setPickerProduct(null)}
+                onClick={() => {
+                  setPickerProduct(null);
+                  setPickerMode('add');
+                }}
                 className="pv-btn-secondary flex-1 px-4 py-2 text-sm"
               >
                 Cancelar
               </button>
+              {pickerMode === 'edit' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeFromCart(pickerProduct.id);
+                    setPickerProduct(null);
+                    setPickerMode('add');
+                  }}
+                  className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                >
+                  Quitar
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={confirmPicker}
                 className="pv-btn-primary flex-1 px-4 py-2 text-sm"
               >
-                Agregar
+                {pickerMode === 'edit' ? 'Guardar' : 'Agregar'}
               </button>
             </div>
           </div>
