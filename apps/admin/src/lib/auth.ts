@@ -25,23 +25,24 @@ async function resolvePlatformAdminFlag(
 ): Promise<{ fullName: string | null; isPlatformAdmin: boolean }> {
   const emailIsAdmin = isEmailPlatformAdmin(email);
 
-  // Primero pedimos solo full_name (siempre existe). Luego el flag de BD si aplica.
   const { data: profile } = await admin
     .from('profiles')
     .select('full_name')
     .eq('id', userId)
     .maybeSingle();
 
+  // Optional DB flag — only queried when PLATFORM_ADMIN_USE_DB_FLAG=1
+  // (after applying supabase/migrations/20250806190000_platform_admin.sql).
   let dbFlag = false;
-  const { data: flagRow, error: flagError } = await admin
-    .from('profiles')
-    .select('is_platform_admin')
-    .eq('id', userId)
-    .maybeSingle();
-
-  // Si la columna aún no existe (migración pendiente), PostgREST responde 42703.
-  if (!flagError) {
-    dbFlag = Boolean(flagRow?.is_platform_admin);
+  if (process.env.PLATFORM_ADMIN_USE_DB_FLAG === '1') {
+    const { data: flagRow, error: flagError } = await admin
+      .from('profiles')
+      .select('is_platform_admin')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!flagError) {
+      dbFlag = Boolean(flagRow?.is_platform_admin);
+    }
   }
 
   return {
