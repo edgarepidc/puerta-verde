@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Marca un usuario existente como super admin de plataforma.
+ * Marca un usuario existente como super admin de plataforma (columna BD).
+ *
+ * Alternativa sin migración: define PLATFORM_ADMIN_EMAILS=tu@correo.com en Vercel.
  *
  * Uso:
  *   ADMIN_EMAIL=tu@correo.com node scripts/promote-platform-admin.mjs
