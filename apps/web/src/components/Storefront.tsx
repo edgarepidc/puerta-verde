@@ -417,14 +417,14 @@ export function Storefront({
             )}
           </section>
 
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1.7fr_1fr]">
+          <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_0.95fr]">
             <section id="catalogo" className="space-y-4 scroll-mt-24">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Catálogo</h2>
                 <input
                   type="search"
                   placeholder="Buscar fruta, verdura..."
-                  className="pv-input w-full sm:max-w-xs"
+                  className="pv-input pv-search w-full sm:max-w-xs"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -445,7 +445,7 @@ export function Storefront({
                 ))}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                 {filteredProducts.map((product) => {
                   const unit = product.product.unit as ProductUnit;
                   const status = getStockStatus(Number(product.stock), true);
@@ -458,7 +458,7 @@ export function Storefront({
                       key={product.id}
                       className="pv-glass-card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md"
                     >
-                      <div className="relative h-36 w-full bg-gradient-to-br from-green-50 to-emerald-100">
+                      <div className="relative h-32 w-full bg-gradient-to-br from-green-50 to-emerald-100 sm:h-36">
                         {product.product.image_url ? (
                           <Image
                             src={product.product.image_url}
@@ -471,13 +471,13 @@ export function Storefront({
                           <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_30%_30%,#bbf7d4,transparent_55%),radial-gradient(circle_at_70%_70%,#86efac,transparent_50%)]" />
                         )}
                       </div>
-                      <div className="p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs uppercase tracking-wide text-[var(--pv-green-600)]">
+                      <div className="p-3 sm:p-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--pv-green-600)] sm:text-xs">
                             {product.product.category?.name ?? 'General'}
                           </p>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-xs ${
                               status === 'out'
                                 ? 'bg-red-100 text-red-700'
                                 : status === 'low'
@@ -488,10 +488,10 @@ export function Storefront({
                             {STOCK_STATUS_LABELS[status]}
                           </span>
                         </div>
-                        <h3 className="mt-1 font-semibold text-[var(--pv-green-900)]">
+                        <h3 className="mt-1 text-sm font-semibold leading-snug text-[var(--pv-green-900)] sm:text-base">
                           {product.product.name}
                         </h3>
-                        <div className="mt-3 flex items-end justify-between gap-3">
+                        <div className="mt-3 flex flex-col gap-2">
                           <p className="text-sm text-[var(--pv-green-800)]">
                             {hasDiscount ? (
                               <>
@@ -511,7 +511,7 @@ export function Storefront({
                             type="button"
                             disabled={status === 'out'}
                             onClick={() => openPicker(product)}
-                            className="pv-btn-primary shrink-0 px-3 py-2 text-xs disabled:cursor-not-allowed sm:text-sm"
+                            className="pv-btn-primary w-full px-3 py-2 text-xs disabled:cursor-not-allowed sm:text-sm"
                           >
                             {status === 'out' ? 'Agotado' : 'Agregar'}
                           </button>
