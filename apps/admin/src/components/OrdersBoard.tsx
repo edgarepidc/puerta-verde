@@ -33,27 +33,27 @@ const COLUMN_META: Record<
   pending: {
     accent: 'orange',
     image: '/orders/pending.png',
-    empty: 'Sin pedidos recibidos',
+    empty: 'Sin pedidos',
   },
   preparing: {
     accent: 'blue',
     image: '/orders/preparing.png',
-    empty: 'Nada en preparación',
+    empty: 'Sin pedidos',
   },
   ready: {
     accent: 'teal',
     image: '/orders/ready.png',
-    empty: 'Ninguno listo aún',
+    empty: 'Sin pedidos',
   },
   out_for_delivery: {
     accent: 'purple',
     image: '/orders/out_for_delivery.png',
-    empty: 'Sin entregas en camino',
+    empty: 'Sin pedidos',
   },
   delivered: {
     accent: 'green',
     image: '/orders/delivered.png',
-    empty: 'Sin entregas hoy',
+    empty: 'Sin pedidos',
   },
 };
 
@@ -116,7 +116,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
   }
 
   return (
-    <div className="grid gap-4 overflow-x-auto lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-2.5">
       {COLUMNS.map((status) => {
         const meta = COLUMN_META[status];
         const columnOrders = grouped[status] ?? [];
@@ -124,21 +124,21 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
         return (
           <section
             key={status}
-            className={`pv-glass-card pv-glass-card-accent pv-glass-card-accent-${meta.accent} min-w-[240px] overflow-hidden p-4`}
+            className={`pv-glass-card pv-glass-card-accent pv-glass-card-accent-${meta.accent} min-w-0 overflow-hidden p-3`}
           >
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-3 flex items-center gap-2.5">
               <Image
                 src={meta.image}
                 alt=""
-                width={56}
-                height={56}
-                className="h-14 w-14 shrink-0 rounded-2xl object-cover"
+                width={44}
+                height={44}
+                className="h-11 w-11 shrink-0 rounded-xl object-cover"
               />
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
                   {ORDER_STATUS_LABELS[status]}
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="truncate text-[11px] text-slate-400">
                   {columnOrders.length === 0
                     ? meta.empty
                     : `${columnOrders.length} pedido${columnOrders.length === 1 ? '' : 's'}`}
