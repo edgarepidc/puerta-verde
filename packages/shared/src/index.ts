@@ -121,6 +121,13 @@ export {
   type StockStatus,
 } from './storefront';
 
+export {
+  buildPtiLabelString,
+  formatGtin14,
+  parseScaleWeightLine,
+  type PtiLabelInput,
+} from './scale';
+
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';

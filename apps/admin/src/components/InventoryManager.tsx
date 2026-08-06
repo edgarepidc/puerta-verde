@@ -12,6 +12,8 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ScalePanel } from '@/components/ScalePanel';
+
 interface ProductStock {
   id: string;
   stock: number;
@@ -128,6 +130,14 @@ export function InventoryManager({
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento</h2>
+        <div className="mt-4">
+          <ScalePanel
+            onWeight={(kg) => {
+              setQuantity(kg);
+              if (movementType !== 'purchase') setMovementType('purchase');
+            }}
+          />
+        </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Producto</span>

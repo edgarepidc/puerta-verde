@@ -204,6 +204,7 @@ export interface Database {
           order_id: string | null;
           created_by: string | null;
           expires_at: string | null;
+          lot_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
@@ -216,6 +217,40 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: 'inventory_movements_branch_product_id_fkey';
+            columns: ['branch_product_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      product_lots: {
+        Row: {
+          id: string;
+          branch_id: string;
+          branch_product_id: string;
+          lot_code: string;
+          gtin: string | null;
+          supplier_name: string | null;
+          pack_date: string | null;
+          expires_at: string | null;
+          quantity_received: number;
+          quantity_remaining: number;
+          pti_label: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['product_lots']['Row']> & {
+          branch_id: string;
+          branch_product_id: string;
+          lot_code: string;
+          quantity_received: number;
+          quantity_remaining: number;
+        };
+        Update: Partial<Database['public']['Tables']['product_lots']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'product_lots_branch_product_id_fkey';
             columns: ['branch_product_id'];
             isOneToOne: false;
             referencedRelation: 'branch_products';
@@ -340,6 +375,37 @@ export interface Database {
       get_branch_discount_percent: {
         Args: { p_branch_id: string };
         Returns: number;
+      };
+      receive_product_lot: {
+        Args: {
+          p_branch_product_id: string;
+          p_lot_code: string;
+          p_quantity: number;
+          p_gtin?: string | null;
+          p_supplier_name?: string | null;
+          p_pack_date?: string | null;
+          p_expires_at?: string | null;
+          p_pti_label?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Array<{ lot_id: string; new_stock: number }>;
+      };
+      get_lot_traceability: {
+        Args: { p_lot_code: string; p_branch_id?: string | null };
+        Returns: Array<Record<string, unknown>>;
+      };
+      get_restock_forecast: {
+        Args: { p_branch_id: string; p_horizon_days?: number };
+        Returns: Array<{
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          current_stock: number;
+          avg_daily_sales: number;
+          forecast_demand: number;
+          suggested_reorder: number;
+          days_until_stockout: number | null;
+        }>;
       };
     };
     Enums: Record<string, never>;
