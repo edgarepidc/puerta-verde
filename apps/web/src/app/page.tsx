@@ -25,7 +25,7 @@ export default function HomePage() {
       </Link>
       <Link
         href="/registro"
-        className="pv-btn-accent mt-3 inline-block px-8 py-3 text-base"
+        className="pv-btn-secondary mt-3 inline-block px-8 py-3 text-base"
       >
         Crear mi verdulería
       </Link>

@@ -1,4 +1,4 @@
-/* Puerta Verde — Liquid Glass design system */
+/* Puerta Verde — clean glass design system */
 
 @theme {
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
@@ -14,12 +14,7 @@
   --color-pv-800: #166534;
   --color-pv-900: #14532d;
   --color-pv-950: #052e16;
-
-  --color-pv-accent: #e8a317;
-  --color-pv-accent-deep: #c4840a;
-  --color-pv-accent-soft: #fff4d6;
   --color-pv-ink: #1c1917;
-  --color-pv-mist: #f7f5f1;
 }
 
 :root {
@@ -30,89 +25,40 @@
   --pv-green-700: #15803d;
   --pv-green-800: #166534;
   --pv-green-900: #14532d;
-
-  /* Warm honey accent — ripe fruit / sunshine contrast to green */
-  --pv-accent: #e8a317;
-  --pv-accent-deep: #c4840a;
-  --pv-accent-soft: #fff4d6;
-  --pv-accent-glow: rgba(232, 163, 23, 0.28);
   --pv-ink: #1c1917;
-  --pv-mist: #f7f5f1;
 
-  --pv-glass-bg: rgba(255, 255, 255, 0.62);
-  --pv-glass-bg-strong: rgba(255, 255, 255, 0.82);
-  --pv-glass-border: rgba(255, 255, 255, 0.6);
-  --pv-glass-border-subtle: rgba(255, 255, 255, 0.4);
-  --pv-glass-shadow: 0 8px 32px rgba(28, 25, 23, 0.06), 0 2px 8px rgba(20, 83, 45, 0.04);
-  --pv-glass-shadow-lg: 0 20px 50px rgba(28, 25, 23, 0.08), 0 4px 16px rgba(20, 83, 45, 0.05);
-  --pv-blur: 20px;
-  --pv-blur-strong: 32px;
+  --pv-glass-bg: rgba(255, 255, 255, 0.92);
+  --pv-glass-bg-strong: #ffffff;
+  --pv-glass-border: rgba(15, 23, 42, 0.08);
+  --pv-glass-border-subtle: rgba(15, 23, 42, 0.06);
+  --pv-glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --pv-glass-shadow-lg: 0 4px 16px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.05);
+  --pv-blur: 12px;
+  --pv-blur-strong: 16px;
 }
 
-/* Ambient mesh background — green + warm honey */
-.pv-ambient {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
+/* Flat white page background — no mesh / blobs */
+.pv-ambient,
+.pv-ambient--admin {
+  display: none;
 }
 
-.pv-ambient::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 70% 55% at 8% 5%, rgba(134, 239, 172, 0.32), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 92% 12%, rgba(232, 163, 23, 0.18), transparent 50%),
-    radial-gradient(ellipse 50% 40% at 55% 95%, rgba(187, 247, 212, 0.28), transparent 55%),
-    linear-gradient(165deg, #f7f5f1 0%, #f0fdf6 40%, #faf8f4 70%, #ecfdf5 100%);
-}
-
-.pv-ambient::after {
-  content: '';
-  position: absolute;
-  width: 480px;
-  height: 480px;
-  top: -100px;
-  right: -60px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, rgba(232, 163, 23, 0.16) 0%, transparent 55%),
-    radial-gradient(circle at 30% 70%, rgba(34, 197, 94, 0.1) 0%, transparent 60%);
-  filter: blur(40px);
-}
-
-.pv-ambient--admin::before {
-  background:
-    radial-gradient(ellipse 70% 50% at 4% 0%, rgba(148, 163, 184, 0.16), transparent 50%),
-    radial-gradient(ellipse 55% 45% at 96% 8%, rgba(232, 163, 23, 0.14), transparent 48%),
-    radial-gradient(ellipse 50% 40% at 40% 100%, rgba(187, 247, 212, 0.22), transparent 55%),
-    linear-gradient(160deg, #f7f5f1 0%, #f0fdf4 45%, #f4f1ea 100%);
-}
-
-/* Glass surfaces */
+/* Glass / panel surfaces */
 .pv-glass {
   background: var(--pv-glass-bg);
-  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
   border: 1px solid var(--pv-glass-border);
   box-shadow: var(--pv-glass-shadow);
 }
 
 .pv-glass-strong {
   background: var(--pv-glass-bg-strong);
-  backdrop-filter: blur(var(--pv-blur-strong)) saturate(200%);
-  -webkit-backdrop-filter: blur(var(--pv-blur-strong)) saturate(200%);
   border: 1px solid var(--pv-glass-border);
   box-shadow: var(--pv-glass-shadow-lg);
 }
 
 .pv-glass-card {
   border-radius: 1.25rem;
-  background: var(--pv-glass-bg);
-  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  background: var(--pv-glass-bg-strong);
   border: 1px solid var(--pv-glass-border);
   box-shadow: var(--pv-glass-shadow);
 }
@@ -120,32 +66,24 @@
 .pv-glass-panel {
   border-radius: 1.5rem;
   background: var(--pv-glass-bg-strong);
-  backdrop-filter: blur(var(--pv-blur-strong)) saturate(190%);
-  -webkit-backdrop-filter: blur(var(--pv-blur-strong)) saturate(190%);
   border: 1px solid var(--pv-glass-border);
   box-shadow: var(--pv-glass-shadow-lg);
 }
 
 .pv-glass-header {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(var(--pv-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--pv-blur)) saturate(180%);
+  background: #ffffff;
   border-bottom: 1px solid var(--pv-glass-border-subtle);
-  box-shadow: 0 4px 24px rgba(28, 25, 23, 0.04);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
 }
 
 .pv-glass-nav {
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  border: 1px solid var(--pv-glass-border-subtle);
+  background: #f1f5f9;
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .pv-glass-item {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: #ffffff;
+  border: 1px solid var(--pv-glass-border);
 }
 
 /* Buttons */
@@ -154,13 +92,13 @@
   background: linear-gradient(135deg, var(--pv-green-600) 0%, var(--pv-green-700) 100%);
   color: white;
   font-weight: 600;
-  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.22);
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 
 .pv-btn-primary:hover:not(:disabled) {
   filter: brightness(1.05);
-  box-shadow: 0 6px 20px rgba(21, 128, 61, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(21, 128, 61, 0.28);
   transform: translateY(-1px);
 }
 
@@ -169,34 +107,18 @@
   cursor: not-allowed;
 }
 
-.pv-btn-accent {
-  border-radius: 9999px;
-  background: linear-gradient(135deg, var(--pv-accent) 0%, var(--pv-accent-deep) 100%);
-  color: #1c1917;
-  font-weight: 600;
-  box-shadow: 0 4px 14px var(--pv-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-}
-
-.pv-btn-accent:hover:not(:disabled) {
-  filter: brightness(1.04);
-  transform: translateY(-1px);
-}
-
 .pv-btn-secondary {
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(232, 163, 23, 0.25);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   color: var(--pv-ink);
   font-weight: 500;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .pv-btn-secondary:hover {
-  background: rgba(255, 244, 214, 0.65);
-  border-color: rgba(232, 163, 23, 0.4);
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.18);
 }
 
 .pv-btn-ghost {
@@ -209,7 +131,7 @@
 }
 
 .pv-btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: #f8fafc;
   color: #0f172a;
   border-color: rgba(148, 163, 184, 0.5);
 }
@@ -218,20 +140,17 @@
 .pv-input {
   width: 100%;
   border-radius: 0.875rem;
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   padding: 0.5rem 0.75rem;
   color: var(--pv-ink);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pv-input:focus {
   outline: none;
-  border-color: rgba(232, 163, 23, 0.55);
-  box-shadow: 0 0 0 3px var(--pv-accent-glow);
-  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(22, 163, 74, 0.55);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
 }
 
 .pv-input::placeholder {
@@ -248,51 +167,44 @@
 }
 
 .pv-pill--active {
-  background: linear-gradient(135deg, var(--pv-accent), var(--pv-accent-deep));
-  color: #1c1917;
-  box-shadow: 0 2px 10px var(--pv-accent-glow);
+  background: #ffffff;
+  color: var(--pv-green-800);
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
 .pv-pill--inactive {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: var(--pv-green-800);
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  color: #475569;
 }
 
 .pv-pill--inactive:hover {
-  background: rgba(255, 255, 255, 0.7);
+  background: #e2e8f0;
 }
 
-/* Nav active state */
+/* Nav active — white chip */
 .pv-nav-active {
-  background: linear-gradient(135deg, var(--pv-accent) 0%, var(--pv-accent-deep) 100%);
-  color: #1c1917;
+  background: #ffffff;
+  color: var(--pv-green-800);
   font-weight: 600;
-  box-shadow: 0 2px 10px var(--pv-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 /* Modal */
 .pv-modal-overlay {
-  background: rgba(28, 25, 23, 0.28);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-/* Promo banner glass */
+/* Promo banner */
 .pv-promo-banner {
   border-radius: 1.25rem;
-  background: linear-gradient(
-    135deg,
-    rgba(21, 128, 61, 0.94) 0%,
-    rgba(22, 101, 52, 0.9) 55%,
-    rgba(196, 132, 10, 0.85) 100%
-  );
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 12px 40px rgba(20, 83, 45, 0.18);
+  background: linear-gradient(135deg, var(--pv-green-700) 0%, var(--pv-green-800) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--pv-glass-shadow);
   color: white;
   overflow: hidden;
 }
@@ -300,15 +212,13 @@
 /* Info callout */
 .pv-callout {
   border-radius: 0.875rem;
-  background: rgba(220, 252, 235, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: #f0fdf4;
+  border: 1px solid rgba(134, 239, 172, 0.45);
   color: var(--pv-green-800);
 }
 
 .pv-callout--amber {
-  background: rgba(255, 244, 214, 0.7);
-  border-color: rgba(232, 163, 23, 0.4);
+  background: #fffbeb;
+  border: 1px solid rgba(251, 191, 36, 0.35);
   color: #92400e;
 }

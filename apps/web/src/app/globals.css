@@ -2,6 +2,7 @@
 @import "@puertaverde/shared/theme.css";
 
 body {
+  background: #ffffff;
   color: var(--pv-green-900);
   min-height: 100vh;
 }
