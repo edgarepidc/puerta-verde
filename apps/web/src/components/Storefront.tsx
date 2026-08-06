@@ -79,6 +79,7 @@ export function Storefront({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [paymentPreference, setPaymentPreference] = useState<'on_delivery' | 'online'>('on_delivery');
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
 
@@ -203,6 +204,21 @@ export function Storefront({
       if (!response.ok) {
         throw new Error(payload.error ?? 'No se pudo crear el pedido');
       }
+
+      if (paymentPreference === 'online') {
+        const payResponse = await fetch('/api/orders/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackingToken: payload.trackingToken }),
+        });
+        const payPayload = await payResponse.json();
+        if (!payResponse.ok) throw new Error(payPayload.error ?? 'No se pudo iniciar el pago en línea');
+        if (payPayload.url) {
+          window.location.href = payPayload.url;
+          return;
+        }
+      }
+
       router.push(`/pedido/${payload.trackingToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar pedido');
@@ -443,6 +459,27 @@ export function Storefront({
                 {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
               </p>
             )}
+            <label className="block text-sm font-medium">Forma de pago</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentPreference('on_delivery')}
+                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  paymentPreference === 'on_delivery' ? 'pv-pill--active' : 'pv-pill--inactive'
+                }`}
+              >
+                Al entregar
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentPreference('online')}
+                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  paymentPreference === 'online' ? 'pv-pill--active' : 'pv-pill--inactive'
+                }`}
+              >
+                Pagar en línea
+              </button>
+            </div>
             <label className="block text-sm font-medium">Notas</label>
             <textarea
               className="pv-input"
@@ -478,7 +515,7 @@ export function Storefront({
             onClick={submitOrder}
             className="pv-btn-primary mt-4 w-full px-4 py-3"
           >
-            {submitting ? 'Enviando...' : 'Confirmar pedido'}
+            {submitting ? 'Enviando...' : paymentPreference === 'online' ? 'Continuar al pago' : 'Confirmar pedido'}
           </button>
         </aside>
       </div>

@@ -197,6 +197,18 @@ export function ProfitabilityManager({
           >
             Actualizar utilidad
           </button>
+          <a
+            href={`/api/export/profit?days=${days}`}
+            className="pv-btn-secondary px-4 py-2 text-sm"
+          >
+            Exportar Excel
+          </a>
+          <a
+            href={`/api/export/profit/pdf?days=${days}`}
+            className="pv-btn-secondary px-4 py-2 text-sm"
+          >
+            Exportar PDF
+          </a>
         </div>
         {summary && (
           <p className="mt-3 text-sm text-slate-600">

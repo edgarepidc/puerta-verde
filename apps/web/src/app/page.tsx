@@ -17,12 +17,18 @@ export default function HomePage() {
               Pide frutas, verduras y semillas sin registrarte. Entrega a tu depto o recoge en el local.
             </p>
           </div>
-          <Link
-            href="/puerta-verde-demo"
-            className="pv-btn-primary mt-8 inline-block px-8 py-3.5 text-base"
-          >
-            Ver tienda demo
-          </Link>
+      <Link
+        href="/puerta-verde-demo"
+        className="pv-btn-primary mt-8 inline-block px-8 py-3.5 text-base"
+      >
+        Ver tienda demo
+      </Link>
+      <Link
+        href="/registro"
+        className="pv-btn-secondary mt-3 inline-block px-8 py-3 text-base"
+      >
+        Crear mi verdulería
+      </Link>
         </div>
         <p className="text-sm text-[var(--pv-green-800)]/60">
           Pedidos por WhatsApp · Sin registro · Pago al entregar

@@ -150,6 +150,24 @@ export {
   type ParsedCostImportRow,
 } from './cost-import';
 
+export {
+  validateOnboardingInput,
+  slugifyOrganizationName,
+  type OnboardingInput,
+} from './onboarding';
+
+export {
+  SUBSCRIPTION_PLANS,
+  SUBSCRIPTION_STATUSES,
+  PLAN_LABELS,
+  PLAN_PRICES_MXN,
+  STATUS_LABELS,
+  isSubscriptionUsable,
+  daysUntilTrialEnd,
+  type SubscriptionPlan,
+  type SubscriptionStatus,
+} from './billing';
+
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';

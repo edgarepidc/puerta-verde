@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { PayOnlineButton } from '@/components/PayOnlineButton';
 import { createServerClient } from '@puertaverde/supabase/client';
 import {
   formatMoney,
@@ -15,10 +16,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function OrderTrackingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ paid?: string }>;
 }) {
   const { token } = await params;
+  const { paid } = await searchParams;
   const supabase = createServerClient();
 
   const { data: orderRows } = await supabase.rpc('get_order_by_tracking_token', {
@@ -84,9 +88,15 @@ export default async function OrderTrackingPage({
         </div>
 
         <p className="pv-callout mt-4 p-3 text-sm">
-          Pago al {order.fulfillment_type === 'delivery' ? 'entregar' : 'recoger'} con efectivo o TPV.
-          Estado de pago: {order.payment_status === 'paid' ? 'Pagado' : 'Pendiente'}.
+          {order.payment_status === 'paid'
+            ? 'Pago recibido. ¡Gracias!'
+            : `Pago al ${order.fulfillment_type === 'delivery' ? 'entregar' : 'recoger'} con efectivo, TPV o en línea.`}
+          {paid === '1' && order.payment_status !== 'paid' && (
+            <> Estamos confirmando tu pago en línea...</>
+          )}
         </p>
+
+        {order.payment_status !== 'paid' && <PayOnlineButton trackingToken={token} />}
 
         <Link href="/" className="mt-6 inline-block text-sm font-medium text-[var(--pv-green-700)]">
           ← Volver al inicio

@@ -7,7 +7,7 @@ import {
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getDefaultTenant, type TenantContext } from '@/lib/tenant';
+import { resolveTenantForUser, type TenantContext } from '@/lib/tenant';
 
 export interface StaffContext extends TenantContext {
   userId: string;
@@ -24,9 +24,10 @@ export async function getStaffSession(): Promise<StaffContext | null> {
 
   if (!user?.email) return null;
 
-  const tenant = await getDefaultTenant();
-  const admin = createAdminClient();
+  const tenant = await resolveTenantForUser(user.id);
+  if (!tenant) return null;
 
+  const admin = createAdminClient();
   const { data: membership } = await admin
     .from('staff_memberships')
     .select('role, status')

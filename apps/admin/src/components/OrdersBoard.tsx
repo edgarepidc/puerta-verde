@@ -61,7 +61,7 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
     }
   }
 
-  async function markPaid(orderId: string, paymentMethod: 'cash' | 'card_terminal') {
+  async function markPaid(orderId: string, paymentMethod: 'cash' | 'card_terminal' | 'transfer') {
     setUpdatingId(orderId);
     try {
       const response = await fetch('/api/orders/payment', {
@@ -138,6 +138,14 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                           className="pv-btn-ghost px-3 py-1 text-xs"
                         >
                           TPV
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingId === order.id}
+                          onClick={() => markPaid(order.id, 'transfer')}
+                          className="pv-btn-ghost px-3 py-1 text-xs"
+                        >
+                          Transferencia
                         </button>
                       </>
                     )}

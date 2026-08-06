@@ -1,6 +1,7 @@
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { AdminShell } from '@/components/AdminShell';
+import { BillingManager } from '@/components/BillingManager';
 import { SettingsManager } from '@/components/SettingsManager';
 import { WhatsAppInbox } from '@/components/WhatsAppInbox';
 import { canManageStaff, getStaffSession } from '@/lib/auth';
@@ -13,11 +14,16 @@ export default async function ConfiguracionPage() {
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
 
-  const [{ data: branch }, { data: memberships }, { data: whatsappMessages }] = await Promise.all([
+  const [{ data: branch }, { data: organization }, { data: memberships }, { data: whatsappMessages }] = await Promise.all([
     supabase
       .from('branches')
       .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount')
       .eq('id', tenant.branchId)
+      .single(),
+    supabase
+      .from('organizations')
+      .select('name, subscription_plan, subscription_status, trial_ends_at, stripe_customer_id')
+      .eq('id', tenant.organizationId)
       .single(),
     supabase
       .from('staff_memberships')
@@ -50,6 +56,10 @@ export default async function ConfiguracionPage() {
   return (
     <AdminShell title="Configuración" subtitle={tenant.branchName}>
       <div className="space-y-8">
+        <BillingManager
+          organization={organization!}
+          canManage={staff ? canManageStaff(staff.role) : false}
+        />
         <SettingsManager
           initialBranch={branch!}
           initialStaff={staffRows}

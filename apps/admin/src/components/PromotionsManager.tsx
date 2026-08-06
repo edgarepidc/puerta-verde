@@ -51,6 +51,7 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [broadcastingId, setBroadcastingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const activeCount = useMemo(
@@ -122,6 +123,22 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
       setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function broadcast(promoId: string, title: string) {
+    if (!confirm(`¿Enviar "${title}" por WhatsApp a clientes suscritos?`)) return;
+    setBroadcastingId(promoId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/promotions/${promoId}/broadcast`, { method: 'POST' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo enviar');
+      alert(`Promo enviada a ${payload.sent} clientes${payload.failed ? ` (${payload.failed} fallaron)` : ''}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar promo');
+    } finally {
+      setBroadcastingId(null);
     }
   }
 
@@ -310,10 +327,20 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
                 {promo.is_active ? 'Activa' : 'Inactiva'}
               </button>
             </div>
-            <div className="mt-4 flex gap-3 text-sm">
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
               <button type="button" onClick={() => openEdit(promo)} className="text-[var(--pv-green-700)] hover:underline">
                 Editar
               </button>
+              {promo.is_active && (
+                <button
+                  type="button"
+                  disabled={broadcastingId === promo.id}
+                  onClick={() => broadcast(promo.id, promo.title)}
+                  className="text-[var(--pv-green-700)] hover:underline disabled:opacity-50"
+                >
+                  {broadcastingId === promo.id ? 'Enviando...' : 'Enviar por WhatsApp'}
+                </button>
+              )}
               <button type="button" onClick={() => remove(promo.id, promo.title)} className="text-red-600 hover:underline">
                 Eliminar
               </button>

@@ -15,8 +15,11 @@ export interface Database {
           name: string;
           slug: string;
           logo_url: string | null;
-          subscription_plan: string;
-          subscription_status: string;
+          subscription_plan: 'basic' | 'pro' | 'enterprise';
+          subscription_status: 'trialing' | 'active' | 'past_due' | 'cancelled';
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          trial_ends_at: string | null;
           settings: Json;
           created_at: string;
           updated_at: string;
@@ -94,6 +97,7 @@ export interface Database {
           payment_status: 'pending' | 'paid' | 'refunded';
           paid_at: string | null;
           paid_by: string | null;
+          stripe_checkout_session_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -311,6 +315,25 @@ export interface Database {
           role: 'owner' | 'org_admin' | 'branch_manager' | 'staff';
         };
         Update: Partial<Database['public']['Tables']['staff_memberships']['Row']>;
+        Relationships: [];
+      };
+      daily_cash_closings: {
+        Row: {
+          id: string;
+          branch_id: string;
+          closing_date: string;
+          cash_total: number;
+          card_terminal_total: number;
+          transfer_total: number;
+          notes: string | null;
+          closed_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['daily_cash_closings']['Row']> & {
+          branch_id: string;
+          closing_date: string;
+        };
+        Update: Partial<Database['public']['Tables']['daily_cash_closings']['Row']>;
         Relationships: [];
       };
       whatsapp_message_logs: {
