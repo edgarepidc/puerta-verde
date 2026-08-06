@@ -22,8 +22,8 @@ export function BrandLogo({
     <Image
       src={LOGO_SRC}
       alt={BRAND_NAME}
-      width={640}
-      height={320}
+      width={329}
+      height={384}
       priority={priority}
       className={imageClassName}
     />
