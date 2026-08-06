@@ -52,6 +52,7 @@ export async function PATCH(
         description: body.description?.trim() || null,
         category_id: categoryId,
         unit: body.unit,
+        image_url: body.imageUrl?.trim() || null,
         shelf_life_days: body.shelfLifeDays ?? null,
         is_active: body.isActive,
       })

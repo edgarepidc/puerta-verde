@@ -25,6 +25,7 @@ export default async function ProductsPage() {
           name,
           description,
           unit,
+          image_url,
           is_active,
           shelf_life_days,
           category_id,
@@ -58,6 +59,7 @@ export default async function ProductsPage() {
             name: string;
             description: string | null;
             unit: ProductUnit;
+            image_url: string | null;
             is_active: boolean;
             shelf_life_days: number | null;
             category_id: string | null;
