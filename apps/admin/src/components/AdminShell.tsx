@@ -50,7 +50,7 @@ export async function AdminShell({
             <BrandLogo href="/" imageClassName="h-16 w-auto sm:h-20" />
             <div className="flex flex-wrap items-center gap-3">
               <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
-              <AdminNav />
+              <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
               <span className="hidden text-sm text-slate-500 sm:inline">
                 {staff.fullName ?? staff.email}
               </span>

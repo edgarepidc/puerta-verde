@@ -1,12 +1,8 @@
-import { OnboardingForm } from '@/components/OnboardingForm';
+import { redirect } from 'next/navigation';
 
+const DEMO_SLUG = process.env.NEXT_PUBLIC_DEMO_BRANCH_SLUG ?? 'puerta-verde-demo';
+
+/** Public self-service signup disabled — verdulerías se crean desde el panel Plataforma. */
 export default function RegistroPage() {
-  return (
-    <>
-      <div className="pv-ambient" aria-hidden />
-      <main className="relative flex min-h-screen items-center justify-center px-4 py-12">
-        <OnboardingForm />
-      </main>
-    </>
-  );
+  redirect(`/${DEMO_SLUG}`);
 }

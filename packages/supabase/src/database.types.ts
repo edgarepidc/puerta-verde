@@ -292,6 +292,7 @@ export interface Database {
           full_name: string | null;
           phone: string | null;
           avatar_url: string | null;
+          is_platform_admin: boolean;
           created_at: string;
           updated_at: string;
         };

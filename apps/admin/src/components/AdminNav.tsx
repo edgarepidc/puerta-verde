@@ -15,12 +15,15 @@ const NAV = [
   { href: '/configuracion', label: 'Configuración' },
 ] as const;
 
-export function AdminNav() {
+export function AdminNav({ isPlatformAdmin = false }: { isPlatformAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isPlatformAdmin
+    ? ([{ href: '/plataforma', label: 'Plataforma' }, ...NAV] as const)
+    : NAV;
 
   return (
     <nav className="pv-glass-nav flex max-w-full overflow-x-auto rounded-full p-1">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
         return (
           <Link

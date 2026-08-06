@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Crea el primer usuario administrador de Puerta Verde.
+ * Crea el primer usuario super admin (plataforma) de Puerta Verde.
  *
  * Uso:
  *   ADMIN_EMAIL=admin@puertaverde.com ADMIN_PASSWORD='...' ADMIN_NAME='Admin' node scripts/create-admin-user.mjs
@@ -48,7 +48,7 @@ if (createError || !created.user) {
 
 const userId = created.user.id;
 
-await supabase.from('profiles').upsert({ id: userId, full_name: fullName });
+await supabase.from('profiles').upsert({ id: userId, full_name: fullName, is_platform_admin: true });
 
 const { error: membershipError } = await supabase.from('staff_memberships').insert({
   user_id: userId,
@@ -63,4 +63,5 @@ if (membershipError) {
   process.exit(1);
 }
 
-console.log(`Usuario admin creado: ${email} (${userId})`);
+console.log(`Usuario super admin creado: ${email} (${userId})`);
+console.log('Accede al panel → /plataforma para crear verdulerías.');

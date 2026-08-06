@@ -42,5 +42,5 @@ organizations (tenant)
 
 ## Próximos sprints
 
-- Sprint 4: inventario y finanzas en admin
-- Sprint 5: onboarding self-service y planes SaaS
+- Super admin de plataforma crea verdulerías desde `/plataforma` (sin registro público)
+- Stripe / planes SaaS opcionales por organización

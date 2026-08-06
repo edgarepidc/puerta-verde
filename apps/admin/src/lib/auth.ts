@@ -7,13 +7,14 @@ import {
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { resolveTenantForUser, type TenantContext } from '@/lib/tenant';
+import { getDefaultTenant, resolveTenantForUser, type TenantContext } from '@/lib/tenant';
 
 export interface StaffContext extends TenantContext {
   userId: string;
   email: string;
   fullName: string | null;
   role: StaffRole;
+  isPlatformAdmin: boolean;
 }
 
 export async function getStaffSession(): Promise<StaffContext | null> {
@@ -24,10 +25,17 @@ export async function getStaffSession(): Promise<StaffContext | null> {
 
   if (!user?.email) return null;
 
-  const tenant = await resolveTenantForUser(user.id);
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('full_name, is_platform_admin')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const isPlatformAdmin = Boolean(profile?.is_platform_admin);
+  const tenant = (await resolveTenantForUser(user.id)) ?? (isPlatformAdmin ? await getDefaultTenant() : null);
   if (!tenant) return null;
 
-  const admin = createAdminClient();
   const { data: membership } = await admin
     .from('staff_memberships')
     .select('role, status')
@@ -37,21 +45,16 @@ export async function getStaffSession(): Promise<StaffContext | null> {
     .maybeSingle();
 
   if (!membership || !STAFF_ROLES.includes(membership.role as StaffRole)) {
-    return null;
+    if (!isPlatformAdmin) return null;
   }
-
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .maybeSingle();
 
   return {
     ...tenant,
     userId: user.id,
     email: user.email,
     fullName: profile?.full_name ?? null,
-    role: membership.role as StaffRole,
+    role: (membership?.role as StaffRole) ?? 'owner',
+    isPlatformAdmin,
   };
 }
 
@@ -68,6 +71,22 @@ export async function requireStaffApi(): Promise<StaffContext | NextResponse> {
     return await requireStaff();
   } catch {
     return NextResponse.json({ error: 'Sesión inválida o sin permisos' }, { status: 401 });
+  }
+}
+
+export async function requirePlatformAdmin(): Promise<StaffContext> {
+  const session = await requireStaff();
+  if (!session.isPlatformAdmin) {
+    throw new Error('Sin acceso de plataforma');
+  }
+  return session;
+}
+
+export async function requirePlatformAdminApi(): Promise<StaffContext | NextResponse> {
+  try {
+    return await requirePlatformAdmin();
+  } catch {
+    return NextResponse.json({ error: 'Solo el super admin puede hacer esto' }, { status: 403 });
   }
 }
 
