@@ -131,6 +131,39 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['customers']['Row']>;
         Relationships: [];
       };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+          unit_cost: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['order_items']['Row']> & {
+          order_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+        };
+        Update: Partial<Database['public']['Tables']['order_items']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'order_items_order_id_fkey';
+            columns: ['order_id'];
+            isOneToOne: false;
+            referencedRelation: 'orders';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       buildings: {
         Row: {
           id: string;
