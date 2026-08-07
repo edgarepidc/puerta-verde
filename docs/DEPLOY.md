@@ -29,6 +29,10 @@
 
 - Root directory: `apps/admin`
 - Variables similares + `NEXT_PUBLIC_WEB_URL` (URL de la tienda para links de seguimiento)
+- `PLATFORM_ADMIN_EMAILS` — emails del super admin de marca (coma-separados). Esos usuarios ven **/plataforma** y pueden crear verdulerías.
+- Opcional: aplica `supabase/migrations/20250806190000_platform_admin.sql` para el flag `profiles.is_platform_admin` y políticas RLS.
+
+La tienda (`/`) redirige a la demo (`/puerta-verde-demo`). El registro público está deshabilitado: las verdulerías se crean solo desde el panel de plataforma.
 
 ## Dominios sugeridos
 

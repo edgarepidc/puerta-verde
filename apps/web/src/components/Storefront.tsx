@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -13,9 +14,12 @@ import {
   getDefaultQuantity,
   getQuantityStep,
   getStockStatus,
+  isValidMexicanPhone,
+  ORDER_STATUS_LABELS,
   PRODUCT_UNIT_LABELS,
   STOCK_STATUS_LABELS,
   type FulfillmentType,
+  type OrderStatus,
   type ProductUnit,
   type PromotionKind,
   validateGuestCheckout,
@@ -23,6 +27,8 @@ import {
 
 import type { StorefrontProduct } from '@/app/[slug]/page';
 import { BrandLogo } from '@/components/BrandLogo';
+import { CartBasketIcon } from '@/components/CartBasketIcon';
+import { PromoCarousel, type CarouselSlide } from '@/components/PromoCarousel';
 
 interface Building {
   id: string;
@@ -32,6 +38,7 @@ interface Building {
 
 interface BranchInfo {
   id: string;
+  organization_id: string;
   name: string;
   slug: string;
   pickup_instructions: string | null;
@@ -57,11 +64,27 @@ interface CartItem {
   quantity: number;
 }
 
+interface LookupOrder {
+  orderNumber: number;
+  status: OrderStatus;
+  total: number;
+  trackingToken: string;
+  createdAt: string;
+  branchName: string;
+}
+
+const DEFAULT_HERO: CarouselSlide = {
+  id: 'default-hero',
+  title: 'Frescos del día, a tu puerta',
+  body: 'Frutas y verduras seleccionadas. Pide en minutos y recibe en tu edificio.',
+  imageUrl: '/brand/store-hero-default.jpg',
+};
+
 export function Storefront({
   branch,
   products,
   promotions,
-  buildings,
+  buildings: _buildings,
 }: {
   branch: BranchInfo;
   products: StorefrontProduct[];
@@ -73,7 +96,7 @@ export function Storefront({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery');
-  const [unitId, setUnitId] = useState('');
+  const [deliveryUnit, setDeliveryUnit] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +105,67 @@ export function Storefront({
   const [paymentPreference, setPaymentPreference] = useState<'on_delivery' | 'online'>('on_delivery');
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
+  const [pickerMode, setPickerMode] = useState<'add' | 'edit'>('add');
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [foundOrders, setFoundOrders] = useState<LookupOrder[]>([]);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [orderPulse, setOrderPulse] = useState(false);
+  const [customerHint, setCustomerHint] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cartListRef = useRef<HTMLUListElement | null>(null);
+  const lastLookupPhone = useRef('');
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const phone = customerPhone.trim();
+    if (!isValidMexicanPhone(phone)) {
+      setCustomerHint(null);
+      return;
+    }
+    if (lastLookupPhone.current === phone) return;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/customers/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, branchSlug: branch.slug }),
+        });
+        const payload = await response.json();
+        if (!response.ok) return;
+        lastLookupPhone.current = phone;
+        const customer = payload.customer as
+          | { fullName?: string; department?: string }
+          | null;
+        if (!customer) {
+          setCustomerHint(null);
+          return;
+        }
+        if (customer.fullName) setCustomerName((current) => current.trim() || customer.fullName || '');
+        if (customer.department) {
+          setDeliveryUnit((current) => current.trim() || customer.department || '');
+        }
+        setCustomerHint(
+          customer.fullName
+            ? `Encontramos tus datos: ${customer.fullName}`
+            : 'Encontramos un pedido previo con este teléfono',
+        );
+      } catch {
+        /* ignore lookup errors while typing */
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [customerPhone, branch.slug]);
 
   const discountPercent = useMemo(() => getActiveDiscountPercent(promotions), [promotions]);
 
@@ -110,6 +194,21 @@ export function Storefront({
   );
   const deliveryFee = fulfillmentType === 'delivery' ? Number(branch.delivery_fee) : 0;
   const total = subtotal + deliveryFee;
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const carouselSlides = useMemo<CarouselSlide[]>(() => {
+    const fromPromos = promotions
+      .filter((p) => p.kind === 'banner' || p.kind === 'bundle')
+      .map((p) => ({
+        id: p.id,
+        title: p.title,
+        body: p.body,
+        imageUrl: p.image_url?.trim() || DEFAULT_HERO.imageUrl,
+      }));
+    return fromPromos.length > 0 ? fromPromos : [DEFAULT_HERO];
+  }, [promotions]);
+
+  const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
 
   function effectivePrice(basePrice: number): number {
     return applyDiscount(basePrice, discountPercent);
@@ -119,45 +218,85 @@ export function Storefront({
     const unit = product.product.unit as ProductUnit;
     const status = getStockStatus(Number(product.stock), true);
     if (status === 'out') return;
+    setPickerMode('add');
     setPickerProduct(product);
     setPickerQty(getDefaultQuantity(unit));
   }
 
-  function addToCart(product: StorefrontProduct, quantity: number) {
-    const unit = product.product.unit as ProductUnit;
-    const price = effectivePrice(Number(product.price));
+  function openEditCartItem(item: CartItem) {
+    const product = products.find((row) => row.id === item.branchProductId);
+    if (!product) return;
+    setPickerMode('edit');
+    setPickerProduct(product);
+    setPickerQty(item.quantity);
+  }
+
+  function removeFromCart(branchProductId: string) {
+    setCart((current) => current.filter((item) => item.branchProductId !== branchProductId));
+    if (highlightId === branchProductId) setHighlightId(null);
+  }
+
+  function adjustCartQty(branchProductId: string, delta: number) {
+    setCart((current) =>
+      current.flatMap((item) => {
+        if (item.branchProductId !== branchProductId) return [item];
+        const step = getQuantityStep(item.unit);
+        const next = Number((item.quantity + delta * step).toFixed(3));
+        if (next <= 0) return [];
+        const product = products.find((row) => row.id === branchProductId);
+        const maxStock = product ? Number(product.stock) : next;
+        return [{ ...item, quantity: Math.min(next, maxStock) }];
+      }),
+    );
+  }
+
+  function confirmPicker() {
+    if (!pickerProduct) return;
+    const unit = pickerProduct.product.unit as ProductUnit;
+    const qty = Number(pickerQty);
+    if (!Number.isFinite(qty) || qty <= 0) return;
+    const price = effectivePrice(Number(pickerProduct.price));
+    const addedId = pickerProduct.id;
+    const mode = pickerMode;
     setCart((current) => {
-      const existing = current.find((item) => item.branchProductId === product.id);
+      const existing = current.find((item) => item.branchProductId === pickerProduct.id);
       if (existing) {
         return current.map((item) =>
-          item.branchProductId === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+          item.branchProductId === pickerProduct.id
+            ? {
+                ...item,
+                quantity: mode === 'edit' ? qty : item.quantity + qty,
+                price,
+              }
             : item,
         );
       }
       return [
         ...current,
         {
-          branchProductId: product.id,
-          name: product.product.name,
+          branchProductId: pickerProduct.id,
+          name: pickerProduct.product.name,
           unit,
           price,
-          quantity,
+          quantity: qty,
         },
       ];
     });
     setPickerProduct(null);
-  }
-
-  function confirmPicker() {
-    if (!pickerProduct) return;
-    const maxStock = Number(pickerProduct.stock);
-    if (pickerQty > maxStock) {
-      setError(`Solo hay ${formatProductQuantity(maxStock, pickerProduct.product.unit as ProductUnit)} disponibles.`);
-      return;
-    }
-    setError(null);
-    addToCart(pickerProduct, pickerQty);
+    setPickerMode('add');
+    setHighlightId(addedId);
+    setOrderPulse(true);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => {
+      setHighlightId(null);
+      setOrderPulse(false);
+    }, 1600);
+    requestAnimationFrame(() => {
+      document.getElementById('pedido')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      cartListRef.current
+        ?.querySelector(`[data-cart-id="${addedId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   }
 
   async function submitOrder() {
@@ -166,7 +305,7 @@ export function Storefront({
       customerName,
       customerPhone,
       fulfillmentType,
-      unitId: fulfillmentType === 'delivery' ? unitId : null,
+      deliveryUnit: fulfillmentType === 'delivery' ? deliveryUnit : null,
       deliveryNotes,
       items: cart.map((item) => ({
         branchProductId: item.branchProductId,
@@ -192,8 +331,9 @@ export function Storefront({
           customerName,
           customerPhone,
           fulfillmentType,
-          unitId: fulfillmentType === 'delivery' ? unitId : null,
+          deliveryUnit: fulfillmentType === 'delivery' ? deliveryUnit : null,
           deliveryNotes,
+          paymentPreference,
           items: cart.map((item) => ({
             branchProductId: item.branchProductId,
             quantity: item.quantity,
@@ -201,24 +341,12 @@ export function Storefront({
         }),
       });
       const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? 'No se pudo crear el pedido');
-      }
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo crear el pedido');
 
-      if (paymentPreference === 'online') {
-        const payResponse = await fetch('/api/orders/pay', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trackingToken: payload.trackingToken }),
-        });
-        const payPayload = await payResponse.json();
-        if (!payResponse.ok) throw new Error(payPayload.error ?? 'No se pudo iniciar el pago en línea');
-        if (payPayload.url) {
-          window.location.href = payPayload.url;
-          return;
-        }
+      if (payload.checkoutUrl) {
+        window.location.href = payload.checkoutUrl;
+        return;
       }
-
       router.push(`/pedido/${payload.trackingToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al enviar pedido');
@@ -227,340 +355,667 @@ export function Storefront({
     }
   }
 
-  const bannerPromos = promotions.filter((p) => p.kind === 'banner' || p.kind === 'bundle');
-  const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
+  async function searchOrders() {
+    setLookupLoading(true);
+    setLookupError(null);
+    try {
+      const response = await fetch('/api/orders/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lookupPhone, branchSlug: branch.slug }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo buscar');
+      setFoundOrders(payload.orders ?? []);
+      if (!(payload.orders ?? []).length) {
+        setLookupError('No encontramos pedidos con ese teléfono.');
+      }
+    } catch (err) {
+      setFoundOrders([]);
+      setLookupError(err instanceof Error ? err.message : 'Error al buscar');
+    } finally {
+      setLookupLoading(false);
+    }
+  }
 
   return (
     <>
       <div className="pv-ambient" aria-hidden />
-      <main className="relative mx-auto max-w-6xl px-4 py-8">
-      <header className="pv-glass-panel mb-8 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
-            <h1 className="mt-1 text-2xl font-bold text-[var(--pv-green-900)]">{branch.name}</h1>
-          </div>
-        </div>
-        <p className="mt-4 text-[var(--pv-green-800)]">
-          Pedido mínimo {formatMoney(Number(branch.minimum_order_amount))}
-          {Number(branch.delivery_fee) > 0
-            ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
-            : ' · Entrega para vecinos'}
-        </p>
-        {discountPromo && (
-          <p className="pv-callout--amber mt-2 px-3 py-2 text-sm font-medium">
-            {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo hoy
-          </p>
-        )}
-      </header>
-
-      {bannerPromos.length > 0 && (
-        <section className="mb-8 grid gap-4 md:grid-cols-2">
-          {bannerPromos.map((promo) => (
-            <article
-              key={promo.id}
-              className="pv-promo-banner"
-            >
-              {promo.image_url && (
-                <div className="relative h-36 w-full">
-                  <Image
-                    src={promo.image_url}
-                    alt={promo.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <div className="p-5">
-                <h2 className="text-lg font-semibold">{promo.title}</h2>
-                {promo.body && <p className="mt-2 text-sm text-green-50">{promo.body}</p>}
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
-
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Catálogo</h2>
-            <input
-              type="search"
-              placeholder="Buscar fruta, verdura..."
-              className="pv-input w-full sm:max-w-xs"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setCategoryFilter(category)}
-                className={`pv-pill ${
-                  categoryFilter === category ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
+      <div className="relative min-h-screen">
+        <header className="pv-store-nav relative z-40">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2 sm:max-w-4xl sm:gap-3 sm:px-4 sm:py-2.5">
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-12 w-auto sm:h-16 md:h-20" priority />
+            <div className="flex items-center gap-2">
+              <a
+                href="#pedido"
+                className="pv-btn-primary relative inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:px-4 sm:text-sm"
               >
-                {category === 'all' ? 'Todos' : category}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredProducts.map((product) => {
-              const unit = product.product.unit as ProductUnit;
-              const status = getStockStatus(Number(product.stock), true);
-              const basePrice = Number(product.price);
-              const salePrice = effectivePrice(basePrice);
-              const hasDiscount = discountPercent > 0 && salePrice < basePrice;
-
-              return (
-                <article key={product.id} className="pv-glass-card p-4">
-                  {product.product.image_url && (
-                    <div className="relative mb-3 h-32 w-full overflow-hidden rounded-xl">
-                      <Image
-                        src={product.product.image_url}
-                        alt={product.product.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs uppercase tracking-wide text-[var(--pv-green-600)]">
-                          {product.product.category?.name ?? 'General'}
-                        </p>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            status === 'out'
-                              ? 'bg-red-100 text-red-700'
-                              : status === 'low'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {STOCK_STATUS_LABELS[status]}
-                        </span>
-                      </div>
-                      <h3 className="font-semibold text-[var(--pv-green-900)]">{product.product.name}</h3>
-                      <p className="text-sm text-[var(--pv-green-800)]">
-                        {hasDiscount ? (
-                          <>
-                            <span className="mr-2 text-slate-400 line-through">
-                              {formatMoney(basePrice)}
-                            </span>
-                            <span className="font-semibold text-red-700">{formatMoney(salePrice)}</span>
-                          </>
-                        ) : (
-                          formatMoney(basePrice)
-                        )}{' '}
-                        / {PRODUCT_UNIT_LABELS[unit]}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={status === 'out'}
-                      onClick={() => openPicker(product)}
-                      className="pv-btn-primary shrink-0 px-4 py-2 text-sm disabled:cursor-not-allowed"
-                    >
-                      {status === 'out' ? 'Agotado' : 'Agregar'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {filteredProducts.length === 0 && (
-            <p className="pv-callout p-6 text-center text-sm">
-              No hay productos con ese filtro. Prueba otra categoría o búsqueda.
-            </p>
-          )}
-        </section>
-
-        <aside className="pv-glass-panel h-fit p-5 lg:sticky lg:top-6">
-          <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
-          {cart.length === 0 ? (
-            <p className="mt-4 text-sm text-[var(--pv-green-800)]">Agrega productos para continuar.</p>
-          ) : (
-            <ul className="mt-4 space-y-2 text-sm">
-              {cart.map((item) => (
-                <li key={item.branchProductId} className="flex justify-between gap-3">
-                  <span>
-                    {item.name} × {formatProductQuantity(item.quantity, item.unit)}
+                <CartBasketIcon className="h-4 w-4" tone="onPrimary" />
+                <span className="hidden sm:inline">Carrito</span>
+                {cartCount > 0 ? (
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums sm:text-xs">
+                    {cartCount}
                   </span>
-                  <span>{formatMoney(item.price * item.quantity)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-6 space-y-3">
-            <label className="block text-sm font-medium">Nombre</label>
-            <input
-              className="pv-input"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Tu nombre"
-            />
-            <label className="block text-sm font-medium">WhatsApp / teléfono</label>
-            <input
-              className="pv-input"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="55 1234 5678"
-            />
-            <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['delivery', 'pickup'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setFulfillmentType(type)}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                    fulfillmentType === type
-                      ? 'pv-pill--active'
-                      : 'pv-pill--inactive'
-                  }`}
-                >
-                  {FULFILLMENT_LABELS[type]}
-                </button>
-              ))}
+                ) : null}
+              </a>
+              <button
+                type="button"
+                className="pv-menu-toggle"
+                aria-expanded={menuOpen}
+                aria-controls="store-menu"
+                aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <span className={`pv-menu-toggle__bar ${menuOpen ? 'translate-y-[7px] rotate-45' : ''}`} />
+                <span className={`pv-menu-toggle__bar ${menuOpen ? 'opacity-0' : ''}`} />
+                <span className={`pv-menu-toggle__bar ${menuOpen ? '-translate-y-[7px] -rotate-45' : ''}`} />
+              </button>
             </div>
-            {fulfillmentType === 'delivery' ? (
-              <>
-                <label className="block text-sm font-medium">Departamento</label>
-                <select
-                  className="pv-input"
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
+          </div>
+          {menuOpen ? (
+            <div id="store-menu" className="border-t border-green-100 bg-white px-3 py-3 sm:px-4">
+              <nav className="mx-auto flex max-w-3xl flex-col gap-1 sm:max-w-4xl" aria-label="Menú de la tienda">
+                <a
+                  href="#inicio"
+                  className="pv-store-link"
+                  onClick={() => setMenuOpen(false)}
                 >
-                  <option value="">Selecciona tu depto</option>
-                  {buildings.map((building) => (
-                    <optgroup key={building.id} label={building.name}>
-                      {building.units.map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {building.name} — {unit.identifier}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <p className="pv-callout p-3 text-sm">
-                {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
+                  Inicio
+                </a>
+                <a
+                  href="#catalogo"
+                  className="pv-store-link"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Catálogo
+                </a>
+                <button
+                  type="button"
+                  className="pv-store-link text-left"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setOrdersOpen(true);
+                  }}
+                >
+                  Mis pedidos
+                </button>
+                <a
+                  href="#pedido"
+                  className="pv-store-link inline-flex items-center gap-1.5"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <CartBasketIcon className="h-4 w-4" />
+                  Carrito{cartCount > 0 ? ` (${cartCount})` : ''}
+                </a>
+              </nav>
+            </div>
+          ) : null}
+        </header>
+
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <section id="inicio" className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
+                <h1 className="text-2xl font-bold text-[var(--pv-green-900)] sm:text-3xl">
+                  {branch.name}
+                </h1>
+              </div>
+              <p className="text-sm text-slate-600">
+                Mínimo {formatMoney(Number(branch.minimum_order_amount))}
+                {Number(branch.delivery_fee) > 0
+                  ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
+                  : ' · Entrega a vecinos'}
+              </p>
+            </div>
+
+            <PromoCarousel slides={carouselSlides} />
+
+            {discountPromo && (
+              <p className="pv-callout--amber px-4 py-3 text-sm font-medium">
+                {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo
               </p>
             )}
-            <label className="block text-sm font-medium">Forma de pago</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentPreference('on_delivery')}
-                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  paymentPreference === 'on_delivery' ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
-              >
-                Al entregar
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentPreference('online')}
-                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  paymentPreference === 'online' ? 'pv-pill--active' : 'pv-pill--inactive'
-                }`}
-              >
-                Pagar en línea
-              </button>
-            </div>
-            <label className="block text-sm font-medium">Notas</label>
-            <textarea
-              className="pv-input"
-              rows={3}
-              value={deliveryNotes}
-              onChange={(e) => setDeliveryNotes(e.target.value)}
-              placeholder="Ej. sin cebolla, entregar después de las 6pm"
-            />
-          </div>
+          </section>
 
-          <div className="mt-6 space-y-1 border-t border-green-100 pt-4 text-sm">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatMoney(subtotal)}</span>
-            </div>
-            {deliveryFee > 0 && (
-              <div className="flex justify-between">
-                <span>Envío</span>
-                <span>{formatMoney(deliveryFee)}</span>
+          <div className="mt-8 grid gap-8 lg:grid-cols-[2fr_0.95fr]">
+            <section id="catalogo" className="space-y-4 scroll-mt-24">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Catálogo</h2>
+                <input
+                  type="search"
+                  placeholder="Buscar fruta, verdura..."
+                  className="pv-input pv-search w-full sm:max-w-xs"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-            )}
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span>{formatMoney(total)}</span>
+
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setCategoryFilter(category)}
+                    className={`pv-pill ${
+                      categoryFilter === category ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    {category === 'all' ? 'Todos' : category}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pv-catalog-scroll">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+                {filteredProducts.map((product) => {
+                  const unit = product.product.unit as ProductUnit;
+                  const status = getStockStatus(Number(product.stock), true);
+                  const basePrice = Number(product.price);
+                  const salePrice = effectivePrice(basePrice);
+                  const hasDiscount = discountPercent > 0 && salePrice < basePrice;
+
+                  return (
+                    <article
+                      key={product.id}
+                      className="pv-glass-card group overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div className="relative h-32 w-full bg-gradient-to-br from-green-50 to-emerald-100 sm:h-36">
+                        {product.product.image_url ? (
+                          <Image
+                            src={product.product.image_url}
+                            alt={product.product.name}
+                            fill
+                            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_30%_30%,#bbf7d4,transparent_55%),radial-gradient(circle_at_70%_70%,#86efac,transparent_50%)]" />
+                        )}
+                      </div>
+                      <div className="p-3 sm:p-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--pv-green-600)] sm:text-xs">
+                            {product.product.category?.name ?? 'General'}
+                          </p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-xs ${
+                              status === 'out'
+                                ? 'bg-red-100 text-red-700'
+                                : status === 'low'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-green-100 text-green-800'
+                            }`}
+                          >
+                            {STOCK_STATUS_LABELS[status]}
+                          </span>
+                        </div>
+                        <h3 className="mt-1 text-sm font-semibold leading-snug text-[var(--pv-green-900)] sm:text-base">
+                          {product.product.name}
+                        </h3>
+                        <div className="mt-3 flex flex-col gap-2">
+                          <p className="text-sm text-[var(--pv-green-800)]">
+                            {hasDiscount ? (
+                              <>
+                                <span className="mr-2 text-slate-400 line-through">
+                                  {formatMoney(basePrice)}
+                                </span>
+                                <span className="font-semibold text-red-700">
+                                  {formatMoney(salePrice)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-semibold">{formatMoney(basePrice)}</span>
+                            )}{' '}
+                            / {PRODUCT_UNIT_LABELS[unit]}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={status === 'out'}
+                            onClick={() => openPicker(product)}
+                            className="pv-btn-primary w-full px-3 py-2 text-xs disabled:cursor-not-allowed sm:text-sm"
+                          >
+                            {status === 'out' ? 'Agotado' : 'Agregar'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+                </div>
+                {filteredProducts.length > 4 ? (
+                  <p className="pointer-events-none sticky bottom-0 bg-gradient-to-t from-white via-white/95 to-transparent pt-6 pb-1 text-center text-[11px] font-medium text-slate-500">
+                    Desliza para ver más productos
+                  </p>
+                ) : null}
+              </div>
+
+              {filteredProducts.length === 0 && (
+                <p className="pv-callout p-6 text-center text-sm">
+                  No hay productos con ese filtro. Prueba otra categoría o búsqueda.
+                </p>
+              )}
+            </section>
+
+            <aside
+              id="pedido"
+              className={`pv-glass-panel h-fit scroll-mt-24 p-5 lg:sticky lg:top-24 ${
+                orderPulse ? 'pv-order-panel--pulse' : ''
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 ring-1 ring-green-100">
+                  <CartBasketIcon className="h-8 w-8" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--pv-green-900)]">Tu pedido</h2>
+                  <p className="text-xs text-slate-500">
+                    {cart.length === 0
+                      ? 'Aún vacío'
+                      : `${cart.length} producto${cart.length === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+              </div>
+              {cart.length === 0 ? (
+                <div className="mt-5 rounded-2xl border border-dashed border-green-200 bg-green-50/50 px-4 py-6 text-center">
+                  <CartBasketIcon className="mx-auto h-14 w-14 opacity-80" />
+                  <p className="mt-3 text-sm text-[var(--pv-green-800)]">
+                    Agrega productos del catálogo para continuar.
+                  </p>
+                </div>
+              ) : (
+                <ul ref={cartListRef} className="mt-4 space-y-2 text-sm">
+                  {cart.map((item) => (
+                    <li
+                      key={item.branchProductId}
+                      data-cart-id={item.branchProductId}
+                      className={`rounded-xl border border-green-100/80 bg-white px-2.5 py-2.5 ${
+                        highlightId === item.branchProductId ? 'pv-cart-item--flash' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-[var(--pv-green-900)]">{item.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {formatMoney(item.price)} / {PRODUCT_UNIT_LABELS[item.unit]}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.branchProductId)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          aria-label={`Quitar ${item.name}`}
+                          title="Quitar"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50">
+                          <button
+                            type="button"
+                            onClick={() => adjustCartQty(item.branchProductId, -1)}
+                            className="px-2.5 py-1 text-base font-semibold text-slate-600 hover:text-[var(--pv-green-800)]"
+                            aria-label="Disminuir cantidad"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[3.5rem] px-1 text-center text-xs font-medium tabular-nums text-slate-700">
+                            {formatProductQuantity(item.quantity, item.unit)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => adjustCartQty(item.branchProductId, 1)}
+                            className="px-2.5 py-1 text-base font-semibold text-slate-600 hover:text-[var(--pv-green-800)]"
+                            aria-label="Aumentar cantidad"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditCartItem(item)}
+                            className="text-xs font-semibold text-[var(--pv-green-700)] hover:underline"
+                          >
+                            Editar
+                          </button>
+                          <span className="font-semibold tabular-nums text-[var(--pv-green-900)]">
+                            {formatMoney(item.price * item.quantity)}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {cart.length > 0 ? (
+                <div className="mt-3 space-y-1 rounded-xl bg-green-50/80 px-3 py-3 text-sm ring-1 ring-green-100">
+                  <div className="flex justify-between text-[var(--pv-green-800)]">
+                    <span>Subtotal</span>
+                    <span className="font-medium tabular-nums">{formatMoney(subtotal)}</span>
+                  </div>
+                  {deliveryFee > 0 ? (
+                    <div className="flex justify-between text-[var(--pv-green-800)]">
+                      <span>Envío</span>
+                      <span className="tabular-nums">{formatMoney(deliveryFee)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between border-t border-green-200/80 pt-2 text-base font-semibold text-[var(--pv-green-900)]">
+                    <span>Total</span>
+                    <span className="tabular-nums">{formatMoney(total)}</span>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-6 space-y-3">
+                <label className="block text-sm font-medium">WhatsApp / teléfono</label>
+                <input
+                  className="pv-input"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    lastLookupPhone.current = '';
+                    setCustomerPhone(e.target.value);
+                  }}
+                  placeholder="55 1234 5678"
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+                {customerHint ? (
+                  <p className="text-xs font-medium text-[var(--pv-green-700)]">{customerHint}</p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Si ya pediste antes, al escribir tu teléfono cargamos nombre y departamento.
+                  </p>
+                )}
+                <label className="block text-sm font-medium">Nombre</label>
+                <input
+                  className="pv-input"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Tu nombre"
+                  autoComplete="name"
+                />
+                <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['delivery', 'pickup'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFulfillmentType(type)}
+                      className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        fulfillmentType === type ? 'pv-pill--active' : 'pv-pill--inactive'
+                      }`}
+                    >
+                      {FULFILLMENT_LABELS[type]}
+                    </button>
+                  ))}
+                </div>
+                {fulfillmentType === 'delivery' ? (
+                  <>
+                    <label className="block text-sm font-medium">Departamento / torre</label>
+                    <input
+                      className="pv-input"
+                      value={deliveryUnit}
+                      onChange={(e) => setDeliveryUnit(e.target.value)}
+                      placeholder="Ej. Torre A 101"
+                      autoComplete="address-line2"
+                    />
+                  </>
+                ) : (
+                  <p className="pv-callout p-3 text-sm">
+                    {branch.pickup_instructions ?? 'Pasa a recoger en el local.'}
+                  </p>
+                )}
+                <label className="block text-sm font-medium">Forma de pago</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPreference('on_delivery')}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      paymentPreference === 'on_delivery' ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    Al entregar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentPreference('online')}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      paymentPreference === 'online' ? 'pv-pill--active' : 'pv-pill--inactive'
+                    }`}
+                  >
+                    Pagar en línea
+                  </button>
+                </div>
+                <label className="block text-sm font-medium">Notas</label>
+                <textarea
+                  className="pv-input"
+                  rows={3}
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="Ej. sin cebolla, entregar después de las 6pm"
+                />
+              </div>
+
+              <div className="mt-6 space-y-1 border-t border-green-100 pt-4 text-sm">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatMoney(subtotal)}</span>
+                </div>
+                {deliveryFee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Envío</span>
+                    <span>{formatMoney(deliveryFee)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Total</span>
+                  <span>{formatMoney(total)}</span>
+                </div>
+              </div>
+
+              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+              <button
+                type="button"
+                disabled={submitting || cart.length === 0}
+                onClick={submitOrder}
+                className="pv-btn-primary mt-4 w-full px-4 py-3"
+              >
+                {submitting
+                  ? 'Enviando...'
+                  : paymentPreference === 'online'
+                    ? 'Continuar al pago'
+                    : 'Confirmar pedido'}
+              </button>
+            </aside>
+          </div>
+        </main>
+
+        <footer className="mt-10 border-t border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-[var(--pv-green-900)]">{branch.org_name}</p>
+              <p>{branch.name}</p>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <a href="#catalogo" className="hover:text-[var(--pv-green-700)]">
+                Catálogo
+              </a>
+              <button
+                type="button"
+                onClick={() => setOrdersOpen(true)}
+                className="hover:text-[var(--pv-green-700)]"
+              >
+                Mis pedidos
+              </button>
+              <a href="#pedido" className="hover:text-[var(--pv-green-700)]">
+                Carrito
+              </a>
             </div>
           </div>
-
-          {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-
-          <button
-            type="button"
-            disabled={submitting || cart.length === 0}
-            onClick={submitOrder}
-            className="pv-btn-primary mt-4 w-full px-4 py-3"
-          >
-            {submitting ? 'Enviando...' : paymentPreference === 'online' ? 'Continuar al pago' : 'Confirmar pedido'}
-          </button>
-        </aside>
+        </footer>
       </div>
 
       {pickerProduct && (
-        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="pv-glass-panel w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">
-              {pickerProduct.product.name}
+              {pickerMode === 'edit' ? 'Editar cantidad' : pickerProduct.product.name}
             </h3>
             <p className="mt-1 text-sm text-[var(--pv-green-800)]">
-              Disponible: {formatProductQuantity(Number(pickerProduct.stock), pickerProduct.product.unit as ProductUnit)}
+              {pickerMode === 'edit' ? pickerProduct.product.name : null}
+              {pickerMode === 'edit' ? ' · ' : null}
+              Disponible:{' '}
+              {formatProductQuantity(
+                Number(pickerProduct.stock),
+                pickerProduct.product.unit as ProductUnit,
+              )}
             </p>
             <label className="mt-4 block text-sm font-medium">
               Cantidad ({PRODUCT_UNIT_LABELS[pickerProduct.product.unit as ProductUnit]})
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Disminuir cantidad"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xl font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  const step = getQuantityStep(pickerProduct.product.unit as ProductUnit);
+                  const min = step;
+                  setPickerQty((current) => {
+                    const next = Number((Number(current) - step).toFixed(3));
+                    return next < min ? min : next;
+                  });
+                }}
+              >
+                −
+              </button>
               <input
                 type="number"
                 min={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 step={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 max={Number(pickerProduct.stock)}
-                className="pv-input mt-1"
+                className="pv-input text-center text-base font-semibold tabular-nums"
                 value={pickerQty}
                 onChange={(e) => setPickerQty(Number(e.target.value))}
+                inputMode="decimal"
               />
-            </label>
+              <button
+                type="button"
+                aria-label="Aumentar cantidad"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xl font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  const step = getQuantityStep(pickerProduct.product.unit as ProductUnit);
+                  const max = Number(pickerProduct.stock);
+                  setPickerQty((current) => {
+                    const next = Number((Number(current) + step).toFixed(3));
+                    return next > max ? max : next;
+                  });
+                }}
+              >
+                +
+              </button>
+            </div>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => setPickerProduct(null)}
+                onClick={() => {
+                  setPickerProduct(null);
+                  setPickerMode('add');
+                }}
                 className="pv-btn-secondary flex-1 px-4 py-2 text-sm"
               >
                 Cancelar
               </button>
+              {pickerMode === 'edit' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeFromCart(pickerProduct.id);
+                    setPickerProduct(null);
+                    setPickerMode('add');
+                  }}
+                  className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                >
+                  Quitar
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={confirmPicker}
                 className="pv-btn-primary flex-1 px-4 py-2 text-sm"
               >
-                Agregar
+                {pickerMode === 'edit' ? 'Guardar' : 'Agregar'}
               </button>
             </div>
           </div>
         </div>
       )}
-    </main>
+
+      {ordersOpen && (
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="pv-glass-panel w-full max-w-md p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">Mis pedidos</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Consulta con el mismo teléfono del pedido. Sin crear cuenta.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrdersOpen(false)}
+                className="text-slate-500 hover:text-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+            <label className="mt-4 block text-sm font-medium">
+              Teléfono / WhatsApp
+              <input
+                className="pv-input mt-1"
+                value={lookupPhone}
+                onChange={(e) => setLookupPhone(e.target.value)}
+                placeholder="55 1234 5678"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={lookupLoading}
+              onClick={searchOrders}
+              className="pv-btn-primary mt-3 w-full px-4 py-2.5 text-sm disabled:opacity-50"
+            >
+              {lookupLoading ? 'Buscando...' : 'Buscar pedidos'}
+            </button>
+            {lookupError && <p className="mt-3 text-sm text-red-600">{lookupError}</p>}
+            <ul className="mt-4 space-y-3">
+              {foundOrders.map((order) => (
+                <li key={order.trackingToken} className="pv-glass-item rounded-xl p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900">#{order.orderNumber}</p>
+                      <p className="text-xs text-slate-500">
+                        {ORDER_STATUS_LABELS[order.status]} ·{' '}
+                        {new Date(order.createdAt).toLocaleDateString('es-MX')}
+                      </p>
+                    </div>
+                    <span className="font-medium">{formatMoney(Number(order.total))}</span>
+                  </div>
+                  <Link
+                    href={`/pedido/${order.trackingToken}`}
+                    className="mt-2 inline-block text-[var(--pv-green-700)] hover:underline"
+                  >
+                    Ver seguimiento →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </>
   );
 }

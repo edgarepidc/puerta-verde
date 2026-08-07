@@ -1,24 +1,62 @@
 import { NextResponse } from 'next/server';
 
+import { normalizePhone } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import {
   buildOrderConfirmationMessage,
   sendTextMessage,
 } from '@puertaverde/whatsapp';
 
+import { resolveDeliveryUnitId } from '@/lib/resolve-delivery-unit';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const supabase = createAdminClient();
+
+    const { data: branch, error: branchError } = await supabase
+      .from('branches')
+      .select('id, name, organization_id')
+      .eq('slug', body.branchSlug)
+      .single();
+
+    if (branchError || !branch) {
+      return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 400 });
+    }
+
+    const deliveryUnitLabel =
+      typeof body.deliveryUnit === 'string' ? body.deliveryUnit.trim() : '';
+    let unitId: string | null = body.unitId ?? null;
+
+    if (body.fulfillmentType === 'delivery') {
+      if (!deliveryUnitLabel && !unitId) {
+        return NextResponse.json(
+          { error: 'Ingresa tu departamento para la entrega.' },
+          { status: 400 },
+        );
+      }
+      if (deliveryUnitLabel) {
+        unitId = await resolveDeliveryUnitId(supabase, branch.id, deliveryUnitLabel);
+      }
+    } else {
+      unitId = null;
+    }
+
+    const items = Array.isArray(body.items)
+      ? body.items.map((item: { branchProductId?: string; branch_product_id?: string; quantity: number }) => ({
+          branch_product_id: item.branch_product_id ?? item.branchProductId,
+          quantity: item.quantity,
+        }))
+      : [];
 
     const { data, error } = await supabase.rpc('place_guest_order', {
       p_branch_slug: body.branchSlug,
       p_customer_name: body.customerName,
       p_customer_phone: body.customerPhone,
       p_fulfillment_type: body.fulfillmentType,
-      p_unit_id: body.unitId ?? null,
+      p_unit_id: unitId,
       p_delivery_notes: body.deliveryNotes ?? null,
-      p_items: body.items,
+      p_items: items,
     });
 
     if (error || !data?.[0]) {
@@ -26,19 +64,27 @@ export async function POST(request: Request) {
     }
 
     const order = data[0];
+
+    if (deliveryUnitLabel) {
+      await supabase
+        .from('orders')
+        .update({ delivery_unit_label: deliveryUnitLabel })
+        .eq('id', order.order_id);
+
+      await supabase
+        .from('customers')
+        .update({ default_delivery_label: deliveryUnitLabel })
+        .eq('organization_id', branch.organization_id)
+        .eq('phone', normalizePhone(String(body.customerPhone ?? '')));
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
     const trackingUrl = `${appUrl}/pedido/${order.tracking_token}`;
-
-    const { data: branch } = await supabase
-      .from('branches')
-      .select('name, organization_id')
-      .eq('slug', body.branchSlug)
-      .single();
 
     const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-    if (whatsappToken && phoneNumberId && branch) {
+    if (whatsappToken && phoneNumberId) {
       const message = buildOrderConfirmationMessage({
         orderNumber: Number(order.order_number),
         customerName: body.customerName,

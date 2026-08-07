@@ -13,8 +13,8 @@ insert into public.branches (id, organization_id, name, slug, address, pickup_in
 values (
   'b0000000-0000-4000-8000-000000000001',
   'a0000000-0000-4000-8000-000000000001',
-  'Puerta Verde — Torre A',
-  'puerta-verde-demo',
+  'Tienda Citté',
+  'tienda-citte',
   'Planta baja, Torre A, Residencial Las Palmas',
   'Pasa por el local en planta baja. Horario: 8am – 8pm.',
   0,

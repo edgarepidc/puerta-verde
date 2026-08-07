@@ -29,6 +29,7 @@ export async function GET() {
             name,
             description,
             unit,
+            image_url,
             is_active,
             shelf_life_days,
             category_id,
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
         name: body.name.trim(),
         description: body.description?.trim() || null,
         unit: body.unit,
+        image_url: body.imageUrl?.trim() || null,
         shelf_life_days: body.shelfLifeDays ?? null,
         is_active: body.isActive,
       })

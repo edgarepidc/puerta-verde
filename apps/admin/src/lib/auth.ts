@@ -6,6 +6,7 @@ import {
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { isEmailPlatformAdmin } from '@/lib/platform-admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getDefaultTenant, resolveTenantForUser, type TenantContext } from '@/lib/tenant';
 
@@ -17,6 +18,39 @@ export interface StaffContext extends TenantContext {
   isPlatformAdmin: boolean;
 }
 
+async function resolvePlatformAdminFlag(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  email: string,
+): Promise<{ fullName: string | null; isPlatformAdmin: boolean }> {
+  const emailIsAdmin = isEmailPlatformAdmin(email);
+
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .maybeSingle();
+
+  // Optional DB flag — only queried when PLATFORM_ADMIN_USE_DB_FLAG=1
+  // (after applying supabase/migrations/20250806190000_platform_admin.sql).
+  let dbFlag = false;
+  if (process.env.PLATFORM_ADMIN_USE_DB_FLAG === '1') {
+    const { data: flagRow, error: flagError } = await admin
+      .from('profiles')
+      .select('is_platform_admin')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!flagError) {
+      dbFlag = Boolean(flagRow?.is_platform_admin);
+    }
+  }
+
+  return {
+    fullName: profile?.full_name ?? null,
+    isPlatformAdmin: emailIsAdmin || dbFlag,
+  };
+}
+
 export async function getStaffSession(): Promise<StaffContext | null> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -26,13 +60,7 @@ export async function getStaffSession(): Promise<StaffContext | null> {
   if (!user?.email) return null;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('full_name, is_platform_admin')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  const isPlatformAdmin = Boolean(profile?.is_platform_admin);
+  const { fullName, isPlatformAdmin } = await resolvePlatformAdminFlag(admin, user.id, user.email);
   const tenant = (await resolveTenantForUser(user.id)) ?? (isPlatformAdmin ? await getDefaultTenant() : null);
   if (!tenant) return null;
 
@@ -52,7 +80,7 @@ export async function getStaffSession(): Promise<StaffContext | null> {
     ...tenant,
     userId: user.id,
     email: user.email,
-    fullName: profile?.full_name ?? null,
+    fullName,
     role: (membership?.role as StaffRole) ?? 'owner',
     isPlatformAdmin,
   };
