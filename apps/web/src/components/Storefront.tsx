@@ -152,27 +152,14 @@ export function Storefront({
 
   const carouselSlides = useMemo<CarouselSlide[]>(() => {
     const fromPromos = promotions
-      .filter((p) => (p.kind === 'banner' || p.kind === 'bundle') && p.image_url)
+      .filter((p) => p.kind === 'banner' || p.kind === 'bundle')
       .map((p) => ({
         id: p.id,
         title: p.title,
         body: p.body,
-        imageUrl: p.image_url as string,
+        imageUrl: p.image_url?.trim() || DEFAULT_HERO.imageUrl,
       }));
-    if (fromPromos.length > 0) return fromPromos;
-
-    const textPromo = promotions.find((p) => p.kind === 'banner' || p.kind === 'bundle');
-    if (textPromo) {
-      return [
-        {
-          id: textPromo.id,
-          title: textPromo.title,
-          body: textPromo.body,
-          imageUrl: DEFAULT_HERO.imageUrl,
-        },
-      ];
-    }
-    return [DEFAULT_HERO];
+    return fromPromos.length > 0 ? fromPromos : [DEFAULT_HERO];
   }, [promotions]);
 
   const discountPromo = promotions.find((p) => p.kind === 'discount' && p.discount_percent);
