@@ -382,31 +382,16 @@ export function Storefront({
     <>
       <div className="pv-ambient" aria-hidden />
       <div className="relative min-h-screen">
-        <header className="pv-store-nav sticky top-0 z-40 backdrop-blur-md">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3">
-            <BrandLogo href={`/${branch.slug}`} imageClassName="h-14 w-auto sm:h-20 md:h-24" priority />
-            <nav className="pv-store-nav__menu hidden md:flex" aria-label="Menú de la tienda">
-              <a href="#inicio" className="pv-store-link">
-                Inicio
-              </a>
-              <a href="#catalogo" className="pv-store-link">
-                Catálogo
-              </a>
-              <button type="button" onClick={() => setOrdersOpen(true)} className="pv-store-link">
-                Mis pedidos
-              </button>
-              <a href="#pedido" className="pv-store-link inline-flex items-center gap-1.5">
-                <CartBasketIcon className="h-4 w-4" />
-                Carrito
-              </a>
-            </nav>
+        <header className="pv-store-nav relative z-40">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2 sm:max-w-4xl sm:gap-3 sm:px-4 sm:py-2.5">
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-12 w-auto sm:h-16 md:h-20" priority />
             <div className="flex items-center gap-2">
               <a
                 href="#pedido"
                 className="pv-btn-primary relative inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:px-4 sm:text-sm"
               >
                 <CartBasketIcon className="h-4 w-4" tone="onPrimary" />
-                <span className="hidden xs:inline sm:inline">Carrito</span>
+                <span className="hidden sm:inline">Carrito</span>
                 {cartCount > 0 ? (
                   <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums sm:text-xs">
                     {cartCount}
@@ -415,9 +400,9 @@ export function Storefront({
               </a>
               <button
                 type="button"
-                className="pv-menu-toggle md:hidden"
+                className="pv-menu-toggle"
                 aria-expanded={menuOpen}
-                aria-controls="mobile-store-menu"
+                aria-controls="store-menu"
                 aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
                 onClick={() => setMenuOpen((open) => !open)}
               >
@@ -428,11 +413,8 @@ export function Storefront({
             </div>
           </div>
           {menuOpen ? (
-            <div
-              id="mobile-store-menu"
-              className="border-t border-green-100 bg-white px-4 py-3 md:hidden"
-            >
-              <nav className="mx-auto flex max-w-4xl flex-col gap-1" aria-label="Menú móvil">
+            <div id="store-menu" className="border-t border-green-100 bg-white px-3 py-3 sm:px-4">
+              <nav className="mx-auto flex max-w-3xl flex-col gap-1 sm:max-w-4xl" aria-label="Menú de la tienda">
                 <a
                   href="#inicio"
                   className="pv-store-link"
@@ -878,7 +860,7 @@ export function Storefront({
       </div>
 
       {pickerProduct && (
-        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="pv-glass-panel w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-[var(--pv-green-900)]">
               {pickerMode === 'edit' ? 'Editar cantidad' : pickerProduct.product.name}
@@ -941,7 +923,7 @@ export function Storefront({
       )}
 
       {ordersOpen && (
-        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+        <div className="pv-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="pv-glass-panel w-full max-w-md p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
