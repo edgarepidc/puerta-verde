@@ -42,6 +42,13 @@ export async function POST(request: Request) {
       unitId = null;
     }
 
+    const items = Array.isArray(body.items)
+      ? body.items.map((item: { branchProductId?: string; branch_product_id?: string; quantity: number }) => ({
+          branch_product_id: item.branch_product_id ?? item.branchProductId,
+          quantity: item.quantity,
+        }))
+      : [];
+
     const { data, error } = await supabase.rpc('place_guest_order', {
       p_branch_slug: body.branchSlug,
       p_customer_name: body.customerName,
@@ -49,7 +56,7 @@ export async function POST(request: Request) {
       p_fulfillment_type: body.fulfillmentType,
       p_unit_id: unitId,
       p_delivery_notes: body.deliveryNotes ?? null,
-      p_items: body.items,
+      p_items: items,
     });
 
     if (error || !data?.[0]) {

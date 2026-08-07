@@ -876,16 +876,49 @@ export function Storefront({
             </p>
             <label className="mt-4 block text-sm font-medium">
               Cantidad ({PRODUCT_UNIT_LABELS[pickerProduct.product.unit as ProductUnit]})
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Disminuir cantidad"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xl font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  const step = getQuantityStep(pickerProduct.product.unit as ProductUnit);
+                  const min = step;
+                  setPickerQty((current) => {
+                    const next = Number((Number(current) - step).toFixed(3));
+                    return next < min ? min : next;
+                  });
+                }}
+              >
+                −
+              </button>
               <input
                 type="number"
                 min={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 step={getQuantityStep(pickerProduct.product.unit as ProductUnit)}
                 max={Number(pickerProduct.stock)}
-                className="pv-input mt-1"
+                className="pv-input text-center text-base font-semibold tabular-nums"
                 value={pickerQty}
                 onChange={(e) => setPickerQty(Number(e.target.value))}
+                inputMode="decimal"
               />
-            </label>
+              <button
+                type="button"
+                aria-label="Aumentar cantidad"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xl font-semibold text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  const step = getQuantityStep(pickerProduct.product.unit as ProductUnit);
+                  const max = Number(pickerProduct.stock);
+                  setPickerQty((current) => {
+                    const next = Number((Number(current) + step).toFixed(3));
+                    return next > max ? max : next;
+                  });
+                }}
+              >
+                +
+              </button>
+            </div>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
