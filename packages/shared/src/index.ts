@@ -78,6 +78,9 @@ export interface GuestCheckoutInput {
   customerName: string;
   customerPhone: string;
   fulfillmentType: FulfillmentType;
+  /** Free-text department / unit label for delivery */
+  deliveryUnit?: string | null;
+  /** @deprecated use deliveryUnit */
   unitId?: string | null;
   deliveryNotes?: string | null;
   items: Array<{
@@ -171,8 +174,9 @@ export {
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
   if (!input.customerName.trim()) return 'El nombre es obligatorio.';
   if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';
-  if (input.fulfillmentType === 'delivery' && !input.unitId) {
-    return 'Selecciona tu departamento para la entrega.';
+  const deliveryUnit = (input.deliveryUnit ?? '').trim() || (input.unitId ?? '').trim();
+  if (input.fulfillmentType === 'delivery' && !deliveryUnit) {
+    return 'Ingresa tu departamento para la entrega.';
   }
   if (!input.items.length) return 'Agrega al menos un producto.';
   for (const item of input.items) {

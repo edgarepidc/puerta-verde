@@ -14,6 +14,7 @@ import {
   getDefaultQuantity,
   getQuantityStep,
   getStockStatus,
+  isValidMexicanPhone,
   ORDER_STATUS_LABELS,
   PRODUCT_UNIT_LABELS,
   STOCK_STATUS_LABELS,
@@ -83,7 +84,7 @@ export function Storefront({
   branch,
   products,
   promotions,
-  buildings,
+  buildings: _buildings,
 }: {
   branch: BranchInfo;
   products: StorefrontProduct[];
@@ -95,7 +96,7 @@ export function Storefront({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery');
-  const [unitId, setUnitId] = useState('');
+  const [deliveryUnit, setDeliveryUnit] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,20 +107,65 @@ export function Storefront({
   const [pickerQty, setPickerQty] = useState(1);
   const [pickerMode, setPickerMode] = useState<'add' | 'edit'>('add');
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [lookupPhone, setLookupPhone] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [foundOrders, setFoundOrders] = useState<LookupOrder[]>([]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [orderPulse, setOrderPulse] = useState(false);
+  const [customerHint, setCustomerHint] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartListRef = useRef<HTMLUListElement | null>(null);
+  const lastLookupPhone = useRef('');
 
   useEffect(() => {
     return () => {
       if (highlightTimer.current) clearTimeout(highlightTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    const phone = customerPhone.trim();
+    if (!isValidMexicanPhone(phone)) {
+      setCustomerHint(null);
+      return;
+    }
+    if (lastLookupPhone.current === phone) return;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/customers/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, branchSlug: branch.slug }),
+        });
+        const payload = await response.json();
+        if (!response.ok) return;
+        lastLookupPhone.current = phone;
+        const customer = payload.customer as
+          | { fullName?: string; department?: string }
+          | null;
+        if (!customer) {
+          setCustomerHint(null);
+          return;
+        }
+        if (customer.fullName) setCustomerName((current) => current.trim() || customer.fullName || '');
+        if (customer.department) {
+          setDeliveryUnit((current) => current.trim() || customer.department || '');
+        }
+        setCustomerHint(
+          customer.fullName
+            ? `Encontramos tus datos: ${customer.fullName}`
+            : 'Encontramos un pedido previo con este teléfono',
+        );
+      } catch {
+        /* ignore lookup errors while typing */
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [customerPhone, branch.slug]);
 
   const discountPercent = useMemo(() => getActiveDiscountPercent(promotions), [promotions]);
 
@@ -259,7 +305,7 @@ export function Storefront({
       customerName,
       customerPhone,
       fulfillmentType,
-      unitId: fulfillmentType === 'delivery' ? unitId : null,
+      deliveryUnit: fulfillmentType === 'delivery' ? deliveryUnit : null,
       deliveryNotes,
       items: cart.map((item) => ({
         branchProductId: item.branchProductId,
@@ -285,7 +331,7 @@ export function Storefront({
           customerName,
           customerPhone,
           fulfillmentType,
-          unitId: fulfillmentType === 'delivery' ? unitId : null,
+          deliveryUnit: fulfillmentType === 'delivery' ? deliveryUnit : null,
           deliveryNotes,
           paymentPreference,
           items: cart.map((item) => ({
@@ -338,7 +384,7 @@ export function Storefront({
       <div className="relative min-h-screen">
         <header className="pv-store-nav sticky top-0 z-40 backdrop-blur-md">
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2.5 sm:py-3">
-            <BrandLogo href={`/${branch.slug}`} imageClassName="h-20 w-auto sm:h-24" priority />
+            <BrandLogo href={`/${branch.slug}`} imageClassName="h-14 w-auto sm:h-20 md:h-24" priority />
             <nav className="pv-store-nav__menu hidden md:flex" aria-label="Menú de la tienda">
               <a href="#inicio" className="pv-store-link">
                 Inicio
@@ -355,27 +401,73 @@ export function Storefront({
               </a>
             </nav>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setOrdersOpen(true)}
-                className="pv-btn-ghost px-3 py-2 text-xs sm:text-sm md:hidden"
-              >
-                Pedidos
-              </button>
               <a
                 href="#pedido"
                 className="pv-btn-primary relative inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:px-4 sm:text-sm"
               >
                 <CartBasketIcon className="h-4 w-4" tone="onPrimary" />
-                <span>Carrito</span>
+                <span className="hidden xs:inline sm:inline">Carrito</span>
                 {cartCount > 0 ? (
-                  <span className="ml-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums sm:text-xs">
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums sm:text-xs">
                     {cartCount}
                   </span>
                 ) : null}
               </a>
+              <button
+                type="button"
+                className="pv-menu-toggle md:hidden"
+                aria-expanded={menuOpen}
+                aria-controls="mobile-store-menu"
+                aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <span className={`pv-menu-toggle__bar ${menuOpen ? 'translate-y-[7px] rotate-45' : ''}`} />
+                <span className={`pv-menu-toggle__bar ${menuOpen ? 'opacity-0' : ''}`} />
+                <span className={`pv-menu-toggle__bar ${menuOpen ? '-translate-y-[7px] -rotate-45' : ''}`} />
+              </button>
             </div>
           </div>
+          {menuOpen ? (
+            <div
+              id="mobile-store-menu"
+              className="border-t border-green-100 bg-white px-4 py-3 md:hidden"
+            >
+              <nav className="mx-auto flex max-w-4xl flex-col gap-1" aria-label="Menú móvil">
+                <a
+                  href="#inicio"
+                  className="pv-store-link"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Inicio
+                </a>
+                <a
+                  href="#catalogo"
+                  className="pv-store-link"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Catálogo
+                </a>
+                <button
+                  type="button"
+                  className="pv-store-link text-left"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setOrdersOpen(true);
+                  }}
+                >
+                  Mis pedidos
+                </button>
+                <a
+                  href="#pedido"
+                  className="pv-store-link inline-flex items-center gap-1.5"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <CartBasketIcon className="h-4 w-4" />
+                  Carrito{cartCount > 0 ? ` (${cartCount})` : ''}
+                </a>
+              </nav>
+            </div>
+          ) : null}
         </header>
 
         <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
@@ -432,7 +524,8 @@ export function Storefront({
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+              <div className="pv-catalog-scroll">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                 {filteredProducts.map((product) => {
                   const unit = product.product.unit as ProductUnit;
                   const status = getStockStatus(Number(product.stock), true);
@@ -507,6 +600,12 @@ export function Storefront({
                     </article>
                   );
                 })}
+                </div>
+                {filteredProducts.length > 4 ? (
+                  <p className="pointer-events-none sticky bottom-0 bg-gradient-to-t from-white via-white/95 to-transparent pt-6 pb-1 text-center text-[11px] font-medium text-slate-500">
+                    Desliza para ver más productos
+                  </p>
+                ) : null}
               </div>
 
               {filteredProducts.length === 0 && (
@@ -609,20 +708,52 @@ export function Storefront({
                 </ul>
               )}
 
+              {cart.length > 0 ? (
+                <div className="mt-3 space-y-1 rounded-xl bg-green-50/80 px-3 py-3 text-sm ring-1 ring-green-100">
+                  <div className="flex justify-between text-[var(--pv-green-800)]">
+                    <span>Subtotal</span>
+                    <span className="font-medium tabular-nums">{formatMoney(subtotal)}</span>
+                  </div>
+                  {deliveryFee > 0 ? (
+                    <div className="flex justify-between text-[var(--pv-green-800)]">
+                      <span>Envío</span>
+                      <span className="tabular-nums">{formatMoney(deliveryFee)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between border-t border-green-200/80 pt-2 text-base font-semibold text-[var(--pv-green-900)]">
+                    <span>Total</span>
+                    <span className="tabular-nums">{formatMoney(total)}</span>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="mt-6 space-y-3">
+                <label className="block text-sm font-medium">WhatsApp / teléfono</label>
+                <input
+                  className="pv-input"
+                  value={customerPhone}
+                  onChange={(e) => {
+                    lastLookupPhone.current = '';
+                    setCustomerPhone(e.target.value);
+                  }}
+                  placeholder="55 1234 5678"
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+                {customerHint ? (
+                  <p className="text-xs font-medium text-[var(--pv-green-700)]">{customerHint}</p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Si ya pediste antes, al escribir tu teléfono cargamos nombre y departamento.
+                  </p>
+                )}
                 <label className="block text-sm font-medium">Nombre</label>
                 <input
                   className="pv-input"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Tu nombre"
-                />
-                <label className="block text-sm font-medium">WhatsApp / teléfono</label>
-                <input
-                  className="pv-input"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="55 1234 5678"
+                  autoComplete="name"
                 />
                 <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -641,23 +772,14 @@ export function Storefront({
                 </div>
                 {fulfillmentType === 'delivery' ? (
                   <>
-                    <label className="block text-sm font-medium">Departamento</label>
-                    <select
+                    <label className="block text-sm font-medium">Departamento / torre</label>
+                    <input
                       className="pv-input"
-                      value={unitId}
-                      onChange={(e) => setUnitId(e.target.value)}
-                    >
-                      <option value="">Selecciona tu depto</option>
-                      {buildings.map((building) => (
-                        <optgroup key={building.id} label={building.name}>
-                          {building.units.map((unit) => (
-                            <option key={unit.id} value={unit.id}>
-                              {building.name} — {unit.identifier}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                      value={deliveryUnit}
+                      onChange={(e) => setDeliveryUnit(e.target.value)}
+                      placeholder="Ej. Torre A 101"
+                      autoComplete="address-line2"
+                    />
                   </>
                 ) : (
                   <p className="pv-callout p-3 text-sm">

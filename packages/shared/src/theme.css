@@ -317,6 +317,57 @@
   border: 1px solid var(--pv-glass-border);
 }
 
+/* Mobile hamburger */
+.pv-menu-toggle {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 9999px;
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.pv-menu-toggle__bar {
+  display: block;
+  height: 2px;
+  width: 1.05rem;
+  border-radius: 9999px;
+  background: var(--pv-green-800);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  transform-origin: center;
+}
+
+/* Scrollable catalog panel so the cart stays reachable */
+.pv-catalog-scroll {
+  max-height: min(68vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(22, 163, 74, 0.14);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 16px rgba(15, 23, 42, 0.04);
+  scrollbar-gutter: stable;
+}
+
+@media (min-width: 640px) {
+  .pv-catalog-scroll {
+    padding: 1rem;
+    max-height: min(72vh, 40rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .pv-catalog-scroll {
+    max-height: min(78vh, 44rem);
+  }
+}
+
 /* Cart add highlight */
 @keyframes pv-cart-flash {
   0% {

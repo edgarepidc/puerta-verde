@@ -89,6 +89,7 @@ export interface Database {
           fulfillment_type: 'delivery' | 'pickup';
           unit_id: string | null;
           delivery_notes: string | null;
+          delivery_unit_label: string | null;
           status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
           subtotal: number;
           delivery_fee: number;
@@ -110,6 +111,69 @@ export interface Database {
         };
         Update: Partial<Database['public']['Tables']['orders']['Row']>;
         Relationships: [];
+      };
+      customers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          phone: string;
+          full_name: string | null;
+          default_unit_id: string | null;
+          default_delivery_label: string | null;
+          whatsapp_opt_in: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['customers']['Row']> & {
+          organization_id: string;
+          phone: string;
+        };
+        Update: Partial<Database['public']['Tables']['customers']['Row']>;
+        Relationships: [];
+      };
+      buildings: {
+        Row: {
+          id: string;
+          branch_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['buildings']['Row']> & {
+          branch_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['buildings']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'buildings_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      units: {
+        Row: {
+          id: string;
+          building_id: string;
+          identifier: string;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['units']['Row']> & {
+          building_id: string;
+          identifier: string;
+        };
+        Update: Partial<Database['public']['Tables']['units']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'units_building_id_fkey';
+            columns: ['building_id'];
+            isOneToOne: false;
+            referencedRelation: 'buildings';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       branches: {
         Row: {
@@ -183,20 +247,6 @@ export interface Database {
           title: string;
         };
         Update: Partial<Database['public']['Tables']['promotions']['Row']>;
-        Relationships: [];
-      };
-      buildings: {
-        Row: {
-          id: string;
-          branch_id: string;
-          name: string;
-          created_at: string;
-        };
-        Insert: Partial<Database['public']['Tables']['buildings']['Row']> & {
-          branch_id: string;
-          name: string;
-        };
-        Update: Partial<Database['public']['Tables']['buildings']['Row']>;
         Relationships: [];
       };
       inventory_movements: {

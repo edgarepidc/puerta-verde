@@ -13,14 +13,25 @@ test('isValidMexicanPhone validates 10-digit numbers', () => {
   assert.equal(isValidMexicanPhone('123'), false);
 });
 
-test('validateGuestCheckout requires unit for delivery', () => {
+test('validateGuestCheckout requires department text for delivery', () => {
   const error = validateGuestCheckout({
     customerName: 'Ana',
     customerPhone: '5512345678',
     fulfillmentType: 'delivery',
     items: [{ branchProductId: 'abc', quantity: 1 }],
   });
-  assert.equal(error, 'Selecciona tu departamento para la entrega.');
+  assert.equal(error, 'Ingresa tu departamento para la entrega.');
+});
+
+test('validateGuestCheckout accepts free-text department', () => {
+  const error = validateGuestCheckout({
+    customerName: 'Ana',
+    customerPhone: '5512345678',
+    fulfillmentType: 'delivery',
+    deliveryUnit: 'Torre A 101',
+    items: [{ branchProductId: 'abc', quantity: 1 }],
+  });
+  assert.equal(error, null);
 });
 
 test('formatMoney uses MXN locale', () => {
