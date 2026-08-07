@@ -22,6 +22,7 @@ interface OrderRow {
   fulfillment_type: 'delivery' | 'pickup';
   total: number;
   payment_status: string;
+  payment_method?: string | null;
   created_at: string;
   branch: { name: string; slug: string } | { name: string; slug: string }[] | null;
 }
@@ -76,6 +77,12 @@ const COLUMN_META: Record<
     empty: 'Sin pedidos',
   },
 };
+
+const PAYMENT_OPTIONS = [
+  { id: 'cash' as const, label: 'Efectivo' },
+  { id: 'card_terminal' as const, label: 'TPV' },
+  { id: 'transfer' as const, label: 'Transferencia' },
+];
 
 function previousStatus(status: OrderStatus): OrderStatus | null {
   const idx = COLUMNS.indexOf(status as (typeof COLUMNS)[number]);
@@ -150,29 +157,51 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
     }
   }
 
-  async function markPaid(orderId: string, paymentMethod: 'cash' | 'card_terminal' | 'transfer') {
+  async function setPayment(
+    orderId: string,
+    paymentMethod: 'cash' | 'card_terminal' | 'transfer' | null,
+  ) {
     setUpdatingId(orderId);
     try {
       const response = await fetch('/api/orders/payment', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, paymentMethod }),
+        body: JSON.stringify(
+          paymentMethod
+            ? { orderId, paymentMethod }
+            : { orderId, clear: true, paymentMethod: null },
+        ),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar pago');
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo actualizar el pago');
+      const nextStatus = payload.paymentStatus ?? (paymentMethod ? 'paid' : 'pending');
+      const nextMethod = payload.paymentMethod ?? paymentMethod;
       setOrders((current) =>
         current.map((order) =>
-          order.id === orderId ? { ...order, payment_status: 'paid' } : order,
+          order.id === orderId
+            ? { ...order, payment_status: nextStatus, payment_method: nextMethod }
+            : order,
         ),
       );
       setDetail((current) =>
-        current?.id === orderId ? { ...current, payment_status: 'paid', payment_method: paymentMethod } : current,
+        current?.id === orderId
+          ? { ...current, payment_status: nextStatus, payment_method: nextMethod }
+          : current,
       );
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Error al registrar pago');
+      alert(error instanceof Error ? error.message : 'Error al actualizar el pago');
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  function togglePayment(
+    orderId: string,
+    currentMethod: string | null | undefined,
+    nextMethod: 'cash' | 'card_terminal' | 'transfer',
+  ) {
+    // Clicking the selected method again clears it; otherwise set/change it.
+    void setPayment(orderId, currentMethod === nextMethod ? null : nextMethod);
   }
 
   return (
@@ -256,34 +285,28 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                             → {ORDER_STATUS_LABELS[forward]}
                           </button>
                         ) : null}
-                        {order.payment_status !== 'paid' && (
-                          <>
+                        {PAYMENT_OPTIONS.map((option) => {
+                          const selected =
+                            order.payment_status === 'paid' && order.payment_method === option.id;
+                          return (
                             <button
+                              key={option.id}
                               type="button"
                               disabled={updatingId === order.id}
-                              onClick={() => markPaid(order.id, 'cash')}
-                              className="pv-btn-ghost px-3 py-1 text-xs"
+                              onClick={() => togglePayment(order.id, order.payment_method, option.id)}
+                              className={`px-3 py-1 text-xs disabled:opacity-50 ${
+                                selected ? 'pv-btn-primary' : 'pv-btn-ghost'
+                              }`}
+                              title={
+                                selected
+                                  ? 'Clic de nuevo para quitar el pago'
+                                  : `Marcar como pagado con ${option.label}`
+                              }
                             >
-                              Efectivo
+                              {option.label}
                             </button>
-                            <button
-                              type="button"
-                              disabled={updatingId === order.id}
-                              onClick={() => markPaid(order.id, 'card_terminal')}
-                              className="pv-btn-ghost px-3 py-1 text-xs"
-                            >
-                              TPV
-                            </button>
-                            <button
-                              type="button"
-                              disabled={updatingId === order.id}
-                              onClick={() => markPaid(order.id, 'transfer')}
-                              className="pv-btn-ghost px-3 py-1 text-xs"
-                            >
-                              Transferencia
-                            </button>
-                          </>
-                        )}
+                          );
+                        })}
                       </div>
                     </article>
                   );
@@ -381,6 +404,36 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
                   <div className="flex justify-between text-base font-semibold text-slate-900">
                     <span>Total</span>
                     <span>{formatMoney(Number(detail.total))}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-800">Forma de pago</h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {detail.payment_status === 'paid'
+                      ? 'Seleccionado resaltado. Clic de nuevo para desmarcar o elige otra opción.'
+                      : 'Elige cómo se pagó. Puedes cambiarlo o desmarcarlo después.'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {PAYMENT_OPTIONS.map((option) => {
+                      const selected =
+                        detail.payment_status === 'paid' && detail.payment_method === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          disabled={updatingId === detail.id}
+                          onClick={() =>
+                            togglePayment(detail.id, detail.payment_method, option.id)
+                          }
+                          className={`px-4 py-2 text-sm disabled:opacity-50 ${
+                            selected ? 'pv-btn-primary' : 'pv-btn-ghost'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
