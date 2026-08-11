@@ -37,6 +37,11 @@ export default async function LotesPage() {
 
   return (
     <AdminShell title="Lotes y PTI" subtitle={`Trazabilidad · ${tenant.branchName}`}>
+      <p className="mb-6 rounded-2xl border border-slate-200/80 bg-white/60 px-4 py-3 text-sm text-slate-600">
+        Lotes sirven para rastrear origen/caducidad (FIFO). El nombre de proveedor aquí es solo una
+        nota. Para guardar precio por proveedor y comparar, usa{' '}
+        <a href="/compras" className="font-medium text-emerald-800 underline underline-offset-2">Compras</a>.
+      </p>
       <LotsManager initialLots={lots ?? []} products={productOptions} />
     </AdminShell>
   );

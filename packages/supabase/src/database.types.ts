@@ -252,6 +252,83 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['branch_operating_costs']['Row']>;
         Relationships: [];
       };
+      suppliers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          phone: string | null;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['suppliers']['Row']> & {
+          organization_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['suppliers']['Row']>;
+        Relationships: [];
+      };
+      purchases: {
+        Row: {
+          id: string;
+          branch_id: string;
+          supplier_id: string;
+          purchased_at: string;
+          notes: string | null;
+          total_amount: number;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['purchases']['Row']> & {
+          branch_id: string;
+          supplier_id: string;
+        };
+        Update: Partial<Database['public']['Tables']['purchases']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'purchases_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'suppliers';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      purchase_items: {
+        Row: {
+          id: string;
+          purchase_id: string;
+          branch_product_id: string;
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['purchase_items']['Row']> & {
+          purchase_id: string;
+          branch_product_id: string;
+          quantity: number;
+          unit_price: number;
+        };
+        Update: Partial<Database['public']['Tables']['purchase_items']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_items_purchase_id_fkey';
+            columns: ['purchase_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchases';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_items_branch_product_id_fkey';
+            columns: ['branch_product_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       product_lots: {
         Row: {
           id: string;
@@ -439,6 +516,16 @@ export interface Database {
           p_notes?: string | null;
         };
         Returns: Array<{ lot_id: string; new_stock: number }>;
+      };
+      record_supplier_purchase: {
+        Args: {
+          p_branch_id: string;
+          p_supplier_id: string;
+          p_purchased_at: string | null;
+          p_notes: string | null;
+          p_items: Json;
+        };
+        Returns: Array<{ purchase_id: string; total_amount: number }>;
       };
       get_lot_traceability: {
         Args: { p_lot_code: string; p_branch_id?: string | null };

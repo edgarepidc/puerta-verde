@@ -132,6 +132,10 @@ export function InventoryManager({
 
       <section className="pv-glass-card p-6">
         <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          La entrada rápida actualiza stock y costo promedio, pero no guarda proveedor. Si quieres
+          comparar precios entre proveedores, regístralo en Compras.
+        </p>
         <div className="mt-4">
           <ScalePanel
             onWeight={(kg) => {

@@ -111,6 +111,14 @@ export {
 } from './inventory';
 
 export {
+  validatePurchaseInput,
+  validateSupplierInput,
+  type PurchaseInput,
+  type PurchaseItemInput,
+  type SupplierInput,
+} from './purchases';
+
+export {
   applyDiscount,
   formatProductQuantity,
   getActiveDiscountPercent,
