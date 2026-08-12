@@ -27,12 +27,12 @@ export default async function BranchStorePage({
   const [{ data: branchProducts }, { data: promotions }, { data: buildings }] = await Promise.all([
     supabase
       .from('branch_products')
-      .select('id, price, stock, product:products(id, name, unit, image_url, category_id, category:product_categories(name))')
+      .select('id, price, stock, product:products(id, name, unit, image_url, category_id, is_active, category:product_categories(name))')
       .eq('branch_id', branch.id)
       .eq('is_available', true),
     supabase
       .from('promotions')
-      .select('id, title, body, kind, image_url, discount_percent')
+      .select('id, title, body, kind, image_url, discount_percent, product_id, category_id')
       .eq('branch_id', branch.id)
       .eq('is_active', true),
     supabase
@@ -42,12 +42,22 @@ export default async function BranchStorePage({
       .order('name'),
   ]);
 
+  const visibleProducts = (branchProducts ?? []).filter(
+    (row) => (row.product as { is_active?: boolean } | null)?.is_active !== false,
+  );
+
   return (
     <Storefront
       branch={branch}
-      products={(branchProducts ?? []) as StorefrontProduct[]}
+      products={visibleProducts as StorefrontProduct[]}
       promotions={promotions ?? []}
-      buildings={buildings ?? []}
+      buildings={
+        (buildings ?? []) as unknown as Array<{
+          id: string;
+          name: string;
+          units: Array<{ id: string; identifier: string }>;
+        }>
+      }
     />
   );
 }
@@ -62,6 +72,7 @@ export interface StorefrontProduct {
     unit: string;
     image_url: string | null;
     category_id: string | null;
+    is_active?: boolean;
     category: { name: string } | null;
   };
 }

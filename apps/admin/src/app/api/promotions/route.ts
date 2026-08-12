@@ -55,6 +55,8 @@ export async function POST(request: Request) {
         kind: body.kind,
         image_url: body.imageUrl?.trim() || null,
         discount_percent: body.kind === 'discount' ? body.discountPercent ?? null : null,
+        product_id: body.kind === 'discount' ? body.productId || null : null,
+        category_id: body.kind === 'discount' ? body.categoryId || null : null,
         starts_at: body.startsAt || null,
         ends_at: body.endsAt || null,
         is_active: body.isActive,

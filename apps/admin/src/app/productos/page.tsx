@@ -17,6 +17,7 @@ export default async function ProductsPage() {
         id,
         price,
         stock,
+        min_stock,
         avg_unit_cost,
         last_unit_cost,
         is_available,
@@ -25,6 +26,8 @@ export default async function ProductsPage() {
           name,
           description,
           unit,
+          sku,
+          image_url,
           is_active,
           shelf_life_days,
           category_id,
@@ -50,6 +53,7 @@ export default async function ProductsPage() {
           id: string;
           price: number;
           stock: number;
+          min_stock: number;
           avg_unit_cost: number;
           last_unit_cost: number | null;
           is_available: boolean;
@@ -58,6 +62,8 @@ export default async function ProductsPage() {
             name: string;
             description: string | null;
             unit: ProductUnit;
+            sku: string | null;
+            image_url: string | null;
             is_active: boolean;
             shelf_life_days: number | null;
             category_id: string | null;

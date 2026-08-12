@@ -85,7 +85,11 @@ export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
-  const body = (await request.json().catch(() => ({}))) as { notes?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    notes?: string;
+    openingFloat?: number | null;
+    countedCash?: number | null;
+  };
   const supabase = createAdminClient();
   const closingDate = todayMexico();
   const startOfDay = `${closingDate}T00:00:00-06:00`;
@@ -119,6 +123,8 @@ export async function POST(request: Request) {
         card_terminal_total: totals.card_terminal,
         transfer_total: totals.transfer,
         notes: body.notes?.trim() || null,
+        opening_float: body.openingFloat ?? null,
+        counted_cash: body.countedCash ?? null,
         closed_by: auth.userId,
       },
       { onConflict: 'branch_id,closing_date' },

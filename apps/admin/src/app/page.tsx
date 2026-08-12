@@ -34,7 +34,7 @@ export default async function AdminHomePage() {
       .limit(50),
     supabase
       .from('branch_products')
-      .select('id, price, stock, product:products ( id, name, unit, image_url )')
+      .select('id, price, stock, min_stock, product:products ( id, name, unit, sku, image_url )')
       .eq('branch_id', staff.branchId)
       .eq('is_available', true)
       .order('created_at', { ascending: true }),
@@ -59,7 +59,8 @@ export default async function AdminHomePage() {
           id: string;
           price: number;
           stock: number;
-          product: { id: string; name: string; unit: ProductUnit; image_url?: string | null };
+          min_stock?: number | null;
+          product: { id: string; name: string; unit: ProductUnit; sku?: string | null; image_url?: string | null };
         }>}
       />
     </AdminShell>

@@ -52,6 +52,8 @@ export async function PATCH(
         description: body.description?.trim() || null,
         category_id: categoryId,
         unit: body.unit,
+        sku: body.sku?.trim() || null,
+        image_url: body.imageUrl?.trim() || null,
         shelf_life_days: body.shelfLifeDays ?? null,
         is_active: body.isActive,
       })
@@ -64,18 +66,20 @@ export async function PATCH(
 
     const branchUpdates: {
       price: number;
-      stock: number;
       is_available: boolean;
       avg_unit_cost?: number;
       last_unit_cost?: number;
+      min_stock?: number;
     } = {
       price: body.price,
-      stock: body.stock,
       is_available: body.isAvailable,
     };
     if (body.unitCost != null && body.unitCost >= 0) {
       branchUpdates.avg_unit_cost = body.unitCost;
       branchUpdates.last_unit_cost = body.unitCost;
+    }
+    if (body.minStock != null && body.minStock >= 0) {
+      branchUpdates.min_stock = body.minStock;
     }
 
     const { error: branchError } = await supabase

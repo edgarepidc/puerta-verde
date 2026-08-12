@@ -37,6 +37,9 @@ interface BranchInfo {
   pickup_instructions: string | null;
   delivery_fee: number;
   minimum_order_amount: number;
+  whatsapp_phone?: string | null;
+  opening_hours?: string | null;
+  fulfillment_mode?: 'pickup' | 'delivery' | 'both' | null;
   org_name: string;
 }
 
@@ -47,6 +50,8 @@ interface Promotion {
   kind: PromotionKind;
   image_url: string | null;
   discount_percent: number | null;
+  product_id?: string | null;
+  category_id?: string | null;
 }
 
 interface CartItem {
@@ -72,7 +77,9 @@ export function Storefront({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery');
+  const defaultFulfillment: FulfillmentType =
+    branch.fulfillment_mode === 'pickup' ? 'pickup' : 'delivery';
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(defaultFulfillment);
   const [unitId, setUnitId] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -83,7 +90,6 @@ export function Storefront({
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
 
-  const discountPercent = useMemo(() => getActiveDiscountPercent(promotions), [promotions]);
 
   const categories = useMemo(() => {
     const names = new Set<string>();
@@ -111,8 +117,12 @@ export function Storefront({
   const deliveryFee = fulfillmentType === 'delivery' ? Number(branch.delivery_fee) : 0;
   const total = subtotal + deliveryFee;
 
-  function effectivePrice(basePrice: number): number {
-    return applyDiscount(basePrice, discountPercent);
+  function effectivePrice(product: StorefrontProduct): number {
+    const discount = getActiveDiscountPercent(promotions, {
+      id: product.product.id,
+      category_id: product.product.category_id,
+    });
+    return applyDiscount(Number(product.price), discount);
   }
 
   function openPicker(product: StorefrontProduct) {
@@ -125,7 +135,7 @@ export function Storefront({
 
   function addToCart(product: StorefrontProduct, quantity: number) {
     const unit = product.product.unit as ProductUnit;
-    const price = effectivePrice(Number(product.price));
+    const price = effectivePrice(product);
     setCart((current) => {
       const existing = current.find((item) => item.branchProductId === product.id);
       if (existing) {
@@ -247,10 +257,12 @@ export function Storefront({
           {Number(branch.delivery_fee) > 0
             ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
             : ' · Entrega para vecinos'}
+          {branch.opening_hours ? ` · ${branch.opening_hours}` : ''}
+          {branch.whatsapp_phone ? ` · WhatsApp ${branch.whatsapp_phone}` : ''}
         </p>
         {discountPromo && (
           <p className="pv-callout--amber mt-2 px-3 py-2 text-sm font-medium">
-            {discountPromo.title} — {Number(discountPromo.discount_percent)}% en todo el catálogo hoy
+            {discountPromo.title} — {Number(discountPromo.discount_percent)}% de descuento
           </p>
         )}
       </header>
@@ -315,8 +327,8 @@ export function Storefront({
               const unit = product.product.unit as ProductUnit;
               const status = getStockStatus(Number(product.stock), true);
               const basePrice = Number(product.price);
-              const salePrice = effectivePrice(basePrice);
-              const hasDiscount = discountPercent > 0 && salePrice < basePrice;
+              const salePrice = effectivePrice(product);
+              const hasDiscount = salePrice < basePrice;
 
               return (
                 <article key={product.id} className="pv-glass-card p-4">
@@ -419,7 +431,13 @@ export function Storefront({
             />
             <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
             <div className="grid grid-cols-2 gap-2">
-              {(['delivery', 'pickup'] as const).map((type) => (
+              {(['delivery', 'pickup'] as const)
+                .filter((type) => {
+                  if (branch.fulfillment_mode === 'pickup') return type === 'pickup';
+                  if (branch.fulfillment_mode === 'delivery') return type === 'delivery';
+                  return true;
+                })
+                .map((type) => (
                 <button
                   key={type}
                   type="button"

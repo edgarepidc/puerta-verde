@@ -13,6 +13,8 @@ export interface PromotionInput {
   kind: PromotionKind;
   imageUrl?: string | null;
   discountPercent?: number | null;
+  productId?: string | null;
+  categoryId?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
   isActive: boolean;

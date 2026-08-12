@@ -87,26 +87,26 @@ export async function POST(request: Request) {
         rows: previewRows,
         parseErrors,
         matchedCount: previewRows.filter((row) => row.matched).length,
+        createCount: previewRows.filter((row) => row.willCreate).length,
         totalCount: previewRows.length,
       });
     }
 
-    const readyRows = previewRows.filter((row) => row.matched);
-    if (!readyRows.length) {
+    if (!previewRows.length) {
       return NextResponse.json(
-        { error: 'No hay filas válidas para importar. Revisa los nombres de producto.' },
+        { error: 'No hay filas válidas para importar.' },
         { status: 400 },
       );
     }
 
-    const result = await applyCostImportRows(tenant.branchId, readyRows);
+    const result = await applyCostImportRows(tenant.branchId, tenant.organizationId, previewRows);
     return NextResponse.json({
       ...result,
-      skipped: previewRows.length - readyRows.length,
+      skipped: 0,
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al importar costos' },
+      { error: error instanceof Error ? error.message : 'Error al importar catálogo' },
       { status: 500 },
     );
   }

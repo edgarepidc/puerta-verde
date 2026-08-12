@@ -10,6 +10,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 import { ScalePanel } from '@/components/ScalePanel';
 
 const STOCK_MOVEMENT_TYPES = ['waste', 'adjustment'] as const;
@@ -18,8 +19,9 @@ type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 interface ProductStock {
   id: string;
   stock: number;
+  min_stock?: number | null;
   is_available: boolean;
-  product: { id: string; name: string; unit: ProductUnit };
+  product: { id: string; name: string; unit: ProductUnit; sku?: string | null };
 }
 
 interface MovementRow {
@@ -53,7 +55,7 @@ export function InventoryManager({
   const [quickWasteQty, setQuickWasteQty] = useState(1);
 
   const lowStock = useMemo(
-    () => products.filter((p) => Number(p.stock) <= LOW_STOCK_THRESHOLD),
+    () => products.filter((p) => Number(p.stock) <= Number(p.min_stock ?? LOW_STOCK_THRESHOLD)),
     [products],
   );
 
@@ -175,19 +177,12 @@ export function InventoryManager({
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="block text-sm md:col-span-2">
             <span className="font-medium text-slate-700">Producto</span>
-            <select
-              className="pv-input mt-1"
+            <ProductSearchSelect
+              products={products}
               value={branchProductId}
-              onChange={(e) => setBranchProductId(e.target.value)}
-            >
-              <option value="">Selecciona...</option>
-              {products.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.product.name} — stock: {Number(row.stock)}{' '}
-                  {PRODUCT_UNIT_LABELS[row.product.unit]}
-                </option>
-              ))}
-            </select>
+              onChange={setBranchProductId}
+              placeholder="Buscar producto o código…"
+            />
           </label>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Tipo</span>

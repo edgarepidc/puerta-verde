@@ -14,6 +14,8 @@ import {
   getStockStatus,
   isValidMexicanPhone,
   normalizePhone,
+  WALK_IN_NAME,
+  WALK_IN_PHONE,
   type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -22,7 +24,8 @@ export interface CounterProduct {
   id: string;
   price: number;
   stock: number;
-  product: { id: string; name: string; unit: ProductUnit; image_url?: string | null };
+  min_stock?: number | null;
+  product: { id: string; name: string; unit: ProductUnit; sku?: string | null; image_url?: string | null };
 }
 
 interface CartItem {
@@ -103,6 +106,7 @@ export function CounterSalePanel({
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
+  const [walkIn, setWalkIn] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [lookupHint, setLookupHint] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -121,7 +125,11 @@ export function CounterSalePanel({
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return products;
-    return products.filter((product) => product.product.name.toLowerCase().includes(q));
+    return products.filter(
+      (product) =>
+        product.product.name.toLowerCase().includes(q) ||
+        (product.product.sku ?? '').toLowerCase().includes(q),
+    );
   }, [products, search]);
 
   const total = useMemo(
@@ -171,6 +179,7 @@ export function CounterSalePanel({
     setSearch('');
     setPaymentMethod('cash');
     setSendWhatsApp(true);
+    setWalkIn(false);
     setCart([]);
     setLookupHint(null);
     setError(null);
@@ -207,8 +216,9 @@ export function CounterSalePanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName: name,
-          customerPhone: phone,
+          customerName: walkIn ? name.trim() || WALK_IN_NAME : name,
+          customerPhone: walkIn ? WALK_IN_PHONE : phone,
+          walkIn,
           fulfillmentType: 'pickup',
           deliveryNotes: notes || null,
           paymentMethod,
@@ -250,7 +260,7 @@ export function CounterSalePanel({
         items,
       });
       setReceipt({ order: payload.order, items, ticketText });
-      if (sendWhatsApp) {
+      if (sendWhatsApp && !walkIn) {
         window.open(whatsappTicketHref(payload.order.customer_phone, ticketText), '_blank');
       }
       resetForm();
@@ -369,7 +379,11 @@ export function CounterSalePanel({
           <div className="grid max-h-[28rem] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
             {filteredProducts.map((product) => {
               const unit = product.product.unit;
-              const status = getStockStatus(Number(product.stock), true);
+              const status = getStockStatus(
+                Number(product.stock),
+                true,
+                Number(product.min_stock ?? 5),
+              );
               return (
                 <article key={product.id} className="rounded-xl border border-slate-200/80 bg-white p-2.5">
                   {product.product.image_url ? (
@@ -420,8 +434,12 @@ export function CounterSalePanel({
 
         <aside className="space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
           <div className="grid gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={walkIn} onChange={(e) => setWalkIn(e.target.checked)} />
+              Cliente de paso (sin celular)
+            </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Celular *</span>
+              <span className="font-medium text-slate-700">Celular {walkIn ? '(opcional)' : '*'}</span>
               <input
                 className="pv-input mt-1"
                 inputMode="tel"
@@ -432,7 +450,7 @@ export function CounterSalePanel({
               {lookupHint && <span className="mt-1 block text-xs text-emerald-700">{lookupHint}</span>}
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Nombre *</span>
+              <span className="font-medium text-slate-700">Nombre {walkIn ? '(opcional)' : '*'}</span>
               <input
                 className="pv-input mt-1"
                 value={name}
@@ -537,7 +555,8 @@ export function CounterSalePanel({
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
-              checked={sendWhatsApp}
+              checked={sendWhatsApp && !walkIn}
+              disabled={walkIn}
               onChange={(e) => setSendWhatsApp(e.target.checked)}
             />
             Abrir WhatsApp con el ticket

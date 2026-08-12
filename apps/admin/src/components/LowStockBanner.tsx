@@ -5,6 +5,7 @@ import { LOW_STOCK_THRESHOLD, PRODUCT_UNIT_LABELS, type ProductUnit } from '@pue
 interface LowStockProduct {
   id: string;
   stock: number;
+  min_stock?: number | null;
   product: { name: string; unit?: ProductUnit };
 }
 
@@ -15,7 +16,9 @@ export function LowStockBanner({
   products: LowStockProduct[];
   href?: string;
 }) {
-  const lowStock = products.filter((product) => Number(product.stock) <= LOW_STOCK_THRESHOLD);
+  const lowStock = products.filter(
+    (product) => Number(product.stock) <= Number(product.min_stock ?? LOW_STOCK_THRESHOLD),
+  );
   if (lowStock.length === 0) return null;
 
   return (

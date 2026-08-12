@@ -26,7 +26,7 @@ export default async function ConfiguracionPage() {
   ] = await Promise.all([
     supabase
       .from('branches')
-      .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount')
+      .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours, fulfillment_mode')
       .eq('id', tenant.branchId)
       .single(),
     supabase

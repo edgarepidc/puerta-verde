@@ -16,6 +16,8 @@ interface PromotionRow {
   kind: PromotionKind;
   image_url: string | null;
   discount_percent: number | null;
+  product_id?: string | null;
+  category_id?: string | null;
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
@@ -28,6 +30,8 @@ const emptyForm: PromotionInput = {
   kind: 'banner',
   imageUrl: '',
   discountPercent: null,
+  productId: '',
+  categoryId: '',
   startsAt: '',
   endsAt: '',
   isActive: true,
@@ -45,7 +49,15 @@ function toIso(local: string): string | null {
   return new Date(local).toISOString();
 }
 
-export function PromotionsManager({ initialPromotions }: { initialPromotions: PromotionRow[] }) {
+export function PromotionsManager({
+  initialPromotions,
+  products = [],
+  categories = [],
+}: {
+  initialPromotions: PromotionRow[];
+  products?: Array<{ id: string; name: string }>;
+  categories?: Array<{ id: string; name: string }>;
+}) {
   const [promotions, setPromotions] = useState(initialPromotions);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -81,6 +93,8 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
       kind: row.kind,
       imageUrl: row.image_url ?? '',
       discountPercent: row.discount_percent ? Number(row.discount_percent) : null,
+      productId: row.product_id ?? '',
+      categoryId: row.category_id ?? '',
       startsAt: toLocalInput(row.starts_at),
       endsAt: toLocalInput(row.ends_at),
       isActive: row.is_active,
@@ -104,6 +118,8 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         ...form,
         body: form.body || null,
         imageUrl: form.imageUrl || null,
+        productId: form.productId || null,
+        categoryId: form.categoryId || null,
         startsAt: toIso(form.startsAt ?? ''),
         endsAt: toIso(form.endsAt ?? ''),
       };
@@ -167,6 +183,8 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
         kind: row.kind,
         imageUrl: row.image_url,
         discountPercent: row.discount_percent ? Number(row.discount_percent) : null,
+        productId: row.product_id,
+        categoryId: row.category_id,
         startsAt: row.starts_at,
         endsAt: row.ends_at,
         isActive: !row.is_active,
@@ -249,12 +267,66 @@ export function PromotionsManager({ initialPromotions }: { initialPromotions: Pr
                 />
               </label>
             )}
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Imagen (URL opcional)</span>
+            {form.kind === 'discount' && (
+              <>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Producto (opcional)</span>
+                  <select
+                    className="pv-input mt-1"
+                    value={form.productId ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value, categoryId: '' }))}
+                  >
+                    <option value="">Toda la tienda</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="font-medium text-slate-700">Categoría (opcional)</span>
+                  <select
+                    className="pv-input mt-1"
+                    value={form.categoryId ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value, productId: '' }))}
+                  >
+                    <option value="">Toda la tienda</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Imagen</span>
               <input
                 className="pv-input mt-1"
                 value={form.imageUrl ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                placeholder="URL o sube un archivo"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-2 block text-sm"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('bucket', 'promo-media');
+                  const response = await fetch('/api/products/upload', { method: 'POST', body: formData });
+                  const payload = await response.json();
+                  if (!response.ok) {
+                    setError(payload.error ?? 'No se pudo subir');
+                    return;
+                  }
+                  setForm((f) => ({ ...f, imageUrl: payload.url }));
+                }}
               />
             </label>
             <label className="block text-sm">

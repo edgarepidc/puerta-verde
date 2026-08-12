@@ -2,9 +2,11 @@ import * as XLSX from 'xlsx';
 
 import {
   COST_IMPORT_TEMPLATE_CSV,
+  LOW_STOCK_THRESHOLD,
   normalizeProductName,
   parseCostImportRows,
   type ParsedCostImportRow,
+  type ProductUnit,
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
@@ -16,6 +18,7 @@ export interface BranchProductMatch {
 
 export interface CostImportPreviewRow extends ParsedCostImportRow {
   matched: boolean;
+  willCreate: boolean;
   branchProductId?: string;
   matchedProductName?: string;
   currentPrice?: number;
@@ -67,78 +70,169 @@ export function matchCostImportRows(
       return {
         ...row,
         matched: true,
+        willCreate: false,
         branchProductId: exact.branchProductId,
         matchedProductName: exact.productName,
         currentPrice: exact.currentPrice,
       };
     }
 
-    const normalized = normalizeProductName(row.productName);
-    const fuzzy = [...index.values()].find((candidate) => {
-      const candidateKey = normalizeProductName(candidate.productName);
-      return candidateKey.includes(normalized) || normalized.includes(candidateKey);
-    });
-
-    if (fuzzy) {
-      return {
-        ...row,
-        matched: true,
-        branchProductId: fuzzy.branchProductId,
-        matchedProductName: fuzzy.productName,
-        currentPrice: fuzzy.currentPrice,
-      };
-    }
-
-    return { ...row, matched: false };
+    return { ...row, matched: false, willCreate: true };
   });
+}
+
+async function ensureCategory(
+  supabase: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  name: string,
+  cache: Map<string, string>,
+): Promise<string | null> {
+  const key = normalizeProductName(name);
+  const cached = cache.get(key);
+  if (cached) return cached;
+
+  const { data: existing } = await supabase
+    .from('product_categories')
+    .select('id, name')
+    .eq('organization_id', organizationId);
+
+  for (const category of existing ?? []) {
+    cache.set(normalizeProductName(category.name), category.id);
+  }
+  const afterScan = cache.get(key);
+  if (afterScan) return afterScan;
+
+  const { data: created, error } = await supabase
+    .from('product_categories')
+    .insert({
+      organization_id: organizationId,
+      name: name.trim(),
+      sort_order: (existing?.length ?? 0) + 1,
+    })
+    .select('id')
+    .single();
+
+  if (error || !created) throw new Error(error?.message ?? `No se pudo crear la categoría ${name}`);
+  cache.set(key, created.id);
+  return created.id;
 }
 
 export async function applyCostImportRows(
   branchId: string,
+  organizationId: string,
   rows: CostImportPreviewRow[],
-): Promise<{ imported: number; failed: Array<{ rowNumber: number; productName: string; error: string }> }> {
+): Promise<{ imported: number; created: number; failed: Array<{ rowNumber: number; productName: string; error: string }> }> {
   const supabase = createAdminClient();
   const failed: Array<{ rowNumber: number; productName: string; error: string }> = [];
   let imported = 0;
+  let created = 0;
+  const categoryCache = new Map<string, string>();
 
   for (const row of rows) {
-    if (!row.matched || !row.branchProductId) {
-      failed.push({
-        rowNumber: row.rowNumber,
-        productName: row.productName,
-        error: 'Producto no encontrado en la sucursal',
-      });
-      continue;
-    }
-
     try {
+      let branchProductId = row.branchProductId;
+
+      if (!branchProductId && row.willCreate) {
+        if (row.salePrice == null || row.salePrice < 0) {
+          throw new Error('Los productos nuevos necesitan precio de venta');
+        }
+
+        let categoryId: string | null = null;
+        if (row.categoryName?.trim()) {
+          categoryId = await ensureCategory(supabase, organizationId, row.categoryName, categoryCache);
+        }
+
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .insert({
+            organization_id: organizationId,
+            category_id: categoryId,
+            name: row.productName.trim(),
+            unit: (row.unit ?? 'kg') as ProductUnit,
+            sku: row.sku?.trim() || null,
+            is_active: true,
+          })
+          .select('id')
+          .single();
+
+        if (productError || !product) {
+          throw new Error(productError?.message ?? 'No se pudo crear el producto');
+        }
+
+        const { data: branchProduct, error: branchError } = await supabase
+          .from('branch_products')
+          .insert({
+            branch_id: branchId,
+            product_id: product.id,
+            price: row.salePrice,
+            stock: 0,
+            avg_unit_cost: row.unitCost ?? 0,
+            last_unit_cost: row.unitCost ?? null,
+            min_stock: row.minStock ?? LOW_STOCK_THRESHOLD,
+            is_available: row.visible ?? true,
+          })
+          .select('id')
+          .single();
+
+        if (branchError || !branchProduct) {
+          await supabase.from('products').delete().eq('id', product.id);
+          throw new Error(branchError?.message ?? 'No se pudo asignar a la sucursal');
+        }
+
+        branchProductId = branchProduct.id;
+        created += 1;
+
+        if (row.quantity != null && row.quantity > 0) {
+          const { error } = await supabase.rpc('record_inventory_movement', {
+            p_branch_product_id: branchProductId,
+            p_movement_type: row.unitCost != null && row.unitCost > 0 ? 'purchase' : 'adjustment',
+            p_quantity: row.quantity,
+            p_notes: 'Inventario inicial (importación)',
+            p_expires_at: null,
+            p_unit_cost: row.unitCost ?? null,
+          });
+          if (error) throw new Error(error.message);
+        }
+
+        imported += 1;
+        continue;
+      }
+
+      if (!branchProductId) {
+        throw new Error('Producto no encontrado en la sucursal');
+      }
+
       if (row.quantity != null && row.quantity > 0) {
         const { error } = await supabase.rpc('record_inventory_movement', {
-          p_branch_product_id: row.branchProductId,
-          p_movement_type: 'purchase',
+          p_branch_product_id: branchProductId,
+          p_movement_type: row.unitCost != null && row.unitCost > 0 ? 'purchase' : 'adjustment',
           p_quantity: row.quantity,
-          p_notes: 'Importación de costos desde Excel',
+          p_notes: 'Importación de catálogo desde Excel',
           p_expires_at: null,
-          p_unit_cost: row.unitCost,
+          p_unit_cost: row.unitCost ?? null,
         });
         if (error) throw new Error(error.message);
-      } else {
+      } else if (row.unitCost != null) {
         const { error } = await supabase
           .from('branch_products')
           .update({
             avg_unit_cost: row.unitCost,
             last_unit_cost: row.unitCost,
           })
-          .eq('id', row.branchProductId)
+          .eq('id', branchProductId)
           .eq('branch_id', branchId);
         if (error) throw new Error(error.message);
       }
 
-      if (row.salePrice != null) {
+      const updates: { price?: number; min_stock?: number; is_available?: boolean } = {};
+      if (row.salePrice != null) updates.price = row.salePrice;
+      if (row.minStock != null) updates.min_stock = row.minStock;
+      if (row.visible != null) updates.is_available = row.visible;
+      if (Object.keys(updates).length) {
         const { error } = await supabase
           .from('branch_products')
-          .update({ price: row.salePrice })
-          .eq('id', row.branchProductId)
+          .update(updates)
+          .eq('id', branchProductId)
           .eq('branch_id', branchId);
         if (error) throw new Error(error.message);
       }
@@ -153,14 +247,14 @@ export async function applyCostImportRows(
     }
   }
 
-  return { imported, failed };
+  return { imported, created, failed };
 }
 
 export function costImportTemplateResponse() {
   return new Response(COST_IMPORT_TEMPLATE_CSV, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="plantilla-costos.csv"',
+      'Content-Disposition': 'attachment; filename="plantilla-catalogo.csv"',
     },
   });
 }

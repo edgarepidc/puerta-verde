@@ -16,8 +16,9 @@ export default async function InventoryPage() {
       .select(`
         id,
         stock,
+        min_stock,
         is_available,
-        product:products ( id, name, unit )
+        product:products ( id, name, unit, sku )
       `)
       .eq('branch_id', tenant.branchId)
       .order('created_at', { ascending: true }),
@@ -50,8 +51,9 @@ export default async function InventoryPage() {
         initialProducts={(products ?? []) as Array<{
           id: string;
           stock: number;
+          min_stock: number;
           is_available: boolean;
-          product: { id: string; name: string; unit: ProductUnit };
+          product: { id: string; name: string; unit: ProductUnit; sku?: string | null };
         }>}
         initialMovements={(movements ?? []) as Array<{
           id: string;

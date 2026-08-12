@@ -20,8 +20,9 @@ export async function GET() {
         .select(`
           id,
           stock,
+          min_stock,
           is_available,
-          product:products ( id, name, unit )
+          product:products ( id, name, unit, sku )
         `)
         .eq('branch_id', tenant.branchId)
         .order('created_at', { ascending: true }),

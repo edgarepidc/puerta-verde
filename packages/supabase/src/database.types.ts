@@ -53,7 +53,8 @@ export interface Database {
           category_id: string | null;
           name: string;
           description: string | null;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box' | 'box';
+          sku: string | null;
           image_url: string | null;
           is_active: boolean;
           shelf_life_days: number | null;
@@ -63,7 +64,7 @@ export interface Database {
         Insert: Partial<Database['public']['Tables']['products']['Row']> & {
           organization_id: string;
           name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box' | 'box';
         };
         Update: Partial<Database['public']['Tables']['products']['Row']>;
         Relationships: [
@@ -118,7 +119,7 @@ export interface Database {
           order_id: string;
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           quantity: number;
           unit_price: number;
           line_total: number;
@@ -129,7 +130,7 @@ export interface Database {
           order_id: string;
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box' | 'box';
           quantity: number;
           unit_price: number;
           line_total: number;
@@ -149,6 +150,9 @@ export interface Database {
           pickup_instructions: string | null;
           delivery_fee: number;
           minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
           settings: Json;
           created_at: string;
           updated_at: string;
@@ -168,6 +172,7 @@ export interface Database {
           product_id: string;
           price: number;
           stock: number;
+          min_stock: number;
           avg_unit_cost: number;
           last_unit_cost: number | null;
           is_available: boolean;
@@ -202,6 +207,8 @@ export interface Database {
           ends_at: string | null;
           is_active: boolean;
           discount_percent: number | null;
+          product_id: string | null;
+          category_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['promotions']['Row']> & {
@@ -223,7 +230,37 @@ export interface Database {
           name: string;
         };
         Update: Partial<Database['public']['Tables']['buildings']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'units_building_id_fkey';
+            columns: ['id'];
+            isOneToOne: false;
+            referencedRelation: 'units';
+            referencedColumns: ['building_id'];
+          },
+        ];
+      };
+      units: {
+        Row: {
+          id: string;
+          building_id: string;
+          identifier: string;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['units']['Row']> & {
+          building_id: string;
+          identifier: string;
+        };
+        Update: Partial<Database['public']['Tables']['units']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'units_building_id_fkey';
+            columns: ['building_id'];
+            isOneToOne: false;
+            referencedRelation: 'buildings';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       customers: {
         Row: {
@@ -448,6 +485,8 @@ export interface Database {
           card_terminal_total: number;
           transfer_total: number;
           notes: string | null;
+          opening_float: number | null;
+          counted_cash: number | null;
           closed_by: string | null;
           created_at: string;
         };
@@ -494,6 +533,9 @@ export interface Database {
           pickup_instructions: string | null;
           delivery_fee: number;
           minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
           org_name: string;
           org_slug: string;
         }>;
@@ -580,7 +622,7 @@ export interface Database {
         Returns: Array<{
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           current_stock: number;
           avg_daily_sales: number;
           forecast_demand: number;
@@ -593,7 +635,7 @@ export interface Database {
         Returns: Array<{
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           sale_price: number;
           avg_unit_cost: number;
           last_unit_cost: number | null;

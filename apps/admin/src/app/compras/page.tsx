@@ -39,7 +39,7 @@ export default async function ComprasPage() {
       .limit(80),
     supabase
       .from('branch_products')
-      .select('id, stock, product:products ( id, name, unit )')
+      .select('id, stock, min_stock, product:products ( id, name, unit, sku )')
       .eq('branch_id', tenant.branchId)
       .order('created_at', { ascending: true }),
     supabase
@@ -77,7 +77,8 @@ export default async function ComprasPage() {
         initialProducts={(products ?? []) as Array<{
           id: string;
           stock: number;
-          product: { id: string; name: string; unit: ProductUnit };
+          min_stock?: number | null;
+          product: { id: string; name: string; unit: ProductUnit; sku?: string | null };
         }>}
         initialSuppliers={(suppliers ?? []) as Array<{
           id: string;

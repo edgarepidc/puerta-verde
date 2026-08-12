@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data: branch, error } = await supabase
       .from('branches')
-      .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount')
+      .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours, fulfillment_mode')
       .eq('id', tenant.branchId)
       .single();
 
@@ -43,6 +43,9 @@ export async function PATCH(request: Request) {
       deliveryFee?: number;
       minimumOrderAmount?: number;
       address?: string | null;
+      whatsappPhone?: string | null;
+      openingHours?: string | null;
+      fulfillmentMode?: 'pickup' | 'delivery' | 'both';
     };
 
     const supabase = createAdminClient();
@@ -53,6 +56,9 @@ export async function PATCH(request: Request) {
         delivery_fee: body.deliveryFee,
         minimum_order_amount: body.minimumOrderAmount,
         address: body.address?.trim() || null,
+        whatsapp_phone: body.whatsappPhone?.trim() || null,
+        opening_hours: body.openingHours?.trim() || null,
+        fulfillment_mode: body.fulfillmentMode ?? 'both',
       })
       .eq('id', tenant.branchId);
 

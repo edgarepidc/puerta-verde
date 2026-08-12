@@ -1,15 +1,20 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
 import {
-  calcMarginPercent,
-  formatMoney,
+  DEMO_PRODUCT_NAMES,
+  LOW_STOCK_THRESHOLD,
   PRODUCT_UNIT_LABELS,
   PRODUCT_UNITS,
+  calcMarginPercent,
+  formatMoney,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
+
+import { CostImportPanel } from '@/components/CostImportPanel';
 
 interface Category {
   id: string;
@@ -21,6 +26,7 @@ interface ProductRow {
   id: string;
   price: number;
   stock: number;
+  min_stock?: number | null;
   avg_unit_cost: number;
   last_unit_cost: number | null;
   is_available: boolean;
@@ -29,6 +35,8 @@ interface ProductRow {
     name: string;
     description: string | null;
     unit: ProductUnit;
+    sku?: string | null;
+    image_url?: string | null;
     is_active: boolean;
     shelf_life_days: number | null;
     category_id: string | null;
@@ -41,14 +49,27 @@ const emptyForm: ProductInput & { newCategoryName: string } = {
   description: '',
   categoryId: '',
   newCategoryName: '',
+  sku: '',
+  imageUrl: '',
   unit: 'kg',
   price: 0,
   unitCost: 0,
   stock: 0,
+  minStock: LOW_STOCK_THRESHOLD,
   shelfLifeDays: null,
   isAvailable: true,
   isActive: true,
 };
+
+async function uploadImage(file: File, bucket: 'product-media' | 'promo-media' = 'product-media') {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('bucket', bucket);
+  const response = await fetch('/api/products/upload', { method: 'POST', body: formData });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error ?? 'No se pudo subir la imagen');
+  return payload.url as string;
+}
 
 export function ProductsManager({
   initialProducts,
@@ -65,8 +86,20 @@ export function ProductsManager({
   const [editing, setEditing] = useState<{ productId: string; branchProductId: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [categoryName, setCategoryName] = useState('');
+
+  const demoCount = useMemo(
+    () =>
+      products.filter(
+        (row) =>
+          DEMO_PRODUCT_NAMES.includes(row.product.name) &&
+          (row.product.is_active || row.is_available),
+      ).length,
+    [products],
+  );
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -74,7 +107,8 @@ export function ProductsManager({
     return products.filter((row) => {
       const name = row.product.name.toLowerCase();
       const category = row.product.category?.name.toLowerCase() ?? '';
-      return name.includes(q) || category.includes(q);
+      const sku = row.product.sku?.toLowerCase() ?? '';
+      return name.includes(q) || category.includes(q) || sku.includes(q);
     });
   }, [products, filter]);
 
@@ -92,10 +126,13 @@ export function ProductsManager({
       description: row.product.description ?? '',
       categoryId: row.product.category_id ?? '',
       newCategoryName: '',
+      sku: row.product.sku ?? '',
+      imageUrl: row.product.image_url ?? '',
       unit: row.product.unit,
       price: Number(row.price),
       unitCost: Number(row.avg_unit_cost),
       stock: Number(row.stock),
+      minStock: Number(row.min_stock ?? LOW_STOCK_THRESHOLD),
       shelfLifeDays: row.product.shelf_life_days ? Number(row.product.shelf_life_days) : null,
       isAvailable: row.is_available,
       isActive: row.product.is_active,
@@ -126,6 +163,8 @@ export function ProductsManager({
       const payload = {
         ...form,
         categoryId: form.categoryId || null,
+        sku: form.sku?.trim() || null,
+        imageUrl: form.imageUrl?.trim() || null,
         newCategoryName: form.newCategoryName.trim() || undefined,
       };
 
@@ -174,8 +213,10 @@ export function ProductsManager({
         description: row.product.description,
         categoryId: row.product.category_id,
         unit: row.product.unit,
+        sku: row.product.sku,
+        imageUrl: row.product.image_url,
         price: Number(row.price),
-        stock: Number(row.stock),
+        minStock: Number(row.min_stock ?? LOW_STOCK_THRESHOLD),
         isAvailable: !row.is_available,
         isActive: row.product.is_active,
         branchProductId: row.id,
@@ -189,8 +230,89 @@ export function ProductsManager({
     await refresh();
   }
 
+  async function archiveDemo() {
+    if (!confirm('¿Ocultar el catálogo demo (Aguacate Hass, etc.) para cargar productos reales?')) return;
+    setSaving(true);
+    try {
+      const response = await fetch('/api/products/archive-demo', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo archivar');
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al archivar demo');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveCategory() {
+    const name = categoryName.trim();
+    if (!name) return;
+    setSaving(true);
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, sortOrder: categories.length + 1 }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo crear');
+      setCategoryName('');
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al crear categoría');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function renameCategory(category: Category) {
+    const name = window.prompt('Nuevo nombre', category.name)?.trim();
+    if (!name || name === category.name) return;
+    const response = await fetch('/api/categories', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: category.id, name }),
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      alert(result.error ?? 'No se pudo renombrar');
+      return;
+    }
+    await refresh();
+  }
+
+  async function deleteCategory(category: Category) {
+    if (!confirm(`¿Eliminar categoría "${category.name}"? Los productos quedan sin categoría.`)) return;
+    const response = await fetch(`/api/categories?id=${category.id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const result = await response.json();
+      alert(result.error ?? 'No se pudo eliminar');
+      return;
+    }
+    await refresh();
+  }
+
   return (
     <div className="space-y-6">
+      {demoCount > 0 && (
+        <section className="pv-callout--amber rounded-2xl p-4">
+          <p className="font-medium text-amber-900">
+            Hay {demoCount} producto(s) de demostración visibles.
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            Ocúltalos antes de cargar tu catálogo real para no mezclar precios de prueba.
+          </p>
+          <button
+            type="button"
+            onClick={archiveDemo}
+            className="mt-3 rounded-full bg-amber-900 px-4 py-2 text-sm text-white"
+          >
+            Ocultar catálogo demo
+          </button>
+        </section>
+      )}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-slate-500">Sucursal: {branchName}</p>
@@ -199,19 +321,45 @@ export function ProductsManager({
         <div className="flex flex-wrap gap-3">
           <input
             className="pv-input"
-            placeholder="Buscar producto..."
+            placeholder="Buscar producto o código..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          <button
-            type="button"
-            onClick={openCreate}
-            className="pv-btn-primary px-5 py-2 text-sm"
-          >
+          <button type="button" onClick={openCreate} className="pv-btn-primary px-5 py-2 text-sm">
             + Nuevo producto
           </button>
         </div>
       </div>
+
+      <CostImportPanel onImported={refresh} />
+
+      <section className="pv-glass-card p-5">
+        <h2 className="text-lg font-semibold text-slate-900">Categorías</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <span key={category.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm">
+              {category.name}
+              <button type="button" className="text-xs text-slate-500" onClick={() => renameCategory(category)}>
+                Editar
+              </button>
+              <button type="button" className="text-xs text-red-600" onClick={() => deleteCategory(category)}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="mt-3 flex max-w-md gap-2">
+          <input
+            className="pv-input"
+            placeholder="Nueva categoría"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+          />
+          <button type="button" className="pv-btn-secondary px-4 py-2 text-sm" onClick={saveCategory}>
+            Agregar
+          </button>
+        </div>
+      </section>
 
       {showForm && (
         <section className="pv-glass-card p-6">
@@ -225,6 +373,15 @@ export function ProductsManager({
                 className="pv-input mt-1"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Código / PLU</span>
+              <input
+                className="pv-input mt-1"
+                value={form.sku ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+                placeholder="Opcional"
               />
             </label>
             <label className="block text-sm">
@@ -242,7 +399,7 @@ export function ProductsManager({
                 ))}
               </select>
             </label>
-            <label className="block text-sm md:col-span-2">
+            <label className="block text-sm">
               <span className="font-medium text-slate-700">Nueva categoría (opcional)</span>
               <input
                 className="pv-input mt-1"
@@ -287,15 +444,29 @@ export function ProductsManager({
                 onChange={(e) => setForm((f) => ({ ...f, unitCost: Number(e.target.value) }))}
               />
             </label>
+            {!editing && (
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Stock inicial</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.001"
+                  className="pv-input mt-1"
+                  value={form.stock ?? 0}
+                  onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
+                />
+                <span className="mt-1 block text-xs text-slate-500">Se registra como inventario inicial.</span>
+              </label>
+            )}
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Stock</span>
+              <span className="font-medium text-slate-700">Mínimo de stock</span>
               <input
                 type="number"
                 min={0}
                 step="0.001"
                 className="pv-input mt-1"
-                value={form.stock}
-                onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
+                value={form.minStock ?? LOW_STOCK_THRESHOLD}
+                onChange={(e) => setForm((f) => ({ ...f, minStock: Number(e.target.value) }))}
               />
             </label>
             <label className="block text-sm">
@@ -313,6 +484,38 @@ export function ProductsManager({
                   }))
                 }
               />
+            </label>
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Foto</span>
+              <div className="mt-2 flex items-center gap-4">
+                {form.imageUrl ? (
+                  <div className="relative h-16 w-16 overflow-hidden rounded-xl">
+                    <Image src={form.imageUrl} alt="" fill className="object-cover" unoptimized />
+                  </div>
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                    Sin foto
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploading(true);
+                    try {
+                      const url = await uploadImage(file);
+                      setForm((f) => ({ ...f, imageUrl: url }));
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+                    } finally {
+                      setUploading(false);
+                    }
+                  }}
+                />
+              </div>
             </label>
             <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Descripción</span>
@@ -350,11 +553,7 @@ export function ProductsManager({
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
-            <button
-              type="button"
-              onClick={closeForm}
-              className="pv-btn-secondary px-5 py-2 text-sm"
-            >
+            <button type="button" onClick={closeForm} className="pv-btn-secondary px-5 py-2 text-sm">
               Cancelar
             </button>
           </div>
@@ -379,20 +578,31 @@ export function ProductsManager({
             {filtered.map((row) => (
               <tr key={row.id} className="border-t border-slate-100">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-900">{row.product.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {PRODUCT_UNIT_LABELS[row.product.unit]}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    {row.product.image_url ? (
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                        <Image src={row.product.image_url} alt="" fill className="object-cover" unoptimized />
+                      </div>
+                    ) : null}
+                    <div>
+                      <p className="font-medium text-slate-900">{row.product.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {PRODUCT_UNIT_LABELS[row.product.unit]}
+                        {row.product.sku ? ` · ${row.product.sku}` : ''}
+                      </p>
+                    </div>
+                  </div>
                 </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {row.product.category?.name ?? '—'}
-                </td>
+                <td className="px-4 py-3 text-slate-600">{row.product.category?.name ?? '—'}</td>
                 <td className="px-4 py-3 font-medium">{formatMoney(Number(row.price))}</td>
                 <td className="px-4 py-3">{formatMoney(Number(row.avg_unit_cost))}</td>
                 <td className="px-4 py-3">
                   {calcMarginPercent(Number(row.price), Number(row.avg_unit_cost)).toFixed(1)}%
                 </td>
-                <td className="px-4 py-3">{Number(row.stock)}</td>
+                <td className="px-4 py-3">
+                  {Number(row.stock)}
+                  <span className="block text-[11px] text-slate-400">mín. {Number(row.min_stock ?? LOW_STOCK_THRESHOLD)}</span>
+                </td>
                 <td className="px-4 py-3">
                   <button
                     type="button"

@@ -23,6 +23,17 @@ test('validateGuestCheckout requires unit for delivery', () => {
   assert.equal(error, 'Selecciona tu departamento para la entrega.');
 });
 
+test('validateGuestCheckout allows walk-in without phone', () => {
+  const error = validateGuestCheckout({
+    customerName: '',
+    customerPhone: '',
+    fulfillmentType: 'pickup',
+    walkIn: true,
+    items: [{ branchProductId: 'abc', quantity: 1 }],
+  });
+  assert.equal(error, null);
+});
+
 test('formatMoney uses MXN locale', () => {
   assert.match(formatMoney(45.5), /\$45\.50/);
 });

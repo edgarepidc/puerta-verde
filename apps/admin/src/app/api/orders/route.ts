@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import {
+  WALK_IN_NAME,
+  WALK_IN_PHONE,
   validateGuestCheckout,
   type GuestCheckoutInput,
   type PaymentMethod,
@@ -23,8 +25,15 @@ export async function POST(request: Request) {
       sendWhatsApp?: boolean;
     };
 
+    const walkIn = Boolean(body.walkIn);
+    const customerName = walkIn ? (body.customerName.trim() || WALK_IN_NAME) : body.customerName;
+    const customerPhone = walkIn ? WALK_IN_PHONE : body.customerPhone;
+
     const validationError = validateGuestCheckout({
       ...body,
+      customerName,
+      customerPhone,
+      walkIn,
       fulfillmentType: body.fulfillmentType ?? 'pickup',
     });
     if (validationError) {
@@ -43,8 +52,8 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase.rpc('place_guest_order', {
       p_branch_slug: auth.branchSlug,
-      p_customer_name: body.customerName.trim(),
-      p_customer_phone: body.customerPhone,
+      p_customer_name: customerName.trim(),
+      p_customer_phone: customerPhone,
       p_fulfillment_type: fulfillmentType,
       p_unit_id: fulfillmentType === 'delivery' ? (body.unitId ?? null) : null,
       p_delivery_notes: deliveryNotes,

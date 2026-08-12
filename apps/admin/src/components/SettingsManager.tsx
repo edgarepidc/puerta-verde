@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   STAFF_ROLE_LABELS,
@@ -17,6 +17,15 @@ interface BranchSettings {
   pickup_instructions: string | null;
   delivery_fee: number;
   minimum_order_amount: number;
+  whatsapp_phone?: string | null;
+  opening_hours?: string | null;
+  fulfillment_mode?: 'pickup' | 'delivery' | 'both';
+}
+
+interface BuildingRow {
+  id: string;
+  name: string;
+  units: Array<{ id: string; identifier: string }>;
 }
 
 interface StaffRow {
@@ -41,9 +50,12 @@ export function SettingsManager({
 }) {
   const [branch, setBranch] = useState(initialBranch);
   const [staff, setStaff] = useState(initialStaff);
+  const [buildings, setBuildings] = useState<BuildingRow[]>([]);
   const [savingBranch, setSavingBranch] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [buildingName, setBuildingName] = useState('');
+  const [unitDraft, setUnitDraft] = useState<Record<string, string>>({});
   const [staffForm, setStaffForm] = useState({
     email: '',
     password: '',
@@ -63,6 +75,9 @@ export function SettingsManager({
           deliveryFee: Number(branch.delivery_fee),
           minimumOrderAmount: Number(branch.minimum_order_amount),
           address: branch.address,
+          whatsappPhone: branch.whatsapp_phone,
+          openingHours: branch.opening_hours,
+          fulfillmentMode: branch.fulfillment_mode ?? 'both',
         }),
       });
       const result = await response.json();
@@ -72,6 +87,13 @@ export function SettingsManager({
     } finally {
       setSavingBranch(false);
     }
+  }
+
+  async function refreshBuildings() {
+    const response = await fetch('/api/locations');
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? 'Error al cargar torres');
+    setBuildings(payload.buildings ?? []);
   }
 
   async function refreshStaff() {
@@ -118,6 +140,10 @@ export function SettingsManager({
 
   const activeStaff = useMemo(() => staff.filter((row) => row.status === 'active').length, [staff]);
 
+  useEffect(() => {
+    refreshBuildings().catch(() => undefined);
+  }, []);
+
   return (
     <div className="space-y-8">
       <section className="pv-glass-card p-6">
@@ -163,6 +189,41 @@ export function SettingsManager({
               onChange={(e) => setBranch((b) => ({ ...b, minimum_order_amount: Number(e.target.value) }))}
             />
           </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">WhatsApp de la sucursal</span>
+            <input
+              className="pv-input mt-1"
+              value={branch.whatsapp_phone ?? ''}
+              onChange={(e) => setBranch((b) => ({ ...b, whatsapp_phone: e.target.value }))}
+              placeholder="5512345678"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Horario</span>
+            <input
+              className="pv-input mt-1"
+              value={branch.opening_hours ?? ''}
+              onChange={(e) => setBranch((b) => ({ ...b, opening_hours: e.target.value }))}
+              placeholder="Lun–Sáb 8:00–20:00"
+            />
+          </label>
+          <label className="block text-sm md:col-span-2">
+            <span className="font-medium text-slate-700">Modo de venta</span>
+            <select
+              className="pv-input mt-1"
+              value={branch.fulfillment_mode ?? 'both'}
+              onChange={(e) =>
+                setBranch((b) => ({
+                  ...b,
+                  fulfillment_mode: e.target.value as 'pickup' | 'delivery' | 'both',
+                }))
+              }
+            >
+              <option value="both">Recoger y domicilio</option>
+              <option value="pickup">Solo recoger</option>
+              <option value="delivery">Solo domicilio</option>
+            </select>
+          </label>
         </div>
         <button
           type="button"
@@ -172,6 +233,95 @@ export function SettingsManager({
         >
           {savingBranch ? 'Guardando...' : 'Guardar sucursal'}
         </button>
+      </section>
+
+      <section className="pv-glass-card p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Torres y departamentos</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Necesarios si vendes a domicilio. Si solo es recoger, puedes dejarlo vacío.
+        </p>
+        <div className="mt-4 flex max-w-md gap-2">
+          <input
+            className="pv-input"
+            placeholder="Nueva torre / edificio"
+            value={buildingName}
+            onChange={(e) => setBuildingName(e.target.value)}
+          />
+          <button
+            type="button"
+            className="pv-btn-secondary px-4 py-2 text-sm"
+            onClick={async () => {
+              if (!buildingName.trim()) return;
+              const response = await fetch('/api/locations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: buildingName }),
+              });
+              if (!response.ok) {
+                const result = await response.json();
+                setError(result.error ?? 'No se pudo crear torre');
+                return;
+              }
+              setBuildingName('');
+              await refreshBuildings();
+            }}
+          >
+            Agregar
+          </button>
+        </div>
+        <div className="mt-4 space-y-4">
+          {buildings.map((building) => (
+            <div key={building.id} className="rounded-xl border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-slate-900">{building.name}</p>
+                <button
+                  type="button"
+                  className="text-xs text-red-600"
+                  onClick={async () => {
+                    if (!confirm(`¿Eliminar ${building.name} y sus departamentos?`)) return;
+                    await fetch(`/api/locations?buildingId=${building.id}`, { method: 'DELETE' });
+                    await refreshBuildings();
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                {(building.units ?? []).map((unit) => unit.identifier).join(', ') || 'Sin departamentos'}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  className="pv-input"
+                  placeholder="101, 102, 103"
+                  value={unitDraft[building.id] ?? ''}
+                  onChange={(e) => setUnitDraft((current) => ({ ...current, [building.id]: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-300 px-3 py-1 text-sm"
+                  onClick={async () => {
+                    const identifiers = unitDraft[building.id];
+                    if (!identifiers?.trim()) return;
+                    const response = await fetch('/api/locations', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ buildingId: building.id, identifiers }),
+                    });
+                    if (!response.ok) {
+                      const result = await response.json();
+                      setError(result.error ?? 'No se pudieron agregar deptos');
+                      return;
+                    }
+                    setUnitDraft((current) => ({ ...current, [building.id]: '' }));
+                    await refreshBuildings();
+                  }}
+                >
+                  Agregar deptos
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="pv-glass-card p-6">

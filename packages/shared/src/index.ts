@@ -27,7 +27,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const PAYMENT_STATUSES = ['pending', 'paid', 'refunded'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PRODUCT_UNITS = ['kg', 'piece', 'bunch', 'bag', 'liter'] as const;
+export const PRODUCT_UNITS = ['kg', 'piece', 'bunch', 'bag', 'liter', 'box'] as const;
 export type ProductUnit = (typeof PRODUCT_UNITS)[number];
 
 export const STAFF_ROLES = ['owner', 'org_admin', 'branch_manager', 'staff'] as const;
@@ -60,7 +60,15 @@ export const PRODUCT_UNIT_LABELS: Record<ProductUnit, string> = {
   bunch: 'manojo',
   bag: 'bolsa',
   liter: 'litro',
+  box: 'caja',
 };
+
+export const WALK_IN_PHONE = '520000000000';
+export const WALK_IN_NAME = 'Cliente de paso';
+
+export function isWalkInPhone(phone: string): boolean {
+  return normalizePhone(phone) === WALK_IN_PHONE;
+}
 
 export function formatMoney(amount: number, currency = 'MXN'): string {
   return new Intl.NumberFormat('es-MX', {
@@ -87,6 +95,7 @@ export interface GuestCheckoutInput {
   fulfillmentType: FulfillmentType;
   unitId?: string | null;
   deliveryNotes?: string | null;
+  walkIn?: boolean;
   items: Array<{
     branchProductId: string;
     quantity: number;
@@ -95,6 +104,7 @@ export interface GuestCheckoutInput {
 
 export {
   validateProductInput,
+  DEMO_PRODUCT_NAMES,
   type ProductInput,
 } from './products';
 
@@ -184,8 +194,10 @@ export {
 } from './billing';
 
 export function validateGuestCheckout(input: GuestCheckoutInput): string | null {
-  if (!input.customerName.trim()) return 'El nombre es obligatorio.';
-  if (!isValidMexicanPhone(input.customerPhone)) return 'Ingresa un teléfono válido de 10 dígitos.';
+  if (!input.walkIn && !input.customerName.trim()) return 'El nombre es obligatorio.';
+  if (!input.walkIn && !isValidMexicanPhone(input.customerPhone)) {
+    return 'Ingresa un teléfono válido de 10 dígitos.';
+  }
   if (input.fulfillmentType === 'delivery' && !input.unitId) {
     return 'Selecciona tu departamento para la entrega.';
   }

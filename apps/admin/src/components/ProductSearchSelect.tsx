@@ -8,7 +8,7 @@ export interface SearchableProduct {
   id: string;
   price?: number;
   stock?: number;
-  product: { name: string; unit: ProductUnit };
+  product: { name: string; unit: ProductUnit; sku?: string | null };
 }
 
 export function ProductSearchSelect({
@@ -30,7 +30,11 @@ export function ProductSearchSelect({
     const q = query.trim().toLowerCase();
     if (!q) return products.slice(0, 12);
     return products
-      .filter((product) => product.product.name.toLowerCase().includes(q))
+      .filter(
+        (product) =>
+          product.product.name.toLowerCase().includes(q) ||
+          (product.product.sku ?? '').toLowerCase().includes(q),
+      )
       .slice(0, 12);
   }, [products, query]);
 

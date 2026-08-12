@@ -11,11 +11,13 @@ import {
 } from '@puertaverde/shared';
 
 import { LowStockBanner } from '@/components/LowStockBanner';
+import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 
 interface ProductOption {
   id: string;
   stock: number;
-  product: { id: string; name: string; unit: ProductUnit };
+  min_stock?: number | null;
+  product: { id: string; name: string; unit: ProductUnit; sku?: string | null };
 }
 
 interface SupplierRow {
@@ -103,6 +105,7 @@ export function PurchasesManager({
   const [supplierName, setSupplierName] = useState('');
   const [supplierPhone, setSupplierPhone] = useState('');
   const [supplierNotes, setSupplierNotes] = useState('');
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
 
   const [compareProductId, setCompareProductId] = useState('');
   const [compareDays, setCompareDays] = useState(90);
@@ -144,9 +147,11 @@ export function PurchasesManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingSupplierId || undefined,
           name: supplierName,
           phone: supplierPhone || null,
           notes: supplierNotes || null,
+          isActive: true,
         }),
       });
       const result = await response.json();
@@ -154,6 +159,7 @@ export function PurchasesManager({
       setSupplierName('');
       setSupplierPhone('');
       setSupplierNotes('');
+      setEditingSupplierId(null);
       await refreshPurchases();
       if (result.supplier?.id) setSupplierId(result.supplier.id);
     } catch (err) {
@@ -337,24 +343,15 @@ export function PurchasesManager({
               >
                 <label className="block text-sm">
                   <span className="font-medium text-slate-700">Producto</span>
-                  <select
-                    className="pv-input mt-1"
+                  <ProductSearchSelect
+                    products={products}
                     value={line.branchProductId}
-                    onChange={(e) =>
+                    onChange={(id) =>
                       setLines((prev) =>
-                        prev.map((row, i) =>
-                          i === index ? { ...row, branchProductId: e.target.value } : row,
-                        ),
+                        prev.map((row, i) => (i === index ? { ...row, branchProductId: id } : row)),
                       )
                     }
-                  >
-                    <option value="">Selecciona...</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.product.name} ({PRODUCT_UNIT_LABELS[product.product.unit]})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
                 <label className="block text-sm">
                   <span className="font-medium text-slate-700">Cantidad</span>
@@ -424,7 +421,9 @@ export function PurchasesManager({
       {tab === 'proveedores' && (
         <section className="space-y-4">
           <div className="pv-glass-card grid gap-4 p-6 md:grid-cols-2">
-            <h2 className="text-lg font-semibold text-slate-900 md:col-span-2">Nuevo proveedor</h2>
+            <h2 className="text-lg font-semibold text-slate-900 md:col-span-2">
+              {editingSupplierId ? 'Editar proveedor' : 'Nuevo proveedor'}
+            </h2>
             <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Nombre *</span>
               <input
@@ -457,7 +456,7 @@ export function PurchasesManager({
                 onClick={saveSupplier}
                 className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
               >
-                {saving ? 'Guardando…' : 'Guardar proveedor'}
+                {saving ? 'Guardando…' : editingSupplierId ? 'Actualizar proveedor' : 'Guardar proveedor'}
               </button>
             </div>
           </div>
@@ -471,6 +470,7 @@ export function PurchasesManager({
                   <th className="pb-2 font-medium">Teléfono</th>
                   <th className="pb-2 font-medium">Notas</th>
                   <th className="pb-2 font-medium">Estado</th>
+                  <th className="pb-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -481,6 +481,42 @@ export function PurchasesManager({
                     <td className="py-2 text-slate-600">{supplier.notes || '—'}</td>
                     <td className="py-2 text-slate-600">
                       {supplier.is_active ? 'Activo' : 'Inactivo'}
+                    </td>
+                    <td className="py-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-sm text-emerald-800 underline"
+                          onClick={() => {
+                            setEditingSupplierId(supplier.id);
+                            setSupplierName(supplier.name);
+                            setSupplierPhone(supplier.phone ?? '');
+                            setSupplierNotes(supplier.notes ?? '');
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-sm text-slate-600 underline"
+                          onClick={async () => {
+                            await fetch('/api/suppliers', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                id: supplier.id,
+                                name: supplier.name,
+                                phone: supplier.phone,
+                                notes: supplier.notes,
+                                isActive: !supplier.is_active,
+                              }),
+                            });
+                            await refreshPurchases();
+                          }}
+                        >
+                          {supplier.is_active ? 'Inactivar' : 'Activar'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

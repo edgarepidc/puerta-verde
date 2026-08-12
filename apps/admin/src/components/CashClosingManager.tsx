@@ -23,6 +23,8 @@ interface CashSummary {
   closing: {
     id: string;
     notes: string | null;
+    opening_float?: number | null;
+    counted_cash?: number | null;
     created_at: string;
   } | null;
 }
@@ -32,6 +34,8 @@ const METHOD_KEYS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer', 'onli
 export function CashClosingManager() {
   const [summary, setSummary] = useState<CashSummary | null>(null);
   const [notes, setNotes] = useState('');
+  const [openingFloat, setOpeningFloat] = useState('');
+  const [countedCash, setCountedCash] = useState('');
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +49,12 @@ export function CashClosingManager() {
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja');
       setSummary(payload);
       setNotes(payload.closing?.notes ?? '');
+      setOpeningFloat(
+        payload.closing?.opening_float != null ? String(payload.closing.opening_float) : '',
+      );
+      setCountedCash(
+        payload.closing?.counted_cash != null ? String(payload.closing.counted_cash) : '',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -63,7 +73,11 @@ export function CashClosingManager() {
       const response = await fetch('/api/cash-closing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({
+          notes,
+          openingFloat: openingFloat === '' ? null : Number(openingFloat),
+          countedCash: countedCash === '' ? null : Number(countedCash),
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo cerrar la caja');
@@ -141,7 +155,44 @@ export function CashClosingManager() {
       </section>
 
       <section className="pv-glass-card p-6">
-        <label className="block text-sm font-medium text-slate-700">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Fondo inicial
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="pv-input mt-2"
+              value={openingFloat}
+              onChange={(e) => setOpeningFloat(e.target.value)}
+              disabled={Boolean(summary.closing)}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Efectivo contado
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="pv-input mt-2"
+              value={countedCash}
+              onChange={(e) => setCountedCash(e.target.value)}
+              disabled={Boolean(summary.closing)}
+            />
+          </label>
+        </div>
+        {countedCash !== '' && (
+          <p className="mt-3 text-sm text-slate-600">
+            Esperado (fondo + efectivo sistema):{' '}
+            {formatMoney(Number(openingFloat || 0) + Number(summary.totals.cash))}
+            {' · '}
+            Diferencia:{' '}
+            <span className="font-semibold">
+              {formatMoney(Number(countedCash) - (Number(openingFloat || 0) + Number(summary.totals.cash)))}
+            </span>
+          </p>
+        )}
+        <label className="mt-4 block text-sm font-medium text-slate-700">
           Notas del cierre
           <textarea
             className="pv-input mt-2"
