@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
 import {
@@ -14,7 +15,12 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
-import { CounterSalePanel, type CounterProduct } from '@/components/CounterSalePanel';
+import {
+  CounterSalePanel,
+  buildTicketText,
+  whatsappTicketHref,
+  type CounterProduct,
+} from '@/components/CounterSalePanel';
 import { LowStockBanner } from '@/components/LowStockBanner';
 
 interface OrderRow {
@@ -40,7 +46,18 @@ interface OrderItem {
   line_total: number;
 }
 
-const COLUMNS: OrderStatus[] = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+const COLUMNS = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'] as const;
+
+const COLUMN_META: Record<
+  (typeof COLUMNS)[number],
+  { accentClass: string; image: string; empty: string }
+> = {
+  pending: { accentClass: 'pv-glass-card-accent-orange', image: '/orders/pending.png', empty: 'Sin pedidos' },
+  preparing: { accentClass: 'pv-glass-card-accent-blue', image: '/orders/preparing.png', empty: 'Sin pedidos' },
+  ready: { accentClass: 'pv-glass-card-accent-teal', image: '/orders/ready.png', empty: 'Sin pedidos' },
+  out_for_delivery: { accentClass: 'pv-glass-card-accent-purple', image: '/orders/out_for_delivery.png', empty: 'Sin pedidos' },
+  delivered: { accentClass: 'pv-glass-card-accent-green', image: '/orders/delivered.png', empty: 'Sin pedidos' },
+};
 
 export function OrdersBoard({
   initialOrders,
@@ -149,14 +166,37 @@ export function OrdersBoard({
         }}
       />
 
-      <div className="grid gap-4 overflow-x-auto lg:grid-cols-5">
-        {COLUMNS.map((status) => (
-          <section key={status} className="pv-glass-card min-w-[240px] p-4">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-              {ORDER_STATUS_LABELS[status]}
-            </h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-2.5">
+        {COLUMNS.map((status) => {
+          const meta = COLUMN_META[status];
+          const columnOrders = grouped[status] ?? [];
+
+          return (
+          <section
+            key={status}
+            className={`pv-glass-card pv-glass-card-accent ${meta.accentClass} min-w-0 overflow-hidden p-3`}
+          >
+            <div className="mb-3 flex items-center gap-2.5">
+              <Image
+                src={meta.image}
+                alt=""
+                width={44}
+                height={44}
+                className="h-11 w-11 shrink-0 rounded-xl object-cover"
+              />
+              <div className="min-w-0">
+                <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  {ORDER_STATUS_LABELS[status]}
+                </h2>
+                <p className="truncate text-[11px] text-slate-400">
+                  {columnOrders.length === 0
+                    ? meta.empty
+                    : `${columnOrders.length} pedido${columnOrders.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
+            </div>
             <div className="space-y-3">
-              {(grouped[status] ?? []).map((order) => {
+              {columnOrders.map((order) => {
                 const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
                 const nextStatus = ORDER_STATUSES[ORDER_STATUSES.indexOf(status) + 1] as
                   | OrderStatus
@@ -218,7 +258,17 @@ export function OrdersBoard({
                         </>
                       )}
                       <a
-                        href={`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`}
+                        href={whatsappTicketHref(
+                          order.customer_phone,
+                          buildTicketText({
+                            orderNumber: order.order_number,
+                            customerName: order.customer_name,
+                            paymentMethod: order.payment_method,
+                            statusLabel: ORDER_STATUS_LABELS[order.status],
+                            total: Number(order.total),
+                            items: [],
+                          }),
+                        )}
                         target="_blank"
                         rel="noreferrer"
                         className="pv-btn-ghost px-3 py-1 text-xs"
@@ -229,12 +279,13 @@ export function OrdersBoard({
                   </article>
                 );
               })}
-              {(grouped[status] ?? []).length === 0 && (
+              {columnOrders.length === 0 && (
                 <p className="text-sm text-slate-400">Sin pedidos</p>
               )}
             </div>
           </section>
-        ))}
+          );
+        })}
       </div>
 
       {detailId && selected && (
@@ -277,6 +328,24 @@ export function OrdersBoard({
               )}
             </div>
             <p className="mt-4 text-right text-base font-semibold">{formatMoney(Number(selected.total))}</p>
+            <a
+              href={whatsappTicketHref(
+                selected.customer_phone,
+                buildTicketText({
+                  orderNumber: selected.order_number,
+                  customerName: selected.customer_name,
+                  paymentMethod: selected.payment_method,
+                  statusLabel: ORDER_STATUS_LABELS[selected.status],
+                  total: Number(selected.total),
+                  items: detailItems,
+                }),
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm"
+            >
+              Enviar ticket por WhatsApp
+            </a>
           </div>
         </div>
       )}
