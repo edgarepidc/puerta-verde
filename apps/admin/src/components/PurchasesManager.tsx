@@ -219,14 +219,6 @@ export function PurchasesManager({
             </strong>{' '}
             — stock actual, mermas y ajustes. No guarda proveedor.
           </li>
-          <li>
-            <strong>
-              <Link href="/lotes" className="underline underline-offset-2">
-                Lotes / PTI
-              </Link>
-            </strong>{' '}
-            — trazabilidad por lote (código, caducidad, FIFO). El proveedor ahí es solo una nota.
-          </li>
         </ul>
       </section>
 

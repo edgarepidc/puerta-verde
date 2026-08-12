@@ -42,10 +42,9 @@ export default async function InventoryPage() {
   return (
     <AdminShell title="Inventario" subtitle={`Stock, mermas y ajustes · ${tenant.branchName}`}>
       <p className="mb-6 rounded-2xl border border-slate-200/80 bg-white/60 px-4 py-3 text-sm text-slate-600">
-        Aquí controlas cuánto hay en stock. Para registrar compras con proveedor y comparar precios,
-        usa <a href="/compras" className="font-medium text-emerald-800 underline underline-offset-2">Compras</a>.
-        Para trazabilidad por lote/PTI, usa{' '}
-        <a href="/lotes" className="font-medium text-emerald-800 underline underline-offset-2">Lotes / PTI</a>.
+        Aquí controlas cuánto hay en stock (mermas y ajustes). Para registrar compras con proveedor y
+        comparar precios, usa{' '}
+        <a href="/compras" className="font-medium text-emerald-800 underline underline-offset-2">Compras</a>.
       </p>
       <InventoryManager
         initialProducts={(products ?? []) as Array<{

@@ -9,7 +9,6 @@ const NAV = [
   { href: '/compras', label: 'Compras' },
   { href: '/promociones', label: 'Promociones' },
   { href: '/inventario', label: 'Inventario' },
-  { href: '/lotes', label: 'Lotes / PTI' },
   { href: '/pronosticos', label: 'Pronósticos' },
   { href: '/caja', label: 'Caja' },
   { href: '/utilidades', label: 'Utilidades' },
