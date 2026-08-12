@@ -2,6 +2,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { AdminShell } from '@/components/AdminShell';
 import { BillingManager } from '@/components/BillingManager';
+import { PlatformManager } from '@/components/PlatformManager';
 import { SettingsManager } from '@/components/SettingsManager';
 import { WhatsAppInbox } from '@/components/WhatsAppInbox';
 import { canManageStaff, getStaffSession } from '@/lib/auth';
@@ -13,8 +14,16 @@ export default async function ConfiguracionPage() {
   const staff = await getStaffSession();
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
+  const isPlatformAdmin = Boolean(staff?.isPlatformAdmin);
 
-  const [{ data: branch }, { data: organization }, { data: memberships }, { data: whatsappMessages }] = await Promise.all([
+  const [
+    { data: branch },
+    { data: organization },
+    { data: memberships },
+    { data: whatsappMessages },
+    platformOrgsResult,
+    platformBranchesResult,
+  ] = await Promise.all([
     supabase
       .from('branches')
       .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount')
@@ -36,6 +45,15 @@ export default async function ConfiguracionPage() {
       .eq('organization_id', tenant.organizationId)
       .order('created_at', { ascending: false })
       .limit(30),
+    isPlatformAdmin
+      ? supabase
+          .from('organizations')
+          .select('id, name, slug, subscription_plan, subscription_status, created_at')
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: null }),
+    isPlatformAdmin
+      ? supabase.from('branches').select('id, name, slug, is_active, organization_id').order('name')
+      : Promise.resolve({ data: null }),
   ]);
 
   const userIds = (memberships ?? []).map((row) => row.user_id);
@@ -52,6 +70,15 @@ export default async function ConfiguracionPage() {
       phone: profile?.phone ?? null,
     };
   });
+
+  const orgsWithBranches = isPlatformAdmin
+    ? (platformOrgsResult.data ?? []).map((org) => ({
+        ...org,
+        branches: (platformBranchesResult.data ?? []).filter(
+          (branchRow) => branchRow.organization_id === org.id,
+        ),
+      }))
+    : [];
 
   return (
     <AdminShell title="Configuración" subtitle={tenant.branchName}>
@@ -77,6 +104,17 @@ export default async function ConfiguracionPage() {
             created_at: string;
           }>}
         />
+        {isPlatformAdmin && (
+          <section id="plataforma" className="scroll-mt-28 space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Plataforma</h2>
+              <p className="text-sm text-slate-500">
+                Solo visible para super admin. Alta de verdulerías y sucursales.
+              </p>
+            </div>
+            <PlatformManager initialOrganizations={orgsWithBranches} />
+          </section>
+        )}
       </div>
     </AdminShell>
   );

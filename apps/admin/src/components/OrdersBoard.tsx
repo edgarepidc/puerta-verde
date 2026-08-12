@@ -10,6 +10,8 @@ import {
   type OrderStatus,
 } from '@puertaverde/shared';
 
+import { CounterSalePanel, type CounterProduct } from '@/components/CounterSalePanel';
+
 interface OrderRow {
   id: string;
   order_number: number;
@@ -19,13 +21,20 @@ interface OrderRow {
   fulfillment_type: 'delivery' | 'pickup';
   total: number;
   payment_status: string;
+  payment_method?: string | null;
   created_at: string;
   branch: { name: string; slug: string } | { name: string; slug: string }[] | null;
 }
 
 const COLUMNS: OrderStatus[] = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 
-export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
+export function OrdersBoard({
+  initialOrders,
+  products,
+}: {
+  initialOrders: OrderRow[];
+  products: CounterProduct[];
+}) {
   const [orders, setOrders] = useState(initialOrders);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -73,7 +82,9 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar pago');
       setOrders((current) =>
         current.map((order) =>
-          order.id === orderId ? { ...order, payment_status: 'paid' } : order,
+          order.id === orderId
+            ? { ...order, payment_status: 'paid', payment_method: paymentMethod }
+            : order,
         ),
       );
     } catch (error) {
@@ -84,81 +95,99 @@ export function OrdersBoard({ initialOrders }: { initialOrders: OrderRow[] }) {
   }
 
   return (
-    <div className="grid gap-4 overflow-x-auto lg:grid-cols-5">
-      {COLUMNS.map((status) => (
-        <section key={status} className="pv-glass-card min-w-[240px] p-4">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            {ORDER_STATUS_LABELS[status]}
-          </h2>
-          <div className="space-y-3">
-            {(grouped[status] ?? []).map((order) => {
-              const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
-              const nextStatus = ORDER_STATUSES[ORDER_STATUSES.indexOf(status) + 1] as
-                | OrderStatus
-                | undefined;
+    <div className="space-y-2">
+      <CounterSalePanel
+        products={products}
+        onCreated={(order) => {
+          setOrders((current) => [
+            {
+              ...order,
+              status: order.status as OrderStatus,
+              fulfillment_type: order.fulfillment_type,
+              branch: current[0]?.branch ?? { name: 'Sucursal', slug: '' },
+            },
+            ...current,
+          ]);
+        }}
+      />
 
-              return (
-                <article key={order.id} className="pv-glass-item rounded-xl p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-slate-900">#{order.order_number}</p>
-                      <p className="text-sm text-slate-600">{order.customer_name}</p>
-                      <p className="text-xs text-slate-500">{order.customer_phone}</p>
+      <div className="grid gap-4 overflow-x-auto lg:grid-cols-5">
+        {COLUMNS.map((status) => (
+          <section key={status} className="pv-glass-card min-w-[240px] p-4">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {ORDER_STATUS_LABELS[status]}
+            </h2>
+            <div className="space-y-3">
+              {(grouped[status] ?? []).map((order) => {
+                const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
+                const nextStatus = ORDER_STATUSES[ORDER_STATUSES.indexOf(status) + 1] as
+                  | OrderStatus
+                  | undefined;
+
+                return (
+                  <article key={order.id} className="pv-glass-item rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">#{order.order_number}</p>
+                        <p className="text-sm text-slate-600">{order.customer_name}</p>
+                        <p className="text-xs text-slate-500">{order.customer_phone}</p>
+                      </div>
+                      <span className="text-sm font-medium">{formatMoney(Number(order.total))}</span>
                     </div>
-                    <span className="text-sm font-medium">{formatMoney(Number(order.total))}</span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {branch?.name} · {FULFILLMENT_LABELS[order.fulfillment_type]}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {nextStatus && nextStatus !== 'cancelled' && (
-                      <button
-                        type="button"
-                        disabled={updatingId === order.id}
-                        onClick={() => updateStatus(order.id, nextStatus)}
-                        className="pv-btn-primary px-3 py-1 text-xs disabled:opacity-50"
-                      >
-                        → {ORDER_STATUS_LABELS[nextStatus]}
-                      </button>
-                    )}
-                    {order.payment_status !== 'paid' && (
-                      <>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {branch?.name} · {FULFILLMENT_LABELS[order.fulfillment_type]}
+                      {order.payment_status === 'paid' ? ' · Pagado' : ''}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {nextStatus && nextStatus !== 'cancelled' && (
                         <button
                           type="button"
                           disabled={updatingId === order.id}
-                          onClick={() => markPaid(order.id, 'cash')}
-                          className="pv-btn-ghost px-3 py-1 text-xs"
+                          onClick={() => updateStatus(order.id, nextStatus)}
+                          className="pv-btn-primary px-3 py-1 text-xs disabled:opacity-50"
                         >
-                          Efectivo
+                          → {ORDER_STATUS_LABELS[nextStatus]}
                         </button>
-                        <button
-                          type="button"
-                          disabled={updatingId === order.id}
-                          onClick={() => markPaid(order.id, 'card_terminal')}
-                          className="pv-btn-ghost px-3 py-1 text-xs"
-                        >
-                          TPV
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updatingId === order.id}
-                          onClick={() => markPaid(order.id, 'transfer')}
-                          className="pv-btn-ghost px-3 py-1 text-xs"
-                        >
-                          Transferencia
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-            {(grouped[status] ?? []).length === 0 && (
-              <p className="text-sm text-slate-400">Sin pedidos</p>
-            )}
-          </div>
-        </section>
-      ))}
+                      )}
+                      {order.payment_status !== 'paid' && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={updatingId === order.id}
+                            onClick={() => markPaid(order.id, 'cash')}
+                            className="pv-btn-ghost px-3 py-1 text-xs"
+                          >
+                            Efectivo
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingId === order.id}
+                            onClick={() => markPaid(order.id, 'card_terminal')}
+                            className="pv-btn-ghost px-3 py-1 text-xs"
+                          >
+                            TPV
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingId === order.id}
+                            onClick={() => markPaid(order.id, 'transfer')}
+                            className="pv-btn-ghost px-3 py-1 text-xs"
+                          >
+                            Transferencia
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+              {(grouped[status] ?? []).length === 0 && (
+                <p className="text-sm text-slate-400">Sin pedidos</p>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

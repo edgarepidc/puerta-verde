@@ -7,6 +7,7 @@ const NAV = [
   { href: '/', label: 'Pedidos' },
   { href: '/productos', label: 'Productos' },
   { href: '/compras', label: 'Compras' },
+  { href: '/clientes', label: 'Clientes' },
   { href: '/promociones', label: 'Promociones' },
   { href: '/inventario', label: 'Inventario' },
   { href: '/pronosticos', label: 'Pronósticos' },
@@ -15,11 +16,9 @@ const NAV = [
   { href: '/configuracion', label: 'Configuración' },
 ] as const;
 
-export function AdminNav({ isPlatformAdmin = false }: { isPlatformAdmin?: boolean }) {
+export function AdminNav({ isPlatformAdmin: _isPlatformAdmin = false }: { isPlatformAdmin?: boolean }) {
   const pathname = usePathname();
-  const items = isPlatformAdmin
-    ? ([{ href: '/plataforma', label: 'Plataforma' }, ...NAV] as const)
-    : NAV;
+  const items = NAV;
 
   return (
     <nav className="pv-glass-nav flex max-w-full overflow-x-auto rounded-full p-1">
