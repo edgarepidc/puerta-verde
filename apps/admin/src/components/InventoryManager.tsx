@@ -5,14 +5,15 @@ import { useMemo, useState } from 'react';
 import {
   INVENTORY_MOVEMENT_LABELS,
   LOW_STOCK_THRESHOLD,
-  MANUAL_INVENTORY_TYPES,
   PRODUCT_UNIT_LABELS,
   type InventoryMovementType,
-  type ManualInventoryMovementType,
   type ProductUnit,
 } from '@puertaverde/shared';
 
 import { ScalePanel } from '@/components/ScalePanel';
+
+const STOCK_MOVEMENT_TYPES = ['waste', 'adjustment'] as const;
+type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 
 interface ProductStock {
   id: string;
@@ -43,13 +44,13 @@ export function InventoryManager({
   const [products, setProducts] = useState(initialProducts);
   const [movements, setMovements] = useState(initialMovements);
   const [branchProductId, setBranchProductId] = useState('');
-  const [movementType, setMovementType] = useState<ManualInventoryMovementType>('purchase');
+  const [movementType, setMovementType] = useState<StockMovementType>('waste');
   const [quantity, setQuantity] = useState(1);
-  const [unitCost, setUnitCost] = useState(0);
   const [notes, setNotes] = useState('');
-  const [expiresAt, setExpiresAt] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickWasteId, setQuickWasteId] = useState<string | null>(null);
+  const [quickWasteQty, setQuickWasteQty] = useState(1);
 
   const lowStock = useMemo(
     () => products.filter((p) => Number(p.stock) <= LOW_STOCK_THRESHOLD),
@@ -73,6 +74,33 @@ export function InventoryManager({
     setMovements(payload.movements);
   }
 
+  async function submitQuickWaste(productId: string) {
+    if (!(quickWasteQty > 0)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branchProductId: productId,
+          movementType: 'waste',
+          quantity: Math.abs(quickWasteQty),
+          notes: 'Merma rápida',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar merma');
+      setQuickWasteId(null);
+      setQuickWasteQty(1);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al registrar merma');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function submitMovement() {
     setSaving(true);
     setError(null);
@@ -87,15 +115,12 @@ export function InventoryManager({
           branchProductId,
           movementType,
           quantity: signedQty,
-          unitCost: movementType === 'purchase' ? unitCost : null,
           notes: notes || null,
-          expiresAt: movementType === 'purchase' && expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
       setNotes('');
-      setExpiresAt('');
       setQuantity(1);
       await refresh();
     } catch (err) {
@@ -131,16 +156,19 @@ export function InventoryManager({
       )}
 
       <section className="pv-glass-card p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Mermas y ajustes</h2>
         <p className="mt-1 text-sm text-slate-500">
-          La entrada rápida actualiza stock y costo promedio, pero no guarda proveedor. Si quieres
-          comparar precios entre proveedores, regístralo en Compras.
+          Las compras con proveedor se registran en{' '}
+          <a href="/compras" className="font-medium text-emerald-800 underline">
+            Compras
+          </a>
+          . Aquí solo bajas merma o corriges stock.
         </p>
         <div className="mt-4">
           <ScalePanel
             onWeight={(kg) => {
               setQuantity(kg);
-              if (movementType !== 'purchase') setMovementType('purchase');
+              setMovementType('waste');
             }}
           />
         </div>
@@ -166,42 +194,15 @@ export function InventoryManager({
             <select
               className="pv-input mt-1"
               value={movementType}
-              onChange={(e) => setMovementType(e.target.value as ManualInventoryMovementType)}
+              onChange={(e) => setMovementType(e.target.value as StockMovementType)}
             >
-              {MANUAL_INVENTORY_TYPES.map((type) => (
+              {STOCK_MOVEMENT_TYPES.map((type) => (
                 <option key={type} value={type}>
                   {INVENTORY_MOVEMENT_LABELS[type]}
                 </option>
               ))}
             </select>
           </label>
-          {movementType === 'purchase' && (
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Costo de compra (por unidad) *</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                className="pv-input mt-1"
-                value={unitCost}
-                onChange={(e) => setUnitCost(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {movementType === 'purchase' && (
-            <label className="block text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Caducidad (opcional)</span>
-              <input
-                type="datetime-local"
-                className="pv-input mt-1"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-              />
-              <span className="mt-1 block text-xs text-slate-500">
-                Si lo dejas vacío, se calcula con los días de vida útil del producto.
-              </span>
-            </label>
-          )}
           <label className="block text-sm">
             <span className="font-medium text-slate-700">
               {movementType === 'adjustment' ? 'Ajuste (+/-)' : 'Cantidad'}
@@ -218,7 +219,7 @@ export function InventoryManager({
             <span className="font-medium text-slate-700">Notas</span>
             <input
               className="pv-input mt-1"
-              placeholder="Ej. Compra mercado central, merma por caducidad"
+              placeholder="Ej. merma por caducidad, conteo físico"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -244,6 +245,7 @@ export function InventoryManager({
                 <th className="px-4 py-3 font-medium">Producto</th>
                 <th className="px-4 py-3 font-medium">Stock</th>
                 <th className="px-4 py-3 font-medium">Unidad</th>
+                <th className="px-4 py-3 font-medium">Merma</th>
               </tr>
             </thead>
             <tbody>
@@ -259,6 +261,46 @@ export function InventoryManager({
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {PRODUCT_UNIT_LABELS[row.product.unit]}
+                  </td>
+                  <td className="px-4 py-3">
+                    {quickWasteId === row.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0.001}
+                          step="0.001"
+                          className="pv-input w-20"
+                          value={quickWasteQty}
+                          onChange={(e) => setQuickWasteQty(Number(e.target.value))}
+                        />
+                        <button
+                          type="button"
+                          disabled={saving}
+                          className="text-xs font-medium text-rose-700"
+                          onClick={() => submitQuickWaste(row.id)}
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-slate-500"
+                          onClick={() => setQuickWasteId(null)}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-rose-700"
+                        onClick={() => {
+                          setQuickWasteId(row.id);
+                          setQuickWasteQty(1);
+                        }}
+                      >
+                        Merma
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

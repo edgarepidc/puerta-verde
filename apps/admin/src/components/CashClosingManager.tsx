@@ -2,12 +2,22 @@
 
 import { useEffect, useState } from 'react';
 
-import { formatMoney } from '@puertaverde/shared';
+import { PAYMENT_METHOD_LABELS, formatMoney, type PaymentMethod } from '@puertaverde/shared';
+
+interface ChannelTotals {
+  cash: number;
+  card_terminal: number;
+  transfer: number;
+  online: number;
+  orderCount: number;
+  total: number;
+}
 
 interface CashSummary {
   closingDate: string;
   branchName: string;
   totals: { cash: number; card_terminal: number; transfer: number; online: number };
+  channels: { pos: ChannelTotals; web: ChannelTotals };
   orderCount: number;
   grandTotal: number;
   closing: {
@@ -16,6 +26,8 @@ interface CashSummary {
     created_at: string;
   } | null;
 }
+
+const METHOD_KEYS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer', 'online'];
 
 export function CashClosingManager() {
   const [summary, setSummary] = useState<CashSummary | null>(null);
@@ -69,10 +81,9 @@ export function CashClosingManager() {
 
   if (!summary) return null;
 
-  const rows = [
-    { label: 'Efectivo', value: summary.totals.cash },
-    { label: 'TPV / terminal', value: summary.totals.card_terminal },
-    { label: 'Transferencia', value: summary.totals.transfer },
+  const channelCards = [
+    { label: 'Mostrador', value: summary.channels?.pos },
+    { label: 'Tienda web', value: summary.channels?.web },
   ];
 
   return (
@@ -90,11 +101,15 @@ export function CashClosingManager() {
           )}
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {rows.map((row) => (
-            <div key={row.label} className="pv-glass-item rounded-xl p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">{row.label}</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{formatMoney(row.value)}</p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {METHOD_KEYS.map((method) => (
+            <div key={method} className="pv-glass-item rounded-xl p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                {PAYMENT_METHOD_LABELS[method]}
+              </p>
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {formatMoney(summary.totals[method] ?? 0)}
+              </p>
             </div>
           ))}
           <div className="pv-glass-item rounded-xl p-4">
@@ -104,6 +119,25 @@ export function CashClosingManager() {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {channelCards.map((channel) => (
+          <div key={channel.label} className="pv-glass-card p-5">
+            <h3 className="font-semibold text-slate-900">{channel.label}</h3>
+            <p className="text-sm text-slate-500">
+              {channel.value?.orderCount ?? 0} ventas · {formatMoney(channel.value?.total ?? 0)}
+            </p>
+            <ul className="mt-3 space-y-1 text-sm text-slate-700">
+              {METHOD_KEYS.map((method) => (
+                <li key={method} className="flex justify-between gap-3">
+                  <span>{PAYMENT_METHOD_LABELS[method]}</span>
+                  <span>{formatMoney(channel.value?.[method] ?? 0)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </section>
 
       <section className="pv-glass-card p-6">
@@ -120,11 +154,11 @@ export function CashClosingManager() {
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         <button
           type="button"
-          disabled={closing}
+          disabled={closing || Boolean(summary.closing)}
           onClick={closeDay}
-          className="pv-btn-primary mt-4 px-5 py-2 text-sm"
+          className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
-          {closing ? 'Guardando...' : summary.closing ? 'Actualizar cierre' : 'Cerrar caja del día'}
+          {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
         </button>
       </section>
     </div>

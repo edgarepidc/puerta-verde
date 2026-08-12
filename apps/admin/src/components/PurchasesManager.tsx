@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   PRODUCT_UNIT_LABELS,
   formatMoney,
   type ProductUnit,
 } from '@puertaverde/shared';
+
+import { LowStockBanner } from '@/components/LowStockBanner';
 
 interface ProductOption {
   id: string;
@@ -82,6 +85,7 @@ export function PurchasesManager({
   initialProducts: ProductOption[];
   initialSuppliers: SupplierRow[];
 }) {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('compra');
   const [purchases, setPurchases] = useState(initialPurchases);
   const [products] = useState(initialProducts);
@@ -104,6 +108,18 @@ export function PurchasesManager({
   const [compareDays, setCompareDays] = useState(90);
   const [comparison, setComparison] = useState<CompareRow[]>([]);
   const [compareLoading, setCompareLoading] = useState(false);
+
+  useEffect(() => {
+    const product = searchParams.get('product');
+    const tabParam = searchParams.get('tab') as Tab | null;
+    if (tabParam && ['compra', 'proveedores', 'comparar', 'historial'].includes(tabParam)) {
+      setTab(tabParam);
+    }
+    if (product && products.some((row) => row.id === product)) {
+      setLines([{ key: 'prefill', branchProductId: product, quantity: 1, unitPrice: 0 }]);
+      setTab('compra');
+    }
+  }, [searchParams, products]);
 
   const activeSuppliers = useMemo(() => suppliers.filter((s) => s.is_active), [suppliers]);
 
@@ -204,6 +220,7 @@ export function PurchasesManager({
 
   return (
     <div className="space-y-6">
+      <LowStockBanner products={products} href="/inventario" />
       <section className="rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-5">
         <h2 className="text-base font-semibold text-emerald-950">Cómo se separan estas pantallas</h2>
         <ul className="mt-3 space-y-2 text-sm text-emerald-900/90">

@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  PAYMENT_METHOD_LABELS,
   PRODUCT_UNIT_LABELS,
   formatMoney,
   isValidMexicanPhone,
   type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
+
+import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 
 export interface CounterProduct {
   id: string;
@@ -21,6 +24,14 @@ interface LineDraft {
   key: string;
   branchProductId: string;
   quantity: number;
+}
+
+interface ReceiptItem {
+  product_name: string;
+  unit?: ProductUnit | string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
 }
 
 interface CreatedOrder {
@@ -37,11 +48,7 @@ interface CreatedOrder {
   branch_id?: string;
 }
 
-const PAYMENT_OPTIONS: Array<{ value: PaymentMethod; label: string }> = [
-  { value: 'cash', label: 'Efectivo' },
-  { value: 'card_terminal', label: 'TPV' },
-  { value: 'transfer', label: 'Transferencia' },
-];
+const POS_METHODS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer'];
 
 export function CounterSalePanel({
   products,
@@ -55,12 +62,18 @@ export function CounterSalePanel({
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [lines, setLines] = useState<LineDraft[]>([
     { key: '1', branchProductId: '', quantity: 1 },
   ]);
   const [lookupHint, setLookupHint] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{
+    order: CreatedOrder;
+    items: ReceiptItem[];
+    whatsappSent: boolean;
+  } | null>(null);
 
   const productById = useMemo(
     () => new Map(products.map((product) => [product.id, product])),
@@ -107,6 +120,17 @@ export function CounterSalePanel({
     return () => window.clearTimeout(handle);
   }, [phone, open]);
 
+  function resetForm() {
+    setPhone('');
+    setName('');
+    setNotes('');
+    setPaymentMethod('cash');
+    setSendWhatsApp(true);
+    setLines([{ key: String(Date.now()), branchProductId: '', quantity: 1 }]);
+    setLookupHint(null);
+    setError(null);
+  }
+
   async function submitSale() {
     setSaving(true);
     setError(null);
@@ -121,6 +145,7 @@ export function CounterSalePanel({
           deliveryNotes: notes || null,
           paymentMethod,
           markDelivered: true,
+          sendWhatsApp,
           items: lines
             .filter((line) => line.branchProductId && line.quantity > 0)
             .map((line) => ({
@@ -132,18 +157,84 @@ export function CounterSalePanel({
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar');
       if (payload.order) onCreated(payload.order);
-      setPhone('');
-      setName('');
-      setNotes('');
-      setPaymentMethod('cash');
-      setLines([{ key: String(Date.now()), branchProductId: '', quantity: 1 }]);
-      setLookupHint(null);
+      setReceipt({
+        order: payload.order,
+        items: payload.items ?? [],
+        whatsappSent: Boolean(payload.whatsappSent),
+      });
+      resetForm();
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrar venta');
     } finally {
       setSaving(false);
     }
+  }
+
+  if (receipt) {
+    const methodLabel =
+      PAYMENT_METHOD_LABELS[(receipt.order.payment_method as PaymentMethod) ?? 'cash'] ??
+      receipt.order.payment_method;
+    return (
+      <section className="pv-glass-card mb-6 space-y-4 p-6 print:border print:shadow-none" id="pv-receipt">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Ticket #{receipt.order.order_number}</h2>
+            <p className="text-sm text-slate-500">
+              {receipt.order.customer_name} · {receipt.order.customer_phone}
+            </p>
+          </div>
+          <button type="button" className="text-sm text-slate-500 print:hidden" onClick={() => setReceipt(null)}>
+            Cerrar
+          </button>
+        </div>
+        <ul className="space-y-1 text-sm">
+          {receipt.items.map((item) => (
+            <li key={`${item.product_name}-${item.quantity}`} className="flex justify-between gap-3">
+              <span>
+                {item.product_name} × {Number(item.quantity)}{' '}
+                {item.unit ? PRODUCT_UNIT_LABELS[item.unit as ProductUnit] ?? item.unit : ''}
+              </span>
+              <span>{formatMoney(Number(item.line_total))}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-semibold">
+          <span>Total · {methodLabel}</span>
+          <span>{formatMoney(Number(receipt.order.total))}</span>
+        </div>
+        {receipt.whatsappSent && (
+          <p className="text-xs text-emerald-700">Recibo enviado por WhatsApp.</p>
+        )}
+        <div className="flex flex-wrap gap-2 print:hidden">
+          <button
+            type="button"
+            className="rounded-full bg-slate-900 px-4 py-2 text-sm text-white"
+            onClick={() => window.print()}
+          >
+            Imprimir
+          </button>
+          <a
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm"
+            href={`https://wa.me/${receipt.order.customer_phone.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir WhatsApp
+          </a>
+          <button
+            type="button"
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm"
+            onClick={() => {
+              setReceipt(null);
+              setOpen(true);
+            }}
+          >
+            Nueva venta
+          </button>
+        </div>
+      </section>
+    );
   }
 
   if (!open) {
@@ -170,7 +261,7 @@ export function CounterSalePanel({
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Venta mostrador</h2>
           <p className="text-sm text-slate-500">
-            Registra con celular. Si el cliente ya existe, rellenamos el nombre.
+            Busca producto, cobra y entrega. Si el celular ya existe, rellenamos el nombre.
           </p>
         </div>
         <button
@@ -239,25 +330,15 @@ export function CounterSalePanel({
           >
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Producto</span>
-              <select
-                className="pv-input mt-1"
+              <ProductSearchSelect
+                products={products}
                 value={line.branchProductId}
-                onChange={(e) =>
+                onChange={(id) =>
                   setLines((prev) =>
-                    prev.map((row, i) =>
-                      i === index ? { ...row, branchProductId: e.target.value } : row,
-                    ),
+                    prev.map((row, i) => (i === index ? { ...row, branchProductId: id } : row)),
                   )
                 }
-              >
-                <option value="">Selecciona...</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.product.name} — {formatMoney(Number(product.price))}/
-                    {PRODUCT_UNIT_LABELS[product.product.unit]}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Cantidad</span>
@@ -291,20 +372,30 @@ export function CounterSalePanel({
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-slate-200/70 pt-4">
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Cobro</span>
-          <select
-            className="pv-input mt-1"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-          >
-            {PAYMENT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-2">
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Cobro</span>
+            <select
+              className="pv-input mt-1"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+            >
+              {POS_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {PAYMENT_METHOD_LABELS[method]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={sendWhatsApp}
+              onChange={(e) => setSendWhatsApp(e.target.checked)}
+            />
+            Enviar recibo por WhatsApp
+          </label>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-slate-600">
             Total: <span className="font-semibold text-slate-900">{formatMoney(total)}</span>

@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import { AdminShell } from '@/components/AdminShell';
 import { PurchasesManager } from '@/components/PurchasesManager';
 import { getDefaultTenant } from '@/lib/tenant';
@@ -52,6 +54,7 @@ export default async function ComprasPage() {
       title="Compras"
       subtitle={`Proveedores y precios de materia prima · ${tenant.branchName}`}
     >
+      <Suspense fallback={<p className="text-sm text-slate-500">Cargando compras…</p>}>
       <PurchasesManager
         initialPurchases={(purchases ?? []) as Array<{
           id: string;
@@ -85,6 +88,7 @@ export default async function ComprasPage() {
           created_at: string;
         }>}
       />
+      </Suspense>
     </AdminShell>
   );
 }

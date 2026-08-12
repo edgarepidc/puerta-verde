@@ -3,14 +3,19 @@
 import { useMemo, useState } from 'react';
 
 import {
-  formatMoney,
   FULFILLMENT_LABELS,
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
+  PAYMENT_METHOD_LABELS,
+  PRODUCT_UNIT_LABELS,
+  formatMoney,
   type OrderStatus,
+  type PaymentMethod,
+  type ProductUnit,
 } from '@puertaverde/shared';
 
 import { CounterSalePanel, type CounterProduct } from '@/components/CounterSalePanel';
+import { LowStockBanner } from '@/components/LowStockBanner';
 
 interface OrderRow {
   id: string;
@@ -26,6 +31,15 @@ interface OrderRow {
   branch: { name: string; slug: string } | { name: string; slug: string }[] | null;
 }
 
+interface OrderItem {
+  id: string;
+  product_name: string;
+  unit: ProductUnit | string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
 const COLUMNS: OrderStatus[] = ['pending', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 
 export function OrdersBoard({
@@ -37,6 +51,10 @@ export function OrdersBoard({
 }) {
   const [orders, setOrders] = useState(initialOrders);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailNotes, setDetailNotes] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     const map = Object.fromEntries(COLUMNS.map((status) => [status, [] as OrderRow[]])) as Record<
@@ -49,6 +67,25 @@ export function OrdersBoard({
     }
     return map;
   }, [orders]);
+
+  const selected = orders.find((order) => order.id === detailId) ?? null;
+
+  async function openDetail(orderId: string) {
+    setDetailId(orderId);
+    setDetailLoading(true);
+    setDetailNotes(null);
+    try {
+      const response = await fetch(`/api/orders/${orderId}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'Error al cargar');
+      setDetailItems(payload.items ?? []);
+      setDetailNotes(payload.order?.delivery_notes ?? null);
+    } catch {
+      setDetailItems([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   async function updateStatus(orderId: string, status: OrderStatus) {
     setUpdatingId(orderId);
@@ -96,6 +133,7 @@ export function OrdersBoard({
 
   return (
     <div className="space-y-2">
+      <LowStockBanner products={products} href="/compras" />
       <CounterSalePanel
         products={products}
         onCreated={(order) => {
@@ -126,18 +164,20 @@ export function OrdersBoard({
 
                 return (
                   <article key={order.id} className="pv-glass-item rounded-xl p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-slate-900">#{order.order_number}</p>
-                        <p className="text-sm text-slate-600">{order.customer_name}</p>
-                        <p className="text-xs text-slate-500">{order.customer_phone}</p>
+                    <button type="button" className="w-full text-left" onClick={() => openDetail(order.id)}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-900">#{order.order_number}</p>
+                          <p className="text-sm text-slate-600">{order.customer_name}</p>
+                          <p className="text-xs text-slate-500">{order.customer_phone}</p>
+                        </div>
+                        <span className="text-sm font-medium">{formatMoney(Number(order.total))}</span>
                       </div>
-                      <span className="text-sm font-medium">{formatMoney(Number(order.total))}</span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {branch?.name} · {FULFILLMENT_LABELS[order.fulfillment_type]}
-                      {order.payment_status === 'paid' ? ' · Pagado' : ''}
-                    </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {branch?.name} · {FULFILLMENT_LABELS[order.fulfillment_type]}
+                        {order.payment_status === 'paid' ? ' · Pagado' : ''}
+                      </p>
+                    </button>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {nextStatus && nextStatus !== 'cancelled' && (
                         <button
@@ -177,6 +217,14 @@ export function OrdersBoard({
                           </button>
                         </>
                       )}
+                      <a
+                        href={`https://wa.me/${order.customer_phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="pv-btn-ghost px-3 py-1 text-xs"
+                      >
+                        WhatsApp
+                      </a>
                     </div>
                   </article>
                 );
@@ -188,6 +236,50 @@ export function OrdersBoard({
           </section>
         ))}
       </div>
+
+      {detailId && selected && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Pedido #{selected.order_number}</h2>
+                <p className="text-sm text-slate-500">
+                  {selected.customer_name} · {selected.customer_phone}
+                </p>
+              </div>
+              <button type="button" className="text-sm text-slate-500" onClick={() => setDetailId(null)}>
+                Cerrar
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              {ORDER_STATUS_LABELS[selected.status]} · {FULFILLMENT_LABELS[selected.fulfillment_type]} ·{' '}
+              {selected.payment_status === 'paid'
+                ? `Pagado (${PAYMENT_METHOD_LABELS[(selected.payment_method as PaymentMethod) ?? 'cash'] ?? selected.payment_method})`
+                : 'Pendiente de pago'}
+            </p>
+            {detailNotes && detailNotes !== '[mostrador]' && (
+              <p className="mt-2 text-sm text-slate-500">Notas: {detailNotes.replace(/^\[mostrador\]\s*/, '')}</p>
+            )}
+            <div className="mt-4 space-y-2">
+              {detailLoading && <p className="text-sm text-slate-500">Cargando productos…</p>}
+              {!detailLoading &&
+                detailItems.map((item) => (
+                  <div key={item.id} className="flex justify-between gap-3 text-sm">
+                    <span>
+                      {item.product_name} × {Number(item.quantity)}{' '}
+                      {PRODUCT_UNIT_LABELS[item.unit as ProductUnit] ?? item.unit}
+                    </span>
+                    <span>{formatMoney(Number(item.line_total))}</span>
+                  </div>
+                ))}
+              {!detailLoading && detailItems.length === 0 && (
+                <p className="text-sm text-slate-500">Sin partidas.</p>
+              )}
+            </div>
+            <p className="mt-4 text-right text-base font-semibold">{formatMoney(Number(selected.total))}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

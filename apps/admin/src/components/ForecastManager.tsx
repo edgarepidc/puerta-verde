@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { PRODUCT_UNIT_LABELS, type ProductUnit } from '@puertaverde/shared';
@@ -249,11 +250,20 @@ export function ForecastManager({ initialForecast }: { initialForecast: Forecast
                 <th className="px-4 py-2">Demanda {horizonDays}d</th>
                 <th className="px-4 py-2">Reponer</th>
                 <th className="px-4 py-2">Días restantes</th>
+                <th className="px-4 py-2">Comprar</th>
               </tr>
             </thead>
             <tbody>
               {forecast.map((row) => (
-                <tr key={row.branch_product_id} className="border-t border-slate-100">
+                <tr
+                  key={row.branch_product_id}
+                  className={`border-t border-slate-100 ${
+                    Number(row.suggested_reorder) > 0 ||
+                    (row.days_until_stockout != null && row.days_until_stockout <= 3)
+                      ? 'bg-amber-50/60'
+                      : ''
+                  }`}
+                >
                   <td className="px-4 py-2 font-medium">{row.product_name}</td>
                   <td className="px-4 py-2">
                     {Number(row.current_stock).toFixed(1)} {PRODUCT_UNIT_LABELS[row.unit]}
@@ -265,6 +275,14 @@ export function ForecastManager({ initialForecast }: { initialForecast: Forecast
                   </td>
                   <td className="px-4 py-2">
                     {row.days_until_stockout != null ? `~${row.days_until_stockout}` : '—'}
+                  </td>
+                  <td className="px-4 py-2">
+                    <Link
+                      href={`/compras?product=${row.branch_product_id}&tab=compra`}
+                      className="text-xs font-medium text-emerald-800 underline"
+                    >
+                      Comprar
+                    </Link>
                   </td>
                 </tr>
               ))}

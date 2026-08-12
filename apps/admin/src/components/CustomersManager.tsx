@@ -50,7 +50,13 @@ function formatPhone(phone: string) {
   return phone;
 }
 
-export function CustomersManager({ initialCustomers }: { initialCustomers: CustomerRow[] }) {
+export function CustomersManager({
+  initialCustomers,
+  frequentCustomers = [],
+}: {
+  initialCustomers: CustomerRow[];
+  frequentCustomers?: CustomerRow[];
+}) {
   const [customers] = useState(initialCustomers);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,6 +92,32 @@ export function CustomersManager({ initialCustomers }: { initialCustomers: Custo
   }
 
   return (
+    <div className="space-y-6">
+      {frequentCustomers.length > 0 && (
+        <section className="pv-glass-card p-5">
+          <h2 className="text-lg font-semibold text-slate-900">Frecuentes esta semana</h2>
+          <p className="text-sm text-slate-500">Top 10 por pedidos en los últimos 7 días</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {frequentCustomers.map((customer) => (
+              <button
+                key={customer.id}
+                type="button"
+                className="rounded-xl border border-slate-200/80 bg-white/60 p-3 text-left hover:bg-emerald-50"
+                onClick={() => openDetail(customer.id)}
+              >
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {customer.full_name || 'Sin nombre'}
+                </p>
+                <p className="text-xs text-slate-500">{formatPhone(customer.phone)}</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {customer.order_count} pedidos · {formatMoney(customer.total_spent)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <section className="pv-glass-card p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -168,6 +200,14 @@ export function CustomersManager({ initialCustomers }: { initialCustomers: Custo
               <p className="mt-2 text-sm text-slate-600">
                 {detail.stats.orderCount} pedidos · {formatMoney(detail.stats.totalSpent)}
               </p>
+              <a
+                href={`https://wa.me/${detail.customer.phone.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-sm font-medium text-emerald-800 underline"
+              >
+                WhatsApp
+              </a>
             </div>
 
             <div>
@@ -215,6 +255,7 @@ export function CustomersManager({ initialCustomers }: { initialCustomers: Custo
           </div>
         )}
       </section>
+    </div>
     </div>
   );
 }

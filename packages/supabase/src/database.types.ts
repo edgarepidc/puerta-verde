@@ -98,6 +98,7 @@ export interface Database {
           paid_at: string | null;
           paid_by: string | null;
           stripe_checkout_session_id: string | null;
+          source: 'web' | 'pos';
           created_at: string;
           updated_at: string;
         };

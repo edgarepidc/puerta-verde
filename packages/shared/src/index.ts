@@ -17,6 +17,13 @@ export type FulfillmentType = (typeof FULFILLMENT_TYPES)[number];
 export const PAYMENT_METHODS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  card_terminal: 'TPV',
+  transfer: 'Transferencia',
+  online: 'En línea',
+};
+
 export const PAYMENT_STATUSES = ['pending', 'paid', 'refunded'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
