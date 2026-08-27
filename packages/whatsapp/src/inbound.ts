@@ -1,6 +1,6 @@
 import {
-  ORDER_STATUS_LABELS,
   formatMoney,
+  orderStatusLabel,
   type OrderStatus,
 } from '@puertaverde/shared';
 
@@ -260,7 +260,7 @@ export function buildInboundOrdersMessage(input: {
 
   for (const order of input.orders) {
     lines.push(
-      `*#${order.orderNumber}* — ${ORDER_STATUS_LABELS[order.status]}`,
+      `*#${order.orderNumber}* — ${orderStatusLabel(order.status)}`,
       `${order.branchName} · ${formatMoney(order.total)}`,
       order.trackingUrl,
       '',
@@ -285,7 +285,7 @@ export function buildInboundOrderLookupMessage(input: {
   return [
     `Pedido *#${input.orderNumber}*`,
     input.branchName ? `Sucursal: *${input.branchName}*` : null,
-    `Estado: *${ORDER_STATUS_LABELS[input.status]}*`,
+    `Estado: *${orderStatusLabel(input.status)}*`,
     `Total: *${formatMoney(input.total)}*`,
     '',
     `Seguimiento: ${input.trackingUrl}`,

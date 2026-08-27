@@ -7,7 +7,7 @@ import {
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function PATCH(
@@ -16,6 +16,13 @@ export async function PATCH(
 ) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.view',
+    'No tienes permiso para gestionar costos',
+  );
+  if (denied) return denied;
 
   try {
     const { id } = await params;
@@ -75,6 +82,13 @@ export async function DELETE(
 ) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.view',
+    'No tienes permiso para gestionar costos',
+  );
+  if (denied) return denied;
 
   try {
     const { id } = await params;

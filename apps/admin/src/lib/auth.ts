@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 
 import {
-  STAFF_ROLES,
+  canEditPermissionMatrix,
+  normalizeStaffRole,
+  parsePermissionsFromOrgSettings,
+  roleHasPermission,
+  type PermissionKey,
+  type PermissionMatrix,
   type StaffRole,
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
@@ -44,7 +49,8 @@ export async function getStaffSession(): Promise<StaffContext | null> {
     .eq('status', 'active')
     .maybeSingle();
 
-  if (!membership || !STAFF_ROLES.includes(membership.role as StaffRole)) {
+  const normalizedRole = normalizeStaffRole(membership?.role ?? null);
+  if (!membership || !normalizedRole) {
     if (!isPlatformAdmin) return null;
   }
 
@@ -53,7 +59,7 @@ export async function getStaffSession(): Promise<StaffContext | null> {
     userId: user.id,
     email: user.email,
     fullName: profile?.full_name ?? null,
-    role: (membership?.role as StaffRole) ?? 'owner',
+    role: normalizedRole ?? 'owner',
     isPlatformAdmin,
   };
 }
@@ -90,6 +96,52 @@ export async function requirePlatformAdminApi(): Promise<StaffContext | NextResp
   }
 }
 
+export function canEditPermissions(staff: Pick<StaffContext, 'role' | 'isPlatformAdmin'>): boolean {
+  return staff.isPlatformAdmin || canEditPermissionMatrix(staff.role);
+}
+
+export async function loadPermissionMatrix(organizationId: string): Promise<PermissionMatrix> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('organizations')
+    .select('settings')
+    .eq('id', organizationId)
+    .maybeSingle();
+  return parsePermissionsFromOrgSettings(data?.settings ?? {});
+}
+
+export function staffHasPermission(
+  staff: Pick<StaffContext, 'role' | 'isPlatformAdmin'>,
+  key: PermissionKey,
+  matrix: PermissionMatrix,
+): boolean {
+  if (staff.isPlatformAdmin) return true;
+  return roleHasPermission(staff.role, key, matrix);
+}
+
+/** Loads org matrix and returns 403 if the staff lacks the permission. */
+export async function requireStaffPermission(
+  staff: Pick<StaffContext, 'organizationId' | 'role' | 'isPlatformAdmin'>,
+  key: PermissionKey,
+  message?: string,
+): Promise<NextResponse | null> {
+  const matrix = await loadPermissionMatrix(staff.organizationId);
+  if (!staffHasPermission(staff, key, matrix)) {
+    return forbiddenPermissionResponse(message);
+  }
+  return null;
+}
+
+/** @deprecated Prefer staffHasPermission with matrix — kept for gradual migration. */
 export function canManageStaff(role: StaffRole): boolean {
-  return role === 'owner' || role === 'org_admin';
+  return role === 'owner' || role === 'branch_manager';
+}
+
+/** @deprecated Prefer staffHasPermission('pos.edit_price'). */
+export function canOverridePosPrice(role: StaffRole): boolean {
+  return role === 'owner' || role === 'branch_manager';
+}
+
+export function forbiddenPermissionResponse(message = 'No tienes permiso para esta acción') {
+  return NextResponse.json({ error: message }, { status: 403 });
 }

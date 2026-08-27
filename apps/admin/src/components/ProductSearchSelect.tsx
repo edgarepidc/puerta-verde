@@ -15,11 +15,13 @@ export function ProductSearchSelect({
   products,
   value,
   onChange,
+  onCreate,
   placeholder = 'Buscar producto…',
 }: {
   products: SearchableProduct[];
   value: string;
   onChange: (id: string) => void;
+  onCreate?: (name: string) => void;
   placeholder?: string;
 }) {
   const [query, setQuery] = useState('');
@@ -37,6 +39,12 @@ export function ProductSearchSelect({
       )
       .slice(0, 12);
   }, [products, query]);
+
+  const trimmedQuery = query.trim();
+  const exactMatch = products.some(
+    (product) => product.product.name.toLowerCase() === trimmedQuery.toLowerCase(),
+  );
+  const canCreate = Boolean(onCreate && trimmedQuery && !exactMatch);
 
   return (
     <div className="relative">
@@ -57,6 +65,21 @@ export function ProductSearchSelect({
       />
       {open && (
         <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {canCreate && (
+            <li>
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onCreate?.(trimmedQuery);
+                  setOpen(false);
+                }}
+              >
+                Crear «{trimmedQuery}» en catálogo
+              </button>
+            </li>
+          )}
           {filtered.map((product) => (
             <li key={product.id}>
               <button
@@ -78,7 +101,7 @@ export function ProductSearchSelect({
               </button>
             </li>
           ))}
-          {filtered.length === 0 && (
+          {filtered.length === 0 && !canCreate && (
             <li className="px-3 py-2 text-sm text-slate-500">Sin coincidencias</li>
           )}
         </ul>

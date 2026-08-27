@@ -2,14 +2,21 @@ import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'products.manage',
+    'No tienes permiso para gestionar el catálogo',
+  );
+  if (denied) return denied;
 
   try {
     const form = await request.formData();
@@ -18,10 +25,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 });
     }
     if (!ALLOWED.has(file.type)) {
-      return NextResponse.json({ error: 'Usa JPG, PNG, WEBP o GIF' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Usa JPG, PNG o WEBP. Si es foto de iPhone (HEIC), exporta a JPG primero.' },
+        { status: 400 },
+      );
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: 'La imagen debe pesar menos de 5 MB' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'La imagen debe pesar menos de 4 MB. Prueba con una foto más ligera.' },
+        { status: 400 },
+      );
     }
 
     const ext = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg';

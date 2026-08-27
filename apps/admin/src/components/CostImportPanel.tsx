@@ -90,7 +90,8 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Importar catálogo desde Excel</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Crea productos nuevos o actualiza los que ya existen. Columnas: producto, categoría, unidad, sku, costo, cantidad, precio, min_stock, visible.
+            Carga masiva de catálogo (nombre, categoría, unidad y precio de venta). Costo y cantidad son
+            opcionales; las entradas del día a día van en Compras.
           </p>
         </div>
         <a

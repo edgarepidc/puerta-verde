@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 
 import {
   COST_IMPORT_TEMPLATE_CSV,
-  LOW_STOCK_THRESHOLD,
+  getDefaultLowStockThreshold,
   normalizeProductName,
   parseCostImportRows,
   type ParsedCostImportRow,
@@ -168,7 +168,13 @@ export async function applyCostImportRows(
             stock: 0,
             avg_unit_cost: row.unitCost ?? 0,
             last_unit_cost: row.unitCost ?? null,
-            min_stock: row.minStock ?? LOW_STOCK_THRESHOLD,
+            min_stock:
+              row.minStock ??
+              getDefaultLowStockThreshold({
+                unit: row.unit ?? 'kg',
+                name: row.productName,
+                categoryName: row.categoryName,
+              }),
             is_available: row.visible ?? true,
           })
           .select('id')

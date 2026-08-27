@@ -1,6 +1,6 @@
 import {
-  ORDER_STATUS_LABELS,
   formatMoney,
+  orderStatusLabel,
   type OrderStatus,
 } from '@puertaverde/shared';
 
@@ -73,7 +73,7 @@ export function buildOrderStatusMessage(input: {
   branchName: string;
   trackingUrl: string;
 }): string {
-  const statusLabel = ORDER_STATUS_LABELS[input.status];
+  const statusLabel = orderStatusLabel(input.status);
   return [
     `Actualización de tu pedido #${input.orderNumber} en *${input.branchName}*:`,
     `Estado: *${statusLabel}*`,

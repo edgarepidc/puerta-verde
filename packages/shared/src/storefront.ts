@@ -15,7 +15,7 @@ export function getStockStatus(
   minStock = LOW_STOCK_THRESHOLD,
 ): StockStatus {
   if (!isAvailable || stock <= 0) return 'out';
-  if (stock <= minStock) return 'low';
+  if (stock < minStock) return 'low';
   return 'available';
 }
 
@@ -23,8 +23,27 @@ export function getQuantityStep(unit: ProductUnit): number {
   return unit === 'kg' ? 0.25 : 1;
 }
 
-export function getDefaultQuantity(unit: ProductUnit): number {
-  return unit === 'kg' ? 0.5 : 1;
+/** Starting qty when adding a product to the cart (any unit). */
+export function getDefaultQuantity(_unit?: ProductUnit): number {
+  return 1;
+}
+
+/** Provisional kg charged/reserved per piece until staff weighs at prep. */
+export const DEFAULT_ESTIMATED_KG_PER_PIECE = 1;
+
+export function estimatedKgForPieces(
+  pieces: number,
+  kgPerPiece = DEFAULT_ESTIMATED_KG_PER_PIECE,
+): number {
+  return Math.round(Math.max(0, pieces) * kgPerPiece * 1000) / 1000;
+}
+
+export function maxPiecesFromStock(
+  stockKg: number,
+  kgPerPiece = DEFAULT_ESTIMATED_KG_PER_PIECE,
+): number {
+  if (kgPerPiece <= 0) return 0;
+  return Math.max(0, Math.floor(Number(stockKg) / kgPerPiece));
 }
 
 export function formatProductQuantity(quantity: number, unit: ProductUnit): string {

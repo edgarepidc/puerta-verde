@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { STAFF_ROLES, type StaffRole } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { canManageStaff, requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function PATCH(
@@ -13,9 +13,8 @@ export async function PATCH(
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
-  if (!canManageStaff(auth.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para editar usuarios' }, { status: 403 });
-  }
+  const denied = await requireStaffPermission(auth, 'staff.manage', 'No tienes permiso para editar usuarios');
+  if (denied) return denied;
 
   try {
     const { id } = await params;

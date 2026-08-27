@@ -9,6 +9,9 @@ import {
   type PromotionKind,
 } from '@puertaverde/shared';
 
+import { DecimalInput, decimalFromNumber, parseOptionalDecimal } from '@/components/DecimalInput';
+import { uploadProductMedia } from '@/lib/upload-image';
+
 interface PromotionRow {
   id: string;
   title: string;
@@ -53,13 +56,16 @@ export function PromotionsManager({
   initialPromotions,
   products = [],
   categories = [],
+  canManage = true,
 }: {
   initialPromotions: PromotionRow[];
   products?: Array<{ id: string; name: string }>;
   categories?: Array<{ id: string; name: string }>;
+  canManage?: boolean;
 }) {
   const [promotions, setPromotions] = useState(initialPromotions);
   const [form, setForm] = useState(emptyForm);
+  const [discountText, setDiscountText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -79,26 +85,30 @@ export function PromotionsManager({
   }
 
   function openCreate() {
+    if (!canManage) return;
     setEditingId(null);
     setForm(emptyForm);
+    setDiscountText('');
     setError(null);
     setShowForm(true);
   }
 
   function openEdit(row: PromotionRow) {
     setEditingId(row.id);
+    const discount = row.discount_percent ? Number(row.discount_percent) : null;
     setForm({
       title: row.title,
       body: row.body ?? '',
       kind: row.kind,
       imageUrl: row.image_url ?? '',
-      discountPercent: row.discount_percent ? Number(row.discount_percent) : null,
+      discountPercent: discount,
       productId: row.product_id ?? '',
       categoryId: row.category_id ?? '',
       startsAt: toLocalInput(row.starts_at),
       endsAt: toLocalInput(row.ends_at),
       isActive: row.is_active,
     });
+    setDiscountText(decimalFromNumber(discount));
     setError(null);
     setShowForm(true);
   }
@@ -107,15 +117,21 @@ export function PromotionsManager({
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setDiscountText('');
     setError(null);
   }
 
   async function save() {
+    if (!canManage) {
+      setError('No tienes permiso para gestionar promociones');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const payload = {
         ...form,
+        discountPercent: form.kind === 'discount' ? parseOptionalDecimal(discountText) : null,
         body: form.body || null,
         imageUrl: form.imageUrl || null,
         productId: form.productId || null,
@@ -143,6 +159,7 @@ export function PromotionsManager({
   }
 
   async function broadcast(promoId: string, title: string) {
+    if (!canManage) return;
     if (!confirm(`¿Enviar "${title}" por WhatsApp a clientes suscritos?`)) return;
     setBroadcastingId(promoId);
     setError(null);
@@ -159,6 +176,7 @@ export function PromotionsManager({
   }
 
   async function remove(id: string, title: string) {
+    if (!canManage) return;
     if (!confirm(`¿Eliminar la promoción "${title}"?`)) return;
     setSaving(true);
     try {
@@ -174,6 +192,7 @@ export function PromotionsManager({
   }
 
   async function toggleActive(row: PromotionRow) {
+    if (!canManage) return;
     const response = await fetch(`/api/promotions/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -200,6 +219,11 @@ export function PromotionsManager({
 
   return (
     <div className="space-y-6">
+      {!canManage ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Solo lectura · no tienes permiso para gestionar promociones.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-2xl font-bold text-slate-900">{promotions.length} promociones</p>
@@ -252,18 +276,11 @@ export function PromotionsManager({
             {form.kind === 'discount' && (
               <label className="block text-sm md:col-span-2">
                 <span className="font-medium text-slate-700">Descuento (%)</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
+                <DecimalInput
+                  placeholder="10"
                   className="pv-input mt-1"
-                  value={form.discountPercent ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      discountPercent: e.target.value ? Number(e.target.value) : null,
-                    }))
-                  }
+                  value={discountText}
+                  onChange={setDiscountText}
                 />
               </label>
             )}
@@ -316,16 +333,13 @@ export function PromotionsManager({
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const formData = new FormData();
-                  formData.append('file', file);
-                  formData.append('bucket', 'promo-media');
-                  const response = await fetch('/api/products/upload', { method: 'POST', body: formData });
-                  const payload = await response.json();
-                  if (!response.ok) {
-                    setError(payload.error ?? 'No se pudo subir');
-                    return;
+                  try {
+                    const url = await uploadProductMedia(file, 'promo-media');
+                    setForm((f) => ({ ...f, imageUrl: url }));
+                    setError(null);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'No se pudo subir');
                   }
-                  setForm((f) => ({ ...f, imageUrl: payload.url }));
                 }}
               />
             </label>

@@ -27,7 +27,7 @@ export default async function BranchStorePage({
   const [{ data: branchProducts }, { data: promotions }, { data: buildings }] = await Promise.all([
     supabase
       .from('branch_products')
-      .select('id, price, stock, product:products(id, name, unit, image_url, category_id, is_active, category:product_categories(name))')
+      .select('id, price, stock, min_stock, product:products(id, name, unit, image_url, category_id, is_active, weigh_at_fulfillment, category:product_categories(name))')
       .eq('branch_id', branch.id)
       .eq('is_available', true),
     supabase
@@ -66,6 +66,7 @@ export interface StorefrontProduct {
   id: string;
   price: number;
   stock: number;
+  min_stock?: number | null;
   product: {
     id: string;
     name: string;
@@ -73,6 +74,7 @@ export interface StorefrontProduct {
     image_url: string | null;
     category_id: string | null;
     is_active?: boolean;
+    weigh_at_fulfillment?: boolean;
     category: { name: string } | null;
   };
 }

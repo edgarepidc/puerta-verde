@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 
 import {
-  LOW_STOCK_THRESHOLD,
+  getDefaultLowStockThreshold,
   validateProductInput,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 const PRODUCT_SELECT = `
@@ -33,6 +33,30 @@ const PRODUCT_SELECT = `
   )
 `;
 
+/** Extended select once weigh_at_fulfillment migration is applied. */
+const PRODUCT_SELECT_WITH_WEIGH = `
+  id,
+  price,
+  stock,
+  min_stock,
+  avg_unit_cost,
+  last_unit_cost,
+  is_available,
+  product:products (
+    id,
+    name,
+    description,
+    unit,
+    sku,
+    image_url,
+    is_active,
+    shelf_life_days,
+    weigh_at_fulfillment,
+    category_id,
+    category:product_categories ( id, name )
+  )
+`;
+
 export async function GET() {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
@@ -41,23 +65,41 @@ export async function GET() {
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
 
-    const [{ data: products }, { data: categories }] = await Promise.all([
-      supabase
+    const [{ data: productsWithWeigh, error: productsWithWeighError }, { data: categories }] =
+      await Promise.all([
+        supabase
+          .from('branch_products')
+          .select(PRODUCT_SELECT_WITH_WEIGH)
+          .eq('branch_id', tenant.branchId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('product_categories')
+          .select('id, name, sort_order')
+          .eq('organization_id', tenant.organizationId)
+          .order('sort_order'),
+      ]);
+
+    let products: unknown[] = productsWithWeigh ?? [];
+    if (productsWithWeighError) {
+      const missingWeigh = /weigh_at_fulfillment/i.test(productsWithWeighError.message);
+      if (!missingWeigh) {
+        return NextResponse.json({ error: productsWithWeighError.message }, { status: 400 });
+      }
+      const { data: fallback, error: fallbackError } = await supabase
         .from('branch_products')
         .select(PRODUCT_SELECT)
         .eq('branch_id', tenant.branchId)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('product_categories')
-        .select('id, name, sort_order')
-        .eq('organization_id', tenant.organizationId)
-        .order('sort_order'),
-    ]);
+        .order('created_at', { ascending: true });
+      if (fallbackError) {
+        return NextResponse.json({ error: fallbackError.message }, { status: 400 });
+      }
+      products = fallback ?? [];
+    }
 
     return NextResponse.json({
       tenant,
       categories: categories ?? [],
-      products: products ?? [],
+      products,
     });
   } catch (error) {
     return NextResponse.json(
@@ -70,6 +112,13 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'products.manage',
+    'No tienes permiso para gestionar el catálogo',
+  );
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();
@@ -110,11 +159,23 @@ export async function POST(request: Request) {
         image_url: body.imageUrl?.trim() || null,
         shelf_life_days: body.shelfLifeDays ?? null,
         is_active: body.isActive,
+        ...(body.weighAtFulfillment != null
+          ? { weigh_at_fulfillment: Boolean(body.weighAtFulfillment) }
+          : {}),
       })
       .select('id')
       .single();
 
     if (productError || !product) {
+      if (productError && /weigh_at_fulfillment/i.test(productError.message)) {
+        return NextResponse.json(
+          {
+            error:
+              'Falta aplicar la migración de “pesar al preparar”. Corre el SQL en Supabase y vuelve a crear el producto.',
+          },
+          { status: 400 },
+        );
+      }
       return NextResponse.json({ error: productError?.message ?? 'No se pudo crear producto' }, { status: 400 });
     }
 
@@ -128,7 +189,12 @@ export async function POST(request: Request) {
         stock: 0,
         avg_unit_cost: body.unitCost ?? 0,
         last_unit_cost: body.unitCost ?? null,
-        min_stock: body.minStock ?? LOW_STOCK_THRESHOLD,
+        min_stock:
+          body.minStock ??
+          getDefaultLowStockThreshold({
+            unit: body.unit,
+            name: body.name,
+          }),
         is_available: body.isAvailable,
       })
       .select('id')

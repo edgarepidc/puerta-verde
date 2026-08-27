@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { sendTextMessage } from '@puertaverde/whatsapp';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 
 function buildPromoBroadcastMessage(input: {
   title: string;
@@ -26,6 +26,13 @@ export async function POST(
 ) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'promotions.manage',
+    'No tienes permiso para gestionar promociones',
+  );
+  if (denied) return denied;
 
   const { id } = await params;
   const supabase = createAdminClient();

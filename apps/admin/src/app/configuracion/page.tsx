@@ -1,20 +1,48 @@
+import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
+
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { AdminShell } from '@/components/AdminShell';
 import { BillingManager } from '@/components/BillingManager';
+import { ConfiguracionTabs } from '@/components/ConfiguracionTabs';
+import { PermissionsManager } from '@/components/PermissionsManager';
 import { PlatformManager } from '@/components/PlatformManager';
 import { SettingsManager } from '@/components/SettingsManager';
 import { WhatsAppInbox } from '@/components/WhatsAppInbox';
-import { canManageStaff, getStaffSession } from '@/lib/auth';
+import {
+  canEditPermissions,
+  getStaffSession,
+  loadPermissionMatrix,
+  staffHasPermission,
+} from '@/lib/auth';
+import { parseBranchSettingsFlags } from '@/lib/branch-settings';
 import { getDefaultTenant } from '@/lib/tenant';
+import { normalizeStaffRole, type StaffRole } from '@puertaverde/shared';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ConfiguracionPage() {
+export default async function ConfiguracionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const params = await searchParams;
+  if (params.tab === 'cupones') redirect('/promociones?section=cupones');
+  if (params.tab === 'stock') redirect('/?section=stock');
+
   const staff = await getStaffSession();
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
   const isPlatformAdmin = Boolean(staff?.isPlatformAdmin);
+  const permissionMatrix = await loadPermissionMatrix(tenant.organizationId);
+  const canManageUsers = staff
+    ? staffHasPermission(staff, 'staff.manage', permissionMatrix)
+    : false;
+  const canEditBranch = staff
+    ? staffHasPermission(staff, 'branch.settings', permissionMatrix)
+    : false;
+  const canEditPerms = staff ? canEditPermissions(staff) : false;
 
   const [
     { data: branch },
@@ -26,7 +54,9 @@ export default async function ConfiguracionPage() {
   ] = await Promise.all([
     supabase
       .from('branches')
-      .select('id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours, fulfillment_mode')
+      .select(
+        'id, name, slug, address, pickup_instructions, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours, fulfillment_mode, settings',
+      )
       .eq('id', tenant.branchId)
       .single(),
     supabase
@@ -62,13 +92,18 @@ export default async function ConfiguracionPage() {
     : { data: [] };
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
-  const staffRows = (memberships ?? []).map((row) => {
+  const staffRows = (memberships ?? []).flatMap((row) => {
+    const role = normalizeStaffRole(row.role);
+    if (!role) return [];
     const profile = profileById.get(row.user_id);
-    return {
-      ...row,
-      full_name: profile?.full_name ?? null,
-      phone: profile?.phone ?? null,
-    };
+    return [
+      {
+        ...row,
+        role: role as StaffRole,
+        full_name: profile?.full_name ?? null,
+        phone: profile?.phone ?? null,
+      },
+    ];
   });
 
   const orgsWithBranches = isPlatformAdmin
@@ -82,40 +117,70 @@ export default async function ConfiguracionPage() {
 
   return (
     <AdminShell title="Configuración" subtitle={tenant.branchName}>
-      <div className="space-y-8">
-        <BillingManager
-          organization={organization!}
-          canManage={staff ? canManageStaff(staff.role) : false}
-        />
-        <SettingsManager
-          initialBranch={branch!}
-          initialStaff={staffRows}
-          canManage={staff ? canManageStaff(staff.role) : false}
-          currentUserId={staff?.userId ?? ''}
-        />
-        <WhatsAppInbox
-          initialMessages={(whatsappMessages ?? []) as Array<{
-            id: string;
-            direction: 'inbound' | 'outbound';
-            recipient_phone: string;
-            template_key: string | null;
-            body: string;
-            status: string;
-            created_at: string;
-          }>}
-        />
-        {isPlatformAdmin && (
-          <section id="plataforma" className="scroll-mt-28 space-y-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Plataforma</h2>
-              <p className="text-sm text-slate-500">
-                Solo visible para super admin. Alta de verdulerías y sucursales.
-              </p>
+      <Suspense fallback={<p className="text-sm text-slate-500">Cargando configuración…</p>}>
+        <ConfiguracionTabs
+          isPlatformAdmin={isPlatformAdmin}
+          suscripcion={
+            <BillingManager
+              organization={organization!}
+              canManage={canManageUsers}
+            />
+          }
+          sucursal={
+            <SettingsManager
+              section="branch"
+              initialBranch={{
+                ...branch!,
+                usb_scale_enabled: parseBranchSettingsFlags(branch?.settings).usbScaleEnabled,
+              }}
+              initialStaff={staffRows}
+              canManage={canEditBranch}
+              currentUserId={staff?.userId ?? ''}
+            />
+          }
+          equipo={
+            <div className="space-y-8">
+              <SettingsManager
+                section="staff"
+                initialBranch={branch!}
+                initialStaff={staffRows}
+                canManage={canManageUsers}
+                currentUserId={staff?.userId ?? ''}
+              />
+              <PermissionsManager
+                initialMatrix={permissionMatrix}
+                canEdit={canEditPerms}
+              />
             </div>
-            <PlatformManager initialOrganizations={orgsWithBranches} />
-          </section>
-        )}
-      </div>
+          }
+          whatsapp={
+            <WhatsAppInbox
+              initialMessages={(whatsappMessages ?? []) as Array<{
+                id: string;
+                direction: 'inbound' | 'outbound';
+                recipient_phone: string;
+                template_key: string | null;
+                body: string;
+                status: string;
+                created_at: string;
+              }>}
+            />
+          }
+          plataforma={
+            isPlatformAdmin ? (
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Plataforma</h2>
+                  <p className="text-sm text-slate-500">
+                    Alta de verdulerías y sucursales.
+                  </p>
+                </div>
+                <PlatformManager initialOrganizations={orgsWithBranches} />
+              </section>
+            ) : null
+          }
+        />
+      </Suspense>
     </AdminShell>
   );
 }

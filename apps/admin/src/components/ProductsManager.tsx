@@ -1,20 +1,29 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  DEMO_PRODUCT_NAMES,
-  LOW_STOCK_THRESHOLD,
   PRODUCT_UNIT_LABELS,
   PRODUCT_UNITS,
   calcMarginPercent,
   formatMoney,
+  getDefaultLowStockThreshold,
+  isLowStock,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { CategorySearchSelect } from '@/components/CategorySearchSelect';
 import { CostImportPanel } from '@/components/CostImportPanel';
+import {
+  DecimalInput,
+  decimalFromNumber,
+  parseDecimal,
+} from '@/components/DecimalInput';
+import { MarketComparePanel } from '@/components/MarketComparePanel';
+import { StockMovementHistory, type StockMovementRow } from '@/components/StockMovementHistory';
+import { uploadProductMedia } from '@/lib/upload-image';
 
 interface Category {
   id: string;
@@ -39,104 +48,207 @@ interface ProductRow {
     image_url?: string | null;
     is_active: boolean;
     shelf_life_days: number | null;
+    weigh_at_fulfillment?: boolean;
     category_id: string | null;
     category: { id: string; name: string } | null;
   };
 }
 
-const emptyForm: ProductInput & { newCategoryName: string } = {
+type CatalogTab = 'productos' | 'importar';
+
+const emptyForm: ProductInput = {
   name: '',
-  description: '',
   categoryId: '',
-  newCategoryName: '',
-  sku: '',
   imageUrl: '',
   unit: 'kg',
   price: 0,
-  unitCost: 0,
-  stock: 0,
-  minStock: LOW_STOCK_THRESHOLD,
   shelfLifeDays: null,
+  weighAtFulfillment: false,
   isAvailable: true,
   isActive: true,
 };
 
-async function uploadImage(file: File, bucket: 'product-media' | 'promo-media' = 'product-media') {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('bucket', bucket);
-  const response = await fetch('/api/products/upload', { method: 'POST', body: formData });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error ?? 'No se pudo subir la imagen');
-  return payload.url as string;
+async function uploadImage(file: File) {
+  return uploadProductMedia(file, 'product-media');
+}
+
+type SortKey = 'name' | 'category' | 'price' | 'cost' | 'margin' | 'stock' | 'store';
+type SortDir = 'asc' | 'desc';
+
+function SortHeader({
+  label,
+  column,
+  sortKey,
+  sortDir,
+  onSort,
+  className = '',
+}: {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (column: SortKey) => void;
+  className?: string;
+}) {
+  const active = sortKey === column;
+  return (
+    <th className={`px-3 py-2 font-medium ${className}`}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="inline-flex items-center gap-1 text-left hover:text-slate-800"
+      >
+        {label}
+        <span className={`text-xs ${active ? 'text-slate-800' : 'text-slate-300'}`} aria-hidden>
+          {active && sortDir === 'desc' ? '↓' : '↑'}
+        </span>
+      </button>
+    </th>
+  );
 }
 
 export function ProductsManager({
   initialProducts,
   initialCategories,
   branchName,
+  canManage = true,
+  canAdjustInventory = false,
+  initialMovements = [],
 }: {
   initialProducts: ProductRow[];
   initialCategories: Category[];
   branchName: string;
+  canManage?: boolean;
+  canAdjustInventory?: boolean;
+  initialMovements?: StockMovementRow[];
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(initialCategories);
+  const [movements, setMovements] = useState(initialMovements);
   const [form, setForm] = useState(emptyForm);
+  const [priceText, setPriceText] = useState('');
+  const [shelfLifeText, setShelfLifeText] = useState('');
   const [editing, setEditing] = useState<{ productId: string; branchProductId: string } | null>(null);
+  const [editingRow, setEditingRow] = useState<ProductRow | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
-  const [categoryName, setCategoryName] = useState('');
+  const [tab, setTab] = useState<CatalogTab>('productos');
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [stockRow, setStockRow] = useState<ProductRow | null>(null);
+  const [countedText, setCountedText] = useState('');
+  const [stockNotes, setStockNotes] = useState('');
+  const [stockError, setStockError] = useState<string | null>(null);
+  const [stockSaving, setStockSaving] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const demoCount = useMemo(
-    () =>
-      products.filter(
-        (row) =>
-          DEMO_PRODUCT_NAMES.includes(row.product.name) &&
-          (row.product.is_active || row.is_available),
-      ).length,
-    [products],
-  );
-
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((row) => {
-      const name = row.product.name.toLowerCase();
-      const category = row.product.category?.name.toLowerCase() ?? '';
-      const sku = row.product.sku?.toLowerCase() ?? '';
-      return name.includes(q) || category.includes(q) || sku.includes(q);
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const q = search.trim().toLowerCase();
+    const filtered = products.filter((row) => {
+      if (categoryFilter === 'none') {
+        if (row.product.category_id) return false;
+      } else if (categoryFilter !== 'all' && row.product.category_id !== categoryFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = `${row.product.name} ${row.product.sku ?? ''} ${row.product.category?.name ?? ''}`.toLowerCase();
+      return hay.includes(q);
     });
-  }, [products, filter]);
+    return [...filtered].sort((a, b) => {
+      const cmp = (left: string | number, right: string | number) => {
+        if (typeof left === 'string' || typeof right === 'string') {
+          return String(left).localeCompare(String(right), 'es', { sensitivity: 'base' }) * dir;
+        }
+        return (Number(left) - Number(right)) * dir;
+      };
+      switch (sortKey) {
+        case 'category':
+          return cmp(a.product.category?.name ?? '', b.product.category?.name ?? '');
+        case 'price':
+          return cmp(Number(a.price), Number(b.price));
+        case 'cost':
+          return cmp(Number(a.avg_unit_cost), Number(b.avg_unit_cost));
+        case 'margin':
+          return cmp(
+            calcMarginPercent(Number(a.price), Number(a.avg_unit_cost)),
+            calcMarginPercent(Number(b.price), Number(b.avg_unit_cost)),
+          );
+        case 'stock':
+          return cmp(Number(a.stock), Number(b.stock));
+        case 'store': {
+          const aVisible = a.is_available && a.product.is_active ? 1 : 0;
+          const bVisible = b.is_available && b.product.is_active ? 1 : 0;
+          return cmp(aVisible, bVisible);
+        }
+        default:
+          return cmp(a.product.name, b.product.name);
+      }
+    });
+  }, [products, search, categoryFilter, sortKey, sortDir]);
+
+  function toggleSort(column: SortKey) {
+    if (sortKey === column) {
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(column);
+    setSortDir(column === 'name' || column === 'category' ? 'asc' : 'desc');
+  }
+
+  useEffect(() => {
+    if (!showForm && !stockRow) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (stockRow) {
+        closeStock();
+        return;
+      }
+      setShowForm(false);
+      setEditing(null);
+      setEditingRow(null);
+      setForm(emptyForm);
+      setPriceText('');
+      setShelfLifeText('');
+      setError(null);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showForm, stockRow]);
 
   function openCreate() {
     setEditing(null);
+    setEditingRow(null);
     setForm(emptyForm);
+    setPriceText('');
+    setShelfLifeText('');
     setError(null);
     setShowForm(true);
   }
 
   function openEdit(row: ProductRow) {
     setEditing({ productId: row.product.id, branchProductId: row.id });
+    setEditingRow(row);
+    const price = Number(row.price);
     setForm({
       name: row.product.name,
-      description: row.product.description ?? '',
       categoryId: row.product.category_id ?? '',
-      newCategoryName: '',
-      sku: row.product.sku ?? '',
       imageUrl: row.product.image_url ?? '',
       unit: row.product.unit,
-      price: Number(row.price),
-      unitCost: Number(row.avg_unit_cost),
-      stock: Number(row.stock),
-      minStock: Number(row.min_stock ?? LOW_STOCK_THRESHOLD),
+      price,
       shelfLifeDays: row.product.shelf_life_days ? Number(row.product.shelf_life_days) : null,
+      weighAtFulfillment: Boolean(row.product.weigh_at_fulfillment),
       isAvailable: row.is_available,
       isActive: row.product.is_active,
     });
+    setPriceText(decimalFromNumber(price));
+    setShelfLifeText(
+      row.product.shelf_life_days ? String(Number(row.product.shelf_life_days)) : '',
+    );
     setError(null);
     setShowForm(true);
   }
@@ -144,28 +256,48 @@ export function ProductsManager({
   function closeForm() {
     setShowForm(false);
     setEditing(null);
+    setEditingRow(null);
     setForm(emptyForm);
+    setPriceText('');
+    setShelfLifeText('');
     setError(null);
   }
 
   async function refresh() {
-    const response = await fetch('/api/products');
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? 'No se pudo recargar');
+    const [productsRes, inventoryRes] = await Promise.all([
+      fetch('/api/products'),
+      fetch('/api/inventory'),
+    ]);
+    const payload = await productsRes.json();
+    if (!productsRes.ok) throw new Error(payload.error ?? 'No se pudo recargar');
     setProducts(payload.products);
     setCategories(payload.categories);
+    if (inventoryRes.ok) {
+      const inventory = await inventoryRes.json();
+      setMovements(inventory.movements ?? []);
+    }
   }
 
   async function saveProduct() {
+    if (!canManage) {
+      setError('No tienes permiso para gestionar el catálogo');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const payload = {
-        ...form,
+        name: form.name,
+        unit: form.unit,
+        price: parseDecimal(priceText),
         categoryId: form.categoryId || null,
-        sku: form.sku?.trim() || null,
         imageUrl: form.imageUrl?.trim() || null,
-        newCategoryName: form.newCategoryName.trim() || undefined,
+        shelfLifeDays: shelfLifeText.trim() ? parseDecimal(shelfLifeText) : null,
+        weighAtFulfillment: Boolean(form.weighAtFulfillment),
+        isAvailable: form.isAvailable,
+        isActive: form.isAvailable,
+        description: editingRow?.product.description ?? null,
+        sku: editingRow?.product.sku ?? null,
       };
 
       const response = await fetch(
@@ -189,11 +321,69 @@ export function ProductsManager({
     }
   }
 
+  function openPhotoPicker() {
+    photoInputRef.current?.click();
+  }
+
+  async function handlePhotoSelected(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadImage(file);
+      setForm((f) => ({ ...f, imageUrl: url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+    } finally {
+      setUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
+
   async function deleteProduct(row: ProductRow) {
+    const twins = products.filter(
+      (other) =>
+        other.id !== row.id &&
+        other.product.unit === row.product.unit &&
+        other.product.name.trim().toLowerCase() === row.product.name.trim().toLowerCase(),
+    );
+    const keeper = [...twins].sort((a, b) => Number(b.stock) - Number(a.stock))[0];
+
+    if (keeper) {
+      const ok = window.confirm(
+        `Hay otro «${row.product.name}» (stock ${Number(keeper.stock)}).\n\n` +
+          `¿Unir este (stock ${Number(row.stock)}) en ese, pasar compras/ventas y eliminar el duplicado?`,
+      );
+      if (!ok) return;
+      setSaving(true);
+      try {
+        const response = await fetch('/api/products/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromBranchProductId: row.id,
+            intoBranchProductId: keeper.id,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? 'No se pudo unir/eliminar');
+        await refresh();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Error al eliminar');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!confirm(`¿Eliminar "${row.product.name}"?`)) return;
     setSaving(true);
     try {
-      const response = await fetch(`/api/products/${row.product.id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/products/${row.product.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branchProductId: row.id }),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo eliminar');
       await refresh();
@@ -205,6 +395,7 @@ export function ProductsManager({
   }
 
   async function toggleAvailability(row: ProductRow) {
+    const nextVisible = !(row.is_available && row.product.is_active);
     const response = await fetch(`/api/products/${row.product.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -216,9 +407,16 @@ export function ProductsManager({
         sku: row.product.sku,
         imageUrl: row.product.image_url,
         price: Number(row.price),
-        minStock: Number(row.min_stock ?? LOW_STOCK_THRESHOLD),
-        isAvailable: !row.is_available,
-        isActive: row.product.is_active,
+        minStock: Number(
+          row.min_stock ??
+            getDefaultLowStockThreshold({
+              unit: row.product.unit,
+              name: row.product.name,
+              categoryName: row.product.category?.name,
+            }),
+        ),
+        isAvailable: nextVisible,
+        isActive: nextVisible,
         branchProductId: row.id,
       }),
     });
@@ -230,34 +428,89 @@ export function ProductsManager({
     await refresh();
   }
 
-  async function archiveDemo() {
-    if (!confirm('¿Ocultar el catálogo demo (Aguacate Hass, etc.) para cargar productos reales?')) return;
-    setSaving(true);
+  function closeStock() {
+    setStockRow(null);
+    setCountedText('');
+    setStockNotes('');
+    setStockError(null);
+    setStockSaving(false);
+  }
+
+  function openStock(row: ProductRow) {
+    setStockRow(row);
+    setCountedText(decimalFromNumber(Number(row.stock), false));
+    setStockNotes('');
+    setStockError(null);
+  }
+
+  async function submitStock(kind: 'waste' | 'adjustment') {
+    if (!stockRow || !canAdjustInventory) return;
+    const system = Number(stockRow.stock);
+    const counted = parseDecimal(countedText);
+    if (!Number.isFinite(counted) || counted < 0) {
+      setStockError('Indica un conteo válido (0 o más).');
+      return;
+    }
+    const delta = Number((counted - system).toFixed(3));
+    if (delta === 0) {
+      setStockError('El conteo es igual al stock del sistema.');
+      return;
+    }
+    if (kind === 'waste' && delta >= 0) {
+      setStockError('La merma solo baja stock. Si hay de más, usa ajustar al conteo.');
+      return;
+    }
+    setStockSaving(true);
+    setStockError(null);
     try {
-      const response = await fetch('/api/products/archive-demo', { method: 'POST' });
+      const response = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branchProductId: stockRow.id,
+          movementType: kind,
+          quantity: kind === 'waste' ? Math.abs(delta) : delta,
+          notes:
+            stockNotes.trim() ||
+            (kind === 'waste'
+              ? `Merma desde catálogo (sistema ${system} → conteo ${counted})`
+              : `Ajuste desde catálogo (sistema ${system} → conteo ${counted})`),
+        }),
+      });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? 'No se pudo archivar');
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
       await refresh();
+      closeStock();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al archivar demo');
+      setStockError(err instanceof Error ? err.message : 'Error al registrar');
     } finally {
-      setSaving(false);
+      setStockSaving(false);
     }
   }
 
-  async function saveCategory() {
-    const name = categoryName.trim();
-    if (!name) return;
+  async function createCategory(name: string, selectInForm = false) {
+    if (!canManage) {
+      setError('No tienes permiso para gestionar el catálogo');
+      return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) return;
     setSaving(true);
     try {
       const response = await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, sortOrder: categories.length + 1 }),
+        body: JSON.stringify({ name: trimmed, sortOrder: categories.length + 1 }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo crear');
-      setCategoryName('');
+      const created = result.category as Category | undefined;
+      if (created) {
+        setCategories((prev) =>
+          prev.some((row) => row.id === created.id) ? prev : [...prev, created],
+        );
+        if (selectInForm) setForm((f) => ({ ...f, categoryId: created.id }));
+      }
       await refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al crear categoría');
@@ -266,386 +519,497 @@ export function ProductsManager({
     }
   }
 
-  async function renameCategory(category: Category) {
-    const name = window.prompt('Nuevo nombre', category.name)?.trim();
-    if (!name || name === category.name) return;
-    const response = await fetch('/api/categories', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: category.id, name }),
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      alert(result.error ?? 'No se pudo renombrar');
-      return;
-    }
-    await refresh();
-  }
-
-  async function deleteCategory(category: Category) {
-    if (!confirm(`¿Eliminar categoría "${category.name}"? Los productos quedan sin categoría.`)) return;
-    const response = await fetch(`/api/categories?id=${category.id}`, { method: 'DELETE' });
-    if (!response.ok) {
-      const result = await response.json();
-      alert(result.error ?? 'No se pudo eliminar');
-      return;
-    }
-    await refresh();
-  }
+  const cost = Number(editingRow?.last_unit_cost ?? editingRow?.avg_unit_cost ?? 0);
 
   return (
     <div className="space-y-6">
-      {demoCount > 0 && (
-        <section className="pv-callout--amber rounded-2xl p-4">
-          <p className="font-medium text-amber-900">
-            Hay {demoCount} producto(s) de demostración visibles.
-          </p>
-          <p className="mt-1 text-sm text-amber-800">
-            Ocúltalos antes de cargar tu catálogo real para no mezclar precios de prueba.
-          </p>
-          <button
-            type="button"
-            onClick={archiveDemo}
-            className="mt-3 rounded-full bg-amber-900 px-4 py-2 text-sm text-white"
-          >
-            Ocultar catálogo demo
-          </button>
-        </section>
-      )}
+      {!canManage ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Solo lectura · no tienes permiso para editar el catálogo.
+        </p>
+      ) : null}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={(e) => void handlePhotoSelected(e.target.files?.[0])}
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-slate-500">Sucursal: {branchName}</p>
-          <p className="text-2xl font-bold text-slate-900">{products.length} productos</p>
+          <p className="text-2xl font-bold text-slate-900">
+            {sorted.length === products.length
+              ? `${products.length} productos`
+              : `${sorted.length} de ${products.length} productos`}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <input
-            className="pv-input"
-            placeholder="Buscar producto o código..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          <button type="button" onClick={openCreate} className="pv-btn-primary px-5 py-2 text-sm">
-            + Nuevo producto
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {tab === 'productos' ? (
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar…"
+              aria-label="Buscar productos"
+              className="h-10 w-40 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-52"
+            />
+          ) : null}
+          {canManage ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setTab(tab === 'importar' ? 'productos' : 'importar')}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  tab === 'importar'
+                    ? 'bg-slate-900 text-white'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {tab === 'importar' ? 'Ver productos' : 'Importar Excel'}
+              </button>
+              {tab === 'productos' ? (
+                <button type="button" onClick={openCreate} className="pv-btn-primary px-5 py-2 text-sm">
+                  + Agregar producto
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </div>
 
-      <CostImportPanel onImported={refresh} />
-
-      <section className="pv-glass-card p-5">
-        <h2 className="text-lg font-semibold text-slate-900">Categorías</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <span key={category.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm">
-              {category.name}
-              <button type="button" className="text-xs text-slate-500" onClick={() => renameCategory(category)}>
-                Editar
-              </button>
-              <button type="button" className="text-xs text-red-600" onClick={() => deleteCategory(category)}>
-                ×
-              </button>
-            </span>
+      {tab === 'productos' && categories.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', label: 'Todas' },
+            ...categories.map((category) => ({ id: category.id, label: category.name })),
+            ...(products.some((row) => !row.product.category_id)
+              ? [{ id: 'none', label: 'Sin categoría' }]
+              : []),
+          ].map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => setCategoryFilter(chip.id)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                categoryFilter === chip.id
+                  ? 'bg-slate-900 text-white'
+                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {chip.label}
+            </button>
           ))}
         </div>
-        <div className="mt-3 flex max-w-md gap-2">
-          <input
-            className="pv-input"
-            placeholder="Nueva categoría"
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-          />
-          <button type="button" className="pv-btn-secondary px-4 py-2 text-sm" onClick={saveCategory}>
-            Agregar
-          </button>
-        </div>
-      </section>
+      ) : null}
 
-      {showForm && (
-        <section className="pv-glass-card p-6">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {editing ? 'Editar producto' : 'Nuevo producto'}
-          </h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Nombre</span>
-              <input
-                className="pv-input mt-1"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Código / PLU</span>
-              <input
-                className="pv-input mt-1"
-                value={form.sku ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                placeholder="Opcional"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Categoría</span>
-              <select
-                className="pv-input mt-1"
-                value={form.categoryId ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              >
-                <option value="">Sin categoría</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Nueva categoría (opcional)</span>
-              <input
-                className="pv-input mt-1"
-                placeholder="Ej. Orgánicos"
-                value={form.newCategoryName}
-                onChange={(e) => setForm((f) => ({ ...f, newCategoryName: e.target.value }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Unidad</span>
-              <select
-                className="pv-input mt-1"
-                value={form.unit}
-                onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value as ProductUnit }))}
-              >
-                {PRODUCT_UNITS.map((unit) => (
-                  <option key={unit} value={unit}>
-                    {PRODUCT_UNIT_LABELS[unit]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Precio</span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="pv-input mt-1"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value) }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Costo de compra</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                className="pv-input mt-1"
-                value={form.unitCost ?? 0}
-                onChange={(e) => setForm((f) => ({ ...f, unitCost: Number(e.target.value) }))}
-              />
-            </label>
-            {!editing && (
-              <label className="block text-sm">
-                <span className="font-medium text-slate-700">Stock inicial</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.001"
-                  className="pv-input mt-1"
-                  value={form.stock ?? 0}
-                  onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
-                />
-                <span className="mt-1 block text-xs text-slate-500">Se registra como inventario inicial.</span>
-              </label>
-            )}
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Mínimo de stock</span>
-              <input
-                type="number"
-                min={0}
-                step="0.001"
-                className="pv-input mt-1"
-                value={form.minStock ?? LOW_STOCK_THRESHOLD}
-                onChange={(e) => setForm((f) => ({ ...f, minStock: Number(e.target.value) }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Vida útil (días, opcional)</span>
-              <input
-                type="number"
-                min={1}
-                className="pv-input mt-1"
-                placeholder="Ej. 3 para lechuga"
-                value={form.shelfLifeDays ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    shelfLifeDays: e.target.value ? Number(e.target.value) : null,
-                  }))
-                }
-              />
-            </label>
-            <label className="block text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Foto</span>
-              <div className="mt-2 flex items-center gap-4">
-                {form.imageUrl ? (
-                  <div className="relative h-16 w-16 overflow-hidden rounded-xl">
-                    <Image src={form.imageUrl} alt="" fill className="object-cover" unoptimized />
-                  </div>
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
-                    Sin foto
-                  </div>
+      {tab === 'importar' && <CostImportPanel onImported={refresh} />}
+
+      {tab === 'productos' && (
+        <div className="pv-glass-card overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <SortHeader label="Producto" column="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader label="Categoría" column="category" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader label="Precio" column="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader label="Costo" column="cost" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader label="Margen" column="margin" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader
+                    label="Stock"
+                    column="stock"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="min-w-[13rem]"
+                  />
+                  <SortHeader label="Tienda" column="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="px-3 py-2 font-medium">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((row) => {
+                  const stock = Number(row.stock);
+                  const minStock = Number(
+                    row.min_stock ??
+                      getDefaultLowStockThreshold({
+                        unit: row.product.unit,
+                        name: row.product.name,
+                        categoryName: row.product.category?.name,
+                      }),
+                  );
+                  const low = isLowStock({
+                    stock,
+                    unit: row.product.unit,
+                    minStock: row.min_stock,
+                    name: row.product.name,
+                    categoryName: row.product.category?.name,
+                  });
+                  return (
+                  <tr key={row.id} className="border-t border-slate-100">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-3">
+                        {row.product.image_url ? (
+                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                            <Image src={row.product.image_url} alt="" fill className="object-cover" unoptimized />
+                          </div>
+                        ) : null}
+                        <div>
+                          <p className="font-medium text-slate-900">{row.product.name}</p>
+                          <p className="text-xs text-slate-500">{PRODUCT_UNIT_LABELS[row.product.unit]}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">{row.product.category?.name ?? '—'}</td>
+                    <td className="px-3 py-3 font-medium">{formatMoney(Number(row.price))}</td>
+                    <td className="px-3 py-3 text-slate-500">{formatMoney(Number(row.avg_unit_cost))}</td>
+                    <td className="px-3 py-3 text-slate-500">
+                      {calcMarginPercent(Number(row.price), Number(row.avg_unit_cost)).toFixed(1)}%
+                    </td>
+                    <td className="min-w-[13rem] whitespace-nowrap px-3 py-3">
+                      <p className={low ? 'font-semibold text-amber-800' : 'text-slate-800'}>
+                        {stock} {PRODUCT_UNIT_LABELS[row.product.unit]}
+                        <span className="ml-2 font-normal text-slate-500">mín. {minStock}</span>
+                      </p>
+                      {canAdjustInventory ? (
+                        <button
+                          type="button"
+                          onClick={() => openStock(row)}
+                          className="mt-1 text-left text-[11px] font-medium text-emerald-800 hover:underline"
+                        >
+                          Merma / ajuste
+                        </button>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleAvailability(row)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          row.is_available && row.product.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {row.is_available && row.product.is_active ? 'Visible' : 'Oculto'}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        className="pv-btn-secondary px-3 py-1 text-xs"
+                      >
+                        Editar
+                      </button>
+                    </td>
+                  </tr>
+                  );
+                })}
+                {sorted.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                      {search.trim() || categoryFilter !== 'all'
+                        ? 'Ningún producto coincide con la búsqueda o categoría.'
+                        : 'Aún no hay productos en el catálogo.'}
+                    </td>
+                  </tr>
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={uploading}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setUploading(true);
-                    try {
-                      const url = await uploadImage(file);
-                      setForm((f) => ({ ...f, imageUrl: url }));
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : 'Error al subir imagen');
-                    } finally {
-                      setUploading(false);
-                    }
-                  }}
-                />
-              </div>
-            </label>
-            <label className="block text-sm md:col-span-2">
-              <span className="font-medium text-slate-700">Descripción</span>
-              <textarea
-                rows={2}
-                className="pv-input mt-1"
-                value={form.description ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.isAvailable}
-                onChange={(e) => setForm((f) => ({ ...f, isAvailable: e.target.checked }))}
-              />
-              Visible en tienda
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-              />
-              Producto activo
-            </label>
-          </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={saveProduct}
-              className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
-            >
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-            <button type="button" onClick={closeForm} className="pv-btn-secondary px-5 py-2 text-sm">
-              Cancelar
-            </button>
-          </div>
-        </section>
+              </tbody>
+            </table>
+        </div>
       )}
 
-      <div className="pv-glass-card">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-medium">Producto</th>
-              <th className="px-4 py-3 font-medium">Categoría</th>
-              <th className="px-4 py-3 font-medium">Precio</th>
-              <th className="px-4 py-3 font-medium">Costo</th>
-              <th className="px-4 py-3 font-medium">Margen</th>
-              <th className="px-4 py-3 font-medium">Stock</th>
-              <th className="px-4 py-3 font-medium">Tienda</th>
-              <th className="px-4 py-3 font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    {row.product.image_url ? (
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
-                        <Image src={row.product.image_url} alt="" fill className="object-cover" unoptimized />
-                      </div>
-                    ) : null}
-                    <div>
-                      <p className="font-medium text-slate-900">{row.product.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {PRODUCT_UNIT_LABELS[row.product.unit]}
-                        {row.product.sku ? ` · ${row.product.sku}` : ''}
-                      </p>
+      {showForm && (
+        <div
+          className="pv-modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+          role="presentation"
+          onClick={closeForm}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-modal-title"
+            className="pv-glass-card my-4 w-full max-w-3xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="product-modal-title" className="text-lg font-semibold text-slate-900">
+                {editing ? 'Editar producto' : 'Agregar producto'}
+              </h2>
+              <button type="button" className="text-sm text-slate-500 hover:text-slate-800" onClick={closeForm}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block text-sm md:col-span-2">
+                <span className="font-medium text-slate-700">Nombre</span>
+                <input
+                  autoFocus
+                  className="pv-input mt-1"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Categoría</span>
+                <CategorySearchSelect
+                  categories={categories}
+                  value={form.categoryId ?? ''}
+                  onChange={(id) => setForm((f) => ({ ...f, categoryId: id }))}
+                  onCreate={(name) => void createCategory(name, true)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Unidad</span>
+                <select
+                  className="pv-input mt-1"
+                  value={form.unit}
+                  onChange={(e) =>
+                    setForm((f) => {
+                      const unit = e.target.value as ProductUnit;
+                      return {
+                        ...f,
+                        unit,
+                        weighAtFulfillment: unit === 'kg' ? f.weighAtFulfillment : false,
+                      };
+                    })
+                  }
+                >
+                  {PRODUCT_UNITS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {PRODUCT_UNIT_LABELS[unit]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Precio de venta</span>
+                <DecimalInput
+                  min={0}
+                  placeholder="0"
+                  className="pv-input mt-1"
+                  value={priceText}
+                  onChange={(value) => {
+                    setPriceText(value);
+                    setForm((f) => ({ ...f, price: parseDecimal(value) }));
+                  }}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Vida útil (días, opcional)</span>
+                <DecimalInput
+                  placeholder="Ej. 3 para lechuga"
+                  className="pv-input mt-1"
+                  value={shelfLifeText}
+                  onChange={setShelfLifeText}
+                />
+              </label>
+              <div className="block text-sm md:col-span-2">
+                <span className="font-medium text-slate-700">Foto</span>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  {form.imageUrl ? (
+                    <div className="relative h-16 w-16 overflow-hidden rounded-xl">
+                      <Image src={form.imageUrl} alt="" fill className="object-cover" unoptimized />
                     </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-slate-600">{row.product.category?.name ?? '—'}</td>
-                <td className="px-4 py-3 font-medium">{formatMoney(Number(row.price))}</td>
-                <td className="px-4 py-3">{formatMoney(Number(row.avg_unit_cost))}</td>
-                <td className="px-4 py-3">
-                  {calcMarginPercent(Number(row.price), Number(row.avg_unit_cost)).toFixed(1)}%
-                </td>
-                <td className="px-4 py-3">
-                  {Number(row.stock)}
-                  <span className="block text-[11px] text-slate-400">mín. {Number(row.min_stock ?? LOW_STOCK_THRESHOLD)}</span>
-                </td>
-                <td className="px-4 py-3">
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                      Sin foto
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => toggleAvailability(row)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      row.is_available && row.product.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
+                    disabled={uploading}
+                    onClick={openPhotoPicker}
+                    className="pv-btn-secondary px-4 py-2 text-sm disabled:opacity-50"
                   >
-                    {row.is_available && row.product.is_active ? 'Visible' : 'Oculto'}
+                    {uploading ? 'Subiendo…' : form.imageUrl ? 'Cambiar foto' : 'Subir foto'}
                   </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                  {form.imageUrl && (
                     <button
                       type="button"
-                      onClick={() => openEdit(row)}
-                      className="text-[var(--pv-green-700)] hover:underline"
+                      onClick={() => setForm((f) => ({ ...f, imageUrl: '' }))}
+                      className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
                     >
-                      Editar
+                      Eliminar foto
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteProduct(row)}
-                      className="text-red-600 hover:underline"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No hay productos que coincidan.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  )}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.isAvailable}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, isAvailable: e.target.checked, isActive: e.target.checked }))
+                  }
+                />
+                Visible en tienda
+              </label>
+              <label className="flex items-start gap-2 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={Boolean(form.weighAtFulfillment)}
+                  disabled={form.unit !== 'kg'}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, weighAtFulfillment: e.target.checked }))
+                  }
+                />
+                <span>
+                  <span className="font-medium text-slate-800">Pesar al preparar (pedir por pieza)</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    El cliente pide piezas; al preparar capturas el peso en kg y el total se calcula con el
+                    precio por kilo. Solo aplica si la unidad es kg.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-4">
+              <MarketComparePanel
+                productName={form.name}
+                unit={form.unit}
+                currentPrice={parseDecimal(priceText)}
+                cost={cost}
+                onPriceChange={(price) => {
+                  setForm((f) => ({ ...f, price }));
+                  setPriceText(decimalFromNumber(price, false));
+                }}
+              />
+            </div>
+
+            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={saveProduct}
+                className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
+              >
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button type="button" onClick={closeForm} className="pv-btn-secondary px-5 py-2 text-sm">
+                Cancelar
+              </button>
+              {editingRow && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    closeForm();
+                    void deleteProduct(editingRow);
+                  }}
+                  className="rounded-full border border-red-200 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  Eliminar producto
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {stockRow && (
+        <div
+          className="pv-modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+          role="presentation"
+          onClick={closeStock}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stock-modal-title"
+            className="pv-glass-card my-4 w-full max-w-md p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="stock-modal-title" className="text-lg font-semibold text-slate-900">
+                Merma / ajuste
+              </h2>
+              <button type="button" className="text-sm text-slate-500 hover:text-slate-800" onClick={closeStock}>
+                Cerrar
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-slate-600">{stockRow.product.name}</p>
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Stock en sistema</dt>
+                <dd className="mt-1 font-semibold text-slate-900">
+                  {Number(stockRow.stock)} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <dt className="text-xs text-slate-500">Mínimo / deberías tener</dt>
+                <dd className="mt-1 font-semibold text-slate-900">
+                  {Number(
+                    stockRow.min_stock ??
+                      getDefaultLowStockThreshold({
+                        unit: stockRow.product.unit,
+                        name: stockRow.product.name,
+                        categoryName: stockRow.product.category?.name,
+                      }),
+                  )}{' '}
+                  {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                </dd>
+              </div>
+            </dl>
+            <label className="mt-4 block text-sm">
+              <span className="font-medium text-slate-700">Conteo físico</span>
+              <DecimalInput
+                className="pv-input mt-1"
+                value={countedText}
+                onChange={setCountedText}
+                placeholder="Lo que hay ahora"
+              />
+            </label>
+            <label className="mt-3 block text-sm">
+              <span className="font-medium text-slate-700">Nota (opcional)</span>
+              <input
+                className="pv-input mt-1"
+                value={stockNotes}
+                onChange={(e) => setStockNotes(e.target.value)}
+                placeholder="Ej. merma por madurez, conteo de anaquel"
+              />
+            </label>
+            {(() => {
+              const system = Number(stockRow.stock);
+              const counted = parseDecimal(countedText, system);
+              const delta = Number((counted - system).toFixed(3));
+              if (!countedText.trim() || delta === 0) return null;
+              return (
+                <p className={`mt-3 text-sm ${delta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
+                  Diferencia: {delta > 0 ? '+' : ''}
+                  {delta} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                </p>
+              );
+            })()}
+            {stockError ? <p className="mt-3 text-sm text-red-600">{stockError}</p> : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={stockSaving}
+                onClick={() => void submitStock('waste')}
+                className="rounded-full bg-rose-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {stockSaving ? 'Guardando…' : 'Registrar merma'}
+              </button>
+              <button
+                type="button"
+                disabled={stockSaving}
+                onClick={() => void submitStock('adjustment')}
+                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === 'productos' ? <StockMovementHistory movements={movements} /> : null}
     </div>
   );
 }

@@ -19,29 +19,33 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (signInError) {
-      setError('Correo o contraseña incorrectos.');
+      if (signInError) {
+        setError('Correo o contraseña incorrectos.');
+        return;
+      }
+
+      const sessionResponse = await fetch('/api/auth/session');
+      if (!sessionResponse.ok) {
+        await supabase.auth.signOut();
+        setError('Tu cuenta no tiene acceso al panel. Pide acceso al administrador.');
+        return;
+      }
+
+      const next = searchParams.get('next') ?? '/';
+      router.push(next);
+      router.refresh();
+    } catch {
+      setError('No se pudo conectar. Recarga la página e inténtalo de nuevo.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const sessionResponse = await fetch('/api/auth/session');
-    if (!sessionResponse.ok) {
-      await supabase.auth.signOut();
-      setError('Tu cuenta no tiene acceso al panel. Pide acceso al administrador.');
-      setLoading(false);
-      return;
-    }
-
-    const next = searchParams.get('next') ?? '/';
-    router.push(next);
-    router.refresh();
   }
 
   return (
@@ -49,7 +53,10 @@ export function LoginForm() {
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
       <main className="relative flex min-h-screen items-center justify-center px-4">
         <div className="pv-glass-panel w-full max-w-md p-8 sm:p-10">
-          <div className="mb-6 flex justify-center">
+          <div className="mb-6 flex flex-col items-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Admin
+            </p>
             <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
           </div>
           <h1 className="text-center text-xl font-bold text-slate-900">Acceso al panel</h1>

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { validateInventoryMovement, type InventoryMovementInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
@@ -60,6 +60,13 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'inventory.adjust',
+    'No tienes permiso para ajustar inventario',
+  );
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();

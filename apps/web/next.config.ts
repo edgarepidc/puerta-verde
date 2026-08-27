@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
       { protocol: 'http', hostname: '**' },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/tienda-citte', destination: '/la-cite', permanent: true },
+      { source: '/puerta-verde-demo', destination: '/la-cite', permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -3,12 +3,19 @@ import { NextResponse } from 'next/server';
 import { validateOperatingCostInput, type OperatingCostInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.view',
+    'No tienes permiso para ver utilidades',
+  );
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();
@@ -36,6 +43,13 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.view',
+    'No tienes permiso para gestionar costos',
+  );
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();

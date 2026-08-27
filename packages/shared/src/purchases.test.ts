@@ -26,4 +26,46 @@ test('validatePurchaseInput requires supplier and items', () => {
     }),
     null,
   );
+  assert.equal(
+    validatePurchaseInput({
+      supplierId: 'sup-1',
+      items: [
+        {
+          branchProductId: 'bp-1',
+          quantity: 2,
+          unitPrice: 12.5,
+          quality: 'premium',
+        },
+      ],
+    }),
+    null,
+  );
+  assert.equal(
+    validatePurchaseInput({
+      supplierId: 'sup-1',
+      items: [
+        {
+          branchProductId: 'bp-1',
+          quantity: 12.5,
+          unitPrice: 40,
+          pieceCount: 15,
+        },
+      ],
+    }),
+    null,
+  );
+  assert.equal(
+    validatePurchaseInput({
+      supplierId: 'sup-1',
+      items: [
+        {
+          branchProductId: 'bp-1',
+          quantity: 12.5,
+          unitPrice: 40,
+          pieceCount: 0,
+        },
+      ],
+    }),
+    'Las piezas deben ser mayores a cero.',
+  );
 });

@@ -59,7 +59,7 @@ npm run dev:web
 npm run dev:admin
 ```
 
-Demo: tienda en [http://localhost:3001/puerta-verde-demo](http://localhost:3001/puerta-verde-demo)
+Demo: tienda en [http://localhost:3001/la-cite](http://localhost:3001/la-cite)
 
 ## Módulos
 

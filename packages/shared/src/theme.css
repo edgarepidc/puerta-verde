@@ -133,6 +133,12 @@
   transform: translateY(-1px);
 }
 
+.pv-btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.2);
+}
+
 .pv-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -144,12 +150,17 @@
   border: 1px solid rgba(15, 23, 42, 0.12);
   color: var(--pv-ink);
   font-weight: 500;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease, filter 0.12s ease;
 }
 
 .pv-btn-secondary:hover {
   background: #f8fafc;
   border-color: rgba(15, 23, 42, 0.18);
+}
+
+.pv-btn-secondary:active:not(:disabled) {
+  transform: scale(0.97);
+  background: #eef2f7;
 }
 
 .pv-btn-ghost {
@@ -158,13 +169,18 @@
   border: 1px solid rgba(148, 163, 184, 0.35);
   color: #64748b;
   font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
 .pv-btn-ghost:hover {
   background: #f8fafc;
   color: #0f172a;
   border-color: rgba(148, 163, 184, 0.5);
+}
+
+.pv-btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
+  background: #e2e8f0;
 }
 
 /* Form controls */
@@ -186,6 +202,26 @@
 
 .pv-input::placeholder {
   color: rgba(28, 25, 23, 0.4);
+}
+
+/* Catalog search — stronger frame so it doesn't disappear on white */
+.pv-search {
+  border: 1.5px solid rgba(22, 163, 74, 0.28);
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.pv-search:hover {
+  border-color: rgba(22, 163, 74, 0.4);
+}
+
+.pv-search:focus {
+  border-color: rgba(22, 163, 74, 0.6);
+  box-shadow:
+    0 0 0 3px rgba(34, 197, 94, 0.16),
+    0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 /* Pills / chips */
@@ -252,4 +288,125 @@
   background: #fffbeb;
   border: 1px solid rgba(251, 191, 36, 0.35);
   color: #92400e;
+}
+
+/* Storefront nav + hero */
+.pv-store-nav {
+  background: linear-gradient(180deg, #ffffff 0%, #f4fbf7 100%);
+  border-bottom: 1px solid rgba(22, 163, 74, 0.18);
+  box-shadow: 0 1px 0 rgba(22, 163, 74, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.pv-store-nav__menu {
+  display: none;
+}
+
+.pv-store-link {
+  border-radius: 9999px;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pv-store-link:hover {
+  background: #ffffff;
+  color: var(--pv-green-800);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.pv-store-link:focus-visible {
+  outline: 2px solid rgba(22, 163, 74, 0.45);
+  outline-offset: 2px;
+}
+
+.pv-hero-carousel {
+  box-shadow: var(--pv-glass-shadow-lg);
+  border: 1px solid var(--pv-glass-border);
+}
+
+.pv-menu-toggle {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 9999px;
+  border: 1px solid rgba(22, 163, 74, 0.22);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.pv-menu-toggle__bar {
+  display: block;
+  height: 2px;
+  width: 1.05rem;
+  border-radius: 9999px;
+  background: var(--pv-green-800);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  transform-origin: center;
+}
+
+.pv-catalog-scroll {
+  max-height: min(68vh, 34rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(22, 163, 74, 0.14);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 16px rgba(15, 23, 42, 0.04);
+  scrollbar-gutter: stable;
+}
+
+@media (min-width: 640px) {
+  .pv-catalog-scroll {
+    padding: 1rem;
+    max-height: min(72vh, 40rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .pv-catalog-scroll {
+    max-height: min(78vh, 44rem);
+  }
+}
+
+@keyframes pv-cart-flash {
+  0% {
+    background-color: rgba(34, 197, 94, 0.28);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.35);
+    transform: scale(1.02);
+  }
+  55% {
+    background-color: rgba(187, 247, 212, 0.55);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+  }
+}
+
+@keyframes pv-order-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.35), var(--pv-glass-shadow-lg);
+    border-color: rgba(22, 163, 74, 0.45);
+  }
+  100% {
+    box-shadow: var(--pv-glass-shadow-lg);
+    border-color: var(--pv-glass-border);
+  }
+}
+
+.pv-cart-item--flash {
+  animation: pv-cart-flash 1.45s ease-out;
+}
+
+.pv-order-panel--pulse {
+  animation: pv-order-pulse 1.2s ease-out;
 }

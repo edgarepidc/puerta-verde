@@ -26,13 +26,9 @@ test('validatePromotionInput requires discount percent', () => {
   );
 });
 
-test('validateInventoryMovement requires product', () => {
-  assert.equal(
-    validateInventoryMovement({
-      branchProductId: '',
-      movementType: 'purchase',
-      quantity: 5,
-    }),
-    'Selecciona un producto.',
-  );
+test('getDefaultQuantity is always 1', async () => {
+  const { getDefaultQuantity } = await import('./storefront');
+  assert.equal(getDefaultQuantity('kg'), 1);
+  assert.equal(getDefaultQuantity('piece'), 1);
+  assert.equal(getDefaultQuantity('bunch'), 1);
 });

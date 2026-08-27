@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 
 import { PAYMENT_METHOD_LABELS, formatMoney, type PaymentMethod } from '@puertaverde/shared';
 
+import { DecimalInput } from '@/components/DecimalInput';
+
 interface ChannelTotals {
   cash: number;
   card_terminal: number;
@@ -31,7 +33,7 @@ interface CashSummary {
 
 const METHOD_KEYS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer', 'online'];
 
-export function CashClosingManager() {
+export function CashClosingManager({ canManage = true }: { canManage?: boolean }) {
   const [summary, setSummary] = useState<CashSummary | null>(null);
   const [notes, setNotes] = useState('');
   const [openingFloat, setOpeningFloat] = useState('');
@@ -67,6 +69,10 @@ export function CashClosingManager() {
   }, []);
 
   async function closeDay() {
+    if (!canManage) {
+      setError('No tienes permiso para cerrar caja');
+      return;
+    }
     setClosing(true);
     setError(null);
     try {
@@ -158,25 +164,21 @@ export function CashClosingManager() {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block text-sm font-medium text-slate-700">
             Fondo inicial
-            <input
-              type="number"
-              min={0}
-              step="0.01"
+            <DecimalInput
+              placeholder="0"
               className="pv-input mt-2"
               value={openingFloat}
-              onChange={(e) => setOpeningFloat(e.target.value)}
+              onChange={setOpeningFloat}
               disabled={Boolean(summary.closing)}
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Efectivo contado
-            <input
-              type="number"
-              min={0}
-              step="0.01"
+            <DecimalInput
+              placeholder="0"
               className="pv-input mt-2"
               value={countedCash}
-              onChange={(e) => setCountedCash(e.target.value)}
+              onChange={setCountedCash}
               disabled={Boolean(summary.closing)}
             />
           </label>
@@ -198,19 +200,24 @@ export function CashClosingManager() {
             className="pv-input mt-2"
             rows={3}
             value={notes}
+            disabled={!canManage || Boolean(summary.closing)}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ej. faltante de $20 en caja chica"
           />
         </label>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-        <button
-          type="button"
-          disabled={closing || Boolean(summary.closing)}
-          onClick={closeDay}
-          className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
-        </button>
+        {!canManage ? (
+          <p className="mt-4 text-sm text-slate-500">Solo lectura · no tienes permiso para cerrar caja.</p>
+        ) : (
+          <button
+            type="button"
+            disabled={closing || Boolean(summary.closing)}
+            onClick={closeDay}
+            className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
+          </button>
+        )}
       </section>
     </div>
   );

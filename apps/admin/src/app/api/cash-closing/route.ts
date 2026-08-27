@@ -2,13 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
-
-function todayMexico(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Mexico_City',
-  }).format(new Date());
-}
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
+import { todayMexicoYmd } from '@/lib/mexico-date';
 
 function emptyMethodTotals() {
   return { cash: 0, card_terminal: 0, transfer: 0, online: 0 };
@@ -27,7 +22,7 @@ export async function GET() {
   if (auth instanceof NextResponse) return auth;
 
   const supabase = createAdminClient();
-  const closingDate = todayMexico();
+  const closingDate = todayMexicoYmd();
   const startOfDay = `${closingDate}T00:00:00-06:00`;
   const endOfDay = `${closingDate}T23:59:59-06:00`;
 
@@ -85,13 +80,20 @@ export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
+  const denied = await requireStaffPermission(
+    auth,
+    'cash.closing',
+    'No tienes permiso para cerrar caja',
+  );
+  if (denied) return denied;
+
   const body = (await request.json().catch(() => ({}))) as {
     notes?: string;
     openingFloat?: number | null;
     countedCash?: number | null;
   };
   const supabase = createAdminClient();
-  const closingDate = todayMexico();
+  const closingDate = todayMexicoYmd();
   const startOfDay = `${closingDate}T00:00:00-06:00`;
   const endOfDay = `${closingDate}T23:59:59-06:00`;
 
