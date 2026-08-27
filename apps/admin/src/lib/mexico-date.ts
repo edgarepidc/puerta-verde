@@ -131,9 +131,28 @@ export function isValidYmd(value: string): boolean {
   );
 }
 
-/** Midday Mexico City (UTC−6, no DST) for a calendar day. */
+/** Midday Mexico City (UTC−6, no DST) for a calendar day. Used for date-range math, not sale times. */
 export function mexicoYmdAtNoonIso(ymd: string): string {
   return `${ymd}T12:00:00-06:00`;
+}
+
+/**
+ * Instant on a Mexico City calendar day, using the local clock from `date`.
+ * Mexico City is UTC−6 year-round (no DST).
+ */
+export function mexicoYmdAtClockIso(ymd: string, date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: MEXICO_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '00';
+  const hour = lookup('hour') === '24' ? '00' : lookup('hour');
+  return `${ymd}T${hour}:${lookup('minute')}:${lookup('second')}-06:00`;
 }
 
 export function addMexicoDays(ymd: string, days: number): string {
@@ -151,8 +170,10 @@ export function mexicoYmdBoundsIso(ymd: string): { start: string; end: string } 
 }
 
 /**
- * Validate a POS backdate: must be a real calendar day, not in the future
+ * Validate a POS sale date: must be a real calendar day, not in the future
  * (Mexico City), and not older than `maxDaysBack` days.
+ * `iso` uses the current Mexico City clock on that calendar day (not noon),
+ * so live sales keep the real hour.
  */
 export function parseSoldOnDate(
   soldOn: string | undefined | null,
@@ -176,5 +197,5 @@ export function parseSoldOnDate(
     return { ok: false, error: `Solo se permiten ventas de los últimos ${maxDaysBack} días` };
   }
 
-  return { ok: true, ymd, iso: mexicoYmdAtNoonIso(ymd) };
+  return { ok: true, ymd, iso: mexicoYmdAtClockIso(ymd) };
 }

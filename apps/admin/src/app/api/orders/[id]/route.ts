@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
-import { parseSoldOnDate } from '@/lib/mexico-date';
+import { mexicoYmdAtClockIso, parseSoldOnDate } from '@/lib/mexico-date';
 
 function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
@@ -213,16 +213,16 @@ export async function PATCH(
 
     const hasLineChanges = updates.size > 0 || removeIds.size > 0 || addItems.length > 0;
     const wantsDateChange = body.soldOn != null && String(body.soldOn).trim() !== '';
-    let soldOnIso: string | null = null;
+    let soldOnYmd: string | null = null;
     if (wantsDateChange) {
       const parsed = parseSoldOnDate(body.soldOn);
       if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
-      soldOnIso = parsed.iso;
+      soldOnYmd = parsed.ymd;
     }
 
-    if (!hasLineChanges && !soldOnIso) {
+    if (!hasLineChanges && !soldOnYmd) {
       return NextResponse.json({ error: 'Indica los cambios del pedido' }, { status: 400 });
     }
 
@@ -250,7 +250,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'No se puede editar un pedido cancelado' }, { status: 400 });
     }
 
-    if (soldOnIso) {
+    let soldOnIso: string | null = null;
+    if (soldOnYmd) {
+      const originalClock = new Date(order.created_at);
+      soldOnIso = mexicoYmdAtClockIso(
+        soldOnYmd,
+        Number.isNaN(originalClock.getTime()) ? new Date() : originalClock,
+      );
       const dateUpdate: { created_at: string; paid_at?: string } = { created_at: soldOnIso };
       if (order.payment_status === 'paid') {
         dateUpdate.paid_at = soldOnIso;
