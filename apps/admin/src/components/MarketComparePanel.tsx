@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   PRODUCT_UNIT_LABELS,
@@ -19,12 +19,20 @@ export function MarketComparePanel({
   currentPrice,
   cost = 0,
   onPriceChange,
+  compact = false,
+  autoSearch = false,
+  currentPriceLabel = 'Precio actual',
+  className = '',
 }: {
   productName: string;
   unit: ProductUnit;
   currentPrice: number;
   cost?: number;
   onPriceChange: (price: number) => void;
+  compact?: boolean;
+  autoSearch?: boolean;
+  currentPriceLabel?: string;
+  className?: string;
 }) {
   const [query, setQuery] = useState(productName);
   const [loading, setLoading] = useState(false);
@@ -39,6 +47,7 @@ export function MarketComparePanel({
   const [selectedId, setSelectedId] = useState('current');
   const [adjustKind, setAdjustKind] = useState<'amount' | 'percent'>('percent');
   const [adjustValue, setAdjustValue] = useState('');
+  const searchSeq = useRef(0);
 
   useEffect(() => {
     if (productName.trim()) setQuery(productName);
@@ -64,7 +73,7 @@ export function MarketComparePanel({
     () => [
       {
         id: 'current',
-        storeLabel: 'Precio actual',
+        storeLabel: currentPriceLabel,
         title: `Tu precio de venta / ${PRODUCT_UNIT_LABELS[unit]}`,
         price: currentPrice,
       },
@@ -77,7 +86,7 @@ export function MarketComparePanel({
         url: offer.url,
       })),
     ],
-    [currentPrice, offers, suggested, suggestedHint, unit],
+    [currentPrice, currentPriceLabel, offers, suggested, suggestedHint, unit],
   );
 
   const selected = bases.find((item) => item.id === selectedId) ?? bases[0];
@@ -87,30 +96,52 @@ export function MarketComparePanel({
     parseDecimal(adjustValue),
   );
 
-  async function search() {
-    const q = query.trim() || productName.trim();
+  async function runSearch(rawQuery: string, { silentEmpty = false } = {}) {
+    const q = rawQuery.trim();
     if (q.length < 2) {
-      setError('Escribe el nombre del producto para buscar.');
+      if (!silentEmpty) setError('Escribe el nombre del producto para buscar.');
       return;
     }
+    const seq = ++searchSeq.current;
     setLoading(true);
     setError(null);
     setMessage(null);
     try {
       const response = await fetch(`/api/market/search?q=${encodeURIComponent(q)}`);
       const payload = await response.json();
+      if (seq !== searchSeq.current) return;
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo buscar');
       const nextOffers = (payload.offers ?? []) as MarketOffer[];
       setOffers(nextOffers);
       setSources(payload.sources ?? null);
       if (!nextOffers.length) {
-        setMessage('No se encontraron precios en súper. Puedes ajustar tu precio actual o el sugerido.');
+        setMessage(
+          'No se encontraron precios en súper. Puedes ajustar tu precio actual o el sugerido.',
+        );
       }
     } catch (err) {
+      if (seq !== searchSeq.current) return;
       setError(err instanceof Error ? err.message : 'Error al buscar precios');
     } finally {
-      setLoading(false);
+      if (seq === searchSeq.current) setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    if (!autoSearch) return;
+    const q = productName.trim();
+    if (q.length < 2) return;
+    const handle = window.setTimeout(() => {
+      void runSearch(q, { silentEmpty: true });
+    }, 500);
+    return () => {
+      window.clearTimeout(handle);
+      searchSeq.current += 1;
+    };
+  }, [autoSearch, productName]);
+
+  async function search() {
+    await runSearch(query.trim() || productName.trim());
   }
 
   function applyPrice() {
@@ -120,12 +151,17 @@ export function MarketComparePanel({
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+    <div
+      className={`space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 ${
+        compact ? 'p-3' : 'p-4'
+      } ${className}`.trim()}
+    >
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Comparar mercado</h3>
         <p className="mt-0.5 text-xs text-slate-500">
-          Por defecto queda tu precio actual. También puedes elegir el sugerido o un resultado de
-          Walmart, Chedraui o La Comer y ajustarlo por % o $.
+          {compact
+            ? 'Para no poner el precio a ciegas: busca en súper, elige una opción y úsala como precio de tienda.'
+            : 'Por defecto queda tu precio actual. También puedes elegir el sugerido o un resultado de Walmart, Chedraui o La Comer y ajustarlo por % o $.'}
         </p>
       </div>
 
@@ -151,10 +187,14 @@ export function MarketComparePanel({
         </div>
       </div>
 
-      <p className="rounded-xl bg-white px-3 py-2 text-sm">
+      <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
         Costo
         <span className="mt-1 block font-semibold text-slate-900">
-          {cost > 0 ? formatMoney(cost) : 'Sin compras aún'}
+          {cost > 0
+            ? formatMoney(cost)
+            : compact
+              ? 'Aún no hay costo en esta partida'
+              : 'Sin compras aún'}
         </span>
       </p>
 
@@ -231,7 +271,15 @@ export function MarketComparePanel({
       {error && <p className="text-sm text-red-600">{error}</p>}
       {message && <p className="text-sm text-emerald-700">{message}</p>}
 
-      <button type="button" onClick={applyPrice} className="pv-btn-secondary px-4 py-2 text-sm">
+      <button
+        type="button"
+        onClick={applyPrice}
+        className={
+          compact
+            ? 'pv-btn-primary px-4 py-2 text-sm'
+            : 'pv-btn-secondary px-4 py-2 text-sm'
+        }
+      >
         Usar este precio
       </button>
     </div>

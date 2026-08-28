@@ -346,22 +346,43 @@ export async function DELETE(
 
     for (const item of items) {
       const qty = Number(item.quantity);
-      if (!(qty > 0)) continue;
-      const { error: moveError } = await supabase.rpc('record_inventory_movement', {
-        p_branch_product_id: item.branch_product_id,
-        p_movement_type: 'adjustment',
-        p_quantity: -qty,
-        p_notes: `Eliminación de compra ${purchaseId.slice(0, 8)}`,
-        p_expires_at: null,
-        p_unit_cost: null,
-      });
-      if (moveError) {
-        return NextResponse.json({ error: moveError.message }, { status: 400 });
-      }
       const pieces = item.piece_count != null ? Number(item.piece_count) : 0;
-      const pieceErr = await adjustPieceStock(supabase, item.branch_product_id, -pieces);
-      if (pieceErr) {
-        return NextResponse.json({ error: pieceErr }, { status: 400 });
+      const { data: bp, error: stockError } = await supabase
+        .from('branch_products')
+        .select('stock, piece_stock')
+        .eq('id', item.branch_product_id)
+        .maybeSingle();
+      if (stockError && !/piece_stock/i.test(stockError.message)) {
+        return NextResponse.json({ error: stockError.message }, { status: 400 });
+      }
+
+      const available = Math.max(0, Number(bp?.stock ?? 0));
+      const reverseQty = Math.min(qty > 0 ? qty : 0, available);
+      if (reverseQty > 0.0005) {
+        const { error: moveError } = await supabase.rpc('record_inventory_movement', {
+          p_branch_product_id: item.branch_product_id,
+          p_movement_type: 'adjustment',
+          p_quantity: -reverseQty,
+          p_notes: `Eliminación de compra ${purchaseId.slice(0, 8)}`,
+          p_expires_at: null,
+          p_unit_cost: null,
+        });
+        if (moveError) {
+          return NextResponse.json({ error: moveError.message }, { status: 400 });
+        }
+      }
+
+      const availablePieces = Math.max(0, Number(bp?.piece_stock ?? 0));
+      const reversePieces = Math.min(pieces > 0 ? pieces : 0, availablePieces);
+      if (reversePieces > 0.0005) {
+        const pieceErr = await adjustPieceStock(
+          supabase,
+          item.branch_product_id,
+          -reversePieces,
+        );
+        if (pieceErr) {
+          return NextResponse.json({ error: pieceErr }, { status: 400 });
+        }
       }
     }
 

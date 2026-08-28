@@ -1013,6 +1013,40 @@ export function OrdersBoard({
                 />
               </label>
             ) : null}
+            {selected.payment_status !== 'paid' ? (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                <p className="text-sm font-semibold text-amber-950">Registrar pago</p>
+                <p className="mt-0.5 text-xs text-amber-800">
+                  Elige cómo pagó el cliente. El pedido queda como pagado al instante.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={updatingId === selected.id}
+                    onClick={() => markPaid(selected.id, 'cash')}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingId === selected.id}
+                    onClick={() => markPaid(selected.id, 'card_terminal')}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    TPV
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingId === selected.id}
+                    onClick={() => markPaid(selected.id, 'transfer')}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Transferencia
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {detailNotes && detailNotes !== '[mostrador]' && (
               <p className="mt-2 text-sm text-slate-500">Notas: {detailNotes.replace(/^\[mostrador\]\s*/, '')}</p>
             )}
@@ -1487,7 +1521,7 @@ function OrderCard({
               type="button"
               disabled={updatingId === order.id}
               onClick={() => onMarkPaid(order.id, 'cash')}
-              className="pv-btn-ghost px-3 py-1 text-xs"
+              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
             >
               Efectivo
             </button>
@@ -1495,7 +1529,7 @@ function OrderCard({
               type="button"
               disabled={updatingId === order.id}
               onClick={() => onMarkPaid(order.id, 'card_terminal')}
-              className="pv-btn-ghost px-3 py-1 text-xs"
+              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
             >
               TPV
             </button>
@@ -1503,7 +1537,7 @@ function OrderCard({
               type="button"
               disabled={updatingId === order.id}
               onClick={() => onMarkPaid(order.id, 'transfer')}
-              className="pv-btn-ghost px-3 py-1 text-xs"
+              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
             >
               Transferencia
             </button>

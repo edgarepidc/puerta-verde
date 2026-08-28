@@ -16,6 +16,7 @@ import {
 } from '@puertaverde/shared';
 
 import { LowStockBanner } from '@/components/LowStockBanner';
+import { MarketComparePanel } from '@/components/MarketComparePanel';
 import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 
@@ -260,6 +261,7 @@ export function PurchasesManager({
   const [expenses, setExpenses] = useState(initialExpenses);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deletingPurchaseId, setDeletingPurchaseId] = useState<string | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(emptyExpenseDraft);
   const [historialExpenseDraft, setHistorialExpenseDraft] =
     useState<ExpenseDraft>(emptyExpenseDraft);
@@ -912,6 +914,7 @@ export function PurchasesManager({
       return;
     }
     setSaving(true);
+    setDeletingPurchaseId(purchase.id);
     setError(null);
     try {
       const response = await fetch(`/api/purchases/${purchase.id}`, { method: 'DELETE' });
@@ -923,6 +926,7 @@ export function PurchasesManager({
       setError(err instanceof Error ? err.message : 'Error al eliminar compra');
     } finally {
       setSaving(false);
+      setDeletingPurchaseId(null);
     }
   }
 
@@ -1186,51 +1190,66 @@ export function PurchasesManager({
                 </div>
 
                 {line.newProduct && (
-                  <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 md:grid-cols-[1fr_1fr_auto]">
-                    <label className="block text-sm">
-                      <span className="font-medium text-slate-700">Unidad de venta</span>
-                      <select
-                        className="pv-input mt-1"
-                        value={line.newProduct.unit}
-                        onChange={(e) =>
-                          updateNewProduct(index, { unit: e.target.value as ProductUnit })
-                        }
-                      >
-                        {PRODUCT_UNITS.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {PRODUCT_UNIT_LABELS[unit]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-sm">
-                      <span className="font-medium text-slate-700">Precio de venta (tienda)</span>
-                      <DecimalInput
-                        placeholder="0"
-                        className="pv-input mt-1"
-                        value={line.newProduct.salePrice}
-                        onChange={(value) => updateNewProduct(index, { salePrice: value })}
-                      />
-                    </label>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
-                        onClick={() =>
-                          setLines((prev) =>
-                            prev.map((row, i) =>
-                              i === index ? { ...row, newProduct: null } : row,
-                            ),
-                          )
-                        }
-                      >
-                        Cancelar alta
-                      </button>
+                  <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Unidad de venta</span>
+                        <select
+                          className="pv-input mt-1"
+                          value={line.newProduct.unit}
+                          onChange={(e) =>
+                            updateNewProduct(index, { unit: e.target.value as ProductUnit })
+                          }
+                        >
+                          {PRODUCT_UNITS.map((unit) => (
+                            <option key={unit} value={unit}>
+                              {PRODUCT_UNIT_LABELS[unit]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm">
+                        <span className="font-medium text-slate-700">Precio de venta (tienda)</span>
+                        <DecimalInput
+                          placeholder="0"
+                          className="pv-input mt-1"
+                          value={line.newProduct.salePrice}
+                          onChange={(value) => updateNewProduct(index, { salePrice: value })}
+                        />
+                      </label>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
+                          onClick={() =>
+                            setLines((prev) =>
+                              prev.map((row, i) =>
+                                i === index ? { ...row, newProduct: null } : row,
+                              ),
+                            )
+                          }
+                        >
+                          Cancelar alta
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-emerald-900/80 md:col-span-3">
+                    <p className="text-xs text-emerald-900/80">
                       Producto nuevo: se crea al registrar la compra, sin stock previo. El costo
                       entra con esta partida.
                     </p>
+                    <MarketComparePanel
+                      productName={line.newProduct.name}
+                      unit={line.newProduct.unit}
+                      currentPrice={parseDecimal(line.newProduct.salePrice)}
+                      cost={parseDecimal(line.unitPrice)}
+                      compact
+                      autoSearch
+                      currentPriceLabel="Precio de tienda"
+                      className="border-emerald-200 bg-white"
+                      onPriceChange={(price) =>
+                        updateNewProduct(index, { salePrice: String(price) })
+                      }
+                    />
                   </div>
                 )}
               </div>
@@ -1819,7 +1838,7 @@ export function PurchasesManager({
                                       className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60"
                                       onClick={() => void deletePurchase(purchase)}
                                     >
-                                      Eliminar
+                                      {deletingPurchaseId === purchase.id ? 'Eliminando…' : 'Eliminar'}
                                     </button>
                                   </div>
                                 </div>
