@@ -316,6 +316,10 @@ async function writeSerial(port: SerialPortLike, data: Uint8Array) {
   }
 }
 
+function toBufferSource(chunk: Uint8Array): ArrayBuffer {
+  return chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
+}
+
 function isGattDisconnectError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /GATT Server is disconnected|Cannot perform GATT operations|GATT operation already in progress|not connected|NetworkError/i.test(
@@ -324,17 +328,18 @@ function isGattDisconnectError(error: unknown) {
 }
 
 async function writeBleChunk(characteristic: BleCharacteristic, chunk: Uint8Array) {
+  const payload = toBufferSource(chunk);
   const canWriteWithoutResponse =
     characteristic.properties.writeWithoutResponse && characteristic.writeValueWithoutResponse;
   try {
     const write = canWriteWithoutResponse
-      ? characteristic.writeValueWithoutResponse!(chunk)
-      : characteristic.writeValue(chunk);
+      ? characteristic.writeValueWithoutResponse!(payload)
+      : characteristic.writeValue(payload);
     await withTimeout(write, WRITE_TIMEOUT_MS, 'Bluetooth no responde. Acerca la impresora y vuelve a conectar.');
   } catch (error) {
     if (!canWriteWithoutResponse || !isGattDisconnectError(error)) throw error;
     await withTimeout(
-      characteristic.writeValue(chunk),
+      characteristic.writeValue(payload),
       WRITE_TIMEOUT_MS,
       'Bluetooth no responde. Acerca la impresora y vuelve a conectar.',
     );
