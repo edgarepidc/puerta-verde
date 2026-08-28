@@ -316,25 +316,87 @@ async function writeSerial(port: SerialPortLike, data: Uint8Array) {
   }
 }
 
-async function writeBle(characteristic: BleCharacteristic, data: Uint8Array) {
-  for (let offset = 0; offset < data.length; offset += BLE_CHUNK) {
-    const chunk = data.slice(offset, offset + BLE_CHUNK);
-    const write = characteristic.properties.writeWithoutResponse && characteristic.writeValueWithoutResponse
-      ? characteristic.writeValueWithoutResponse(chunk)
+function isGattDisconnectError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /GATT Server is disconnected|Cannot perform GATT operations|GATT operation already in progress|not connected|NetworkError/i.test(
+    message,
+  );
+}
+
+async function writeBleChunk(characteristic: BleCharacteristic, chunk: Uint8Array) {
+  const canWriteWithoutResponse =
+    characteristic.properties.writeWithoutResponse && characteristic.writeValueWithoutResponse;
+  try {
+    const write = canWriteWithoutResponse
+      ? characteristic.writeValueWithoutResponse!(chunk)
       : characteristic.writeValue(chunk);
     await withTimeout(write, WRITE_TIMEOUT_MS, 'Bluetooth no responde. Acerca la impresora y vuelve a conectar.');
-    await delay(20);
+  } catch (error) {
+    if (!canWriteWithoutResponse || !isGattDisconnectError(error)) throw error;
+    await withTimeout(
+      characteristic.writeValue(chunk),
+      WRITE_TIMEOUT_MS,
+      'Bluetooth no responde. Acerca la impresora y vuelve a conectar.',
+    );
   }
 }
 
+async function writeBle(characteristic: BleCharacteristic, data: Uint8Array) {
+  for (let offset = 0; offset < data.length; offset += BLE_CHUNK) {
+    const chunk = data.slice(offset, offset + BLE_CHUNK);
+    await writeBleChunk(characteristic, chunk);
+    await delay(30);
+  }
+}
+
+async function reconnectBle(device: BleDevice) {
+  try {
+    if (device.gatt?.connected) device.gatt.disconnect();
+  } catch {
+    // already down
+  }
+  handle = null;
+  await delay(400);
+  await openBle(device);
+}
+
+async function writeBleReliable(data: Uint8Array) {
+  const device = handle?.kind === 'ble' ? handle.device : null;
+  if (!device) {
+    throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
+  }
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (handle?.kind !== 'ble' || handle.device !== device || !device.gatt?.connected) {
+        await reconnectBle(device);
+      }
+      if (handle?.kind !== 'ble' || handle.device !== device) {
+        throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
+      }
+      await writeBle(handle.characteristic, data);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isGattDisconnectError(error) && attempt > 0) throw error;
+      await reconnectBle(device);
+    }
+  }
+  throw lastError instanceof Error && isGattDisconnectError(lastError)
+    ? new Error('Se perdió el Bluetooth. Pulsa Conectar Bluetooth y vuelve a imprimir.')
+    : lastError instanceof Error
+      ? lastError
+      : new Error('Se perdió el Bluetooth. Pulsa Conectar Bluetooth y vuelve a imprimir.');
+}
+
 async function writeBytes(data: Uint8Array) {
+  if (handle?.kind === 'ble') {
+    await writeBleReliable(data);
+    return;
+  }
   if (!handle || !isHandleLive()) {
     handle = null;
     throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
-  }
-  if (handle.kind === 'ble') {
-    await writeBle(handle.characteristic, data);
-    return;
   }
   if (handle.kind === 'serial') {
     await writeSerial(handle.port, data);
@@ -360,7 +422,22 @@ async function openBle(device: BleDevice) {
   if (!device.gatt) {
     throw new Error('Este dispositivo Bluetooth no se puede usar para imprimir desde Chrome.');
   }
-  const server = await device.gatt.connect();
+  // Chrome can keep gatt.connected=true after the printer dropped GATT.
+  // Disconnect first so we always get a fresh characteristic.
+  if (device.gatt.connected) {
+    try {
+      device.gatt.disconnect();
+    } catch {
+      // already down
+    }
+    await delay(400);
+  }
+  const server = await withTimeout(
+    device.gatt.connect(),
+    WRITE_TIMEOUT_MS,
+    'Bluetooth no responde al conectar. Acerca la impresora y vuelve a intentar.',
+  );
+  await delay(250);
   let characteristic: BleCharacteristic | null = null;
 
   for (const uuid of BLE_SERVICES) {

@@ -604,7 +604,7 @@ export function CounterSalePanel({
       });
       if (printTicket) {
         try {
-          await printThermalReceipt(ticket);
+          await printThermalReceipt(ticket, { connectIfNeeded: true });
         } catch (err) {
           setPrintError(
             err instanceof Error
