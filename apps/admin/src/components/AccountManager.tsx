@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export function AccountManager({
   initialEmail,
@@ -101,9 +102,9 @@ export function AccountManager({
         </label>
         <label className="block text-sm md:col-span-2">
           <span className="font-medium text-slate-700">Contraseña actual</span>
-          <input
-            type="password"
-            className="pv-input mt-1"
+          <PasswordInput
+            className="pv-input"
+            wrapperClassName="mt-1"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             autoComplete="current-password"
@@ -114,9 +115,9 @@ export function AccountManager({
         </label>
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Contraseña nueva</span>
-          <input
-            type="password"
-            className="pv-input mt-1"
+          <PasswordInput
+            className="pv-input"
+            wrapperClassName="mt-1"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
@@ -125,9 +126,9 @@ export function AccountManager({
         </label>
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Confirmar contraseña</span>
-          <input
-            type="password"
-            className="pv-input mt-1"
+          <PasswordInput
+            className="pv-input"
+            wrapperClassName="mt-1"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
