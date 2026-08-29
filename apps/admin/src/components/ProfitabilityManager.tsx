@@ -14,6 +14,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, ChevronDownIcon, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import {
   currentMexicoMonthRange,
@@ -108,6 +109,25 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   custom: 'Personalizado',
 };
 
+const PRESET_EMOJI: Record<PeriodPreset, string> = {
+  current: '📅',
+  previous: '📆',
+  custom: '✏️',
+};
+
+function formatShortRange(from: string, to: string): string {
+  const start = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
+  const month = (date: Date) =>
+    date.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '').toLowerCase();
+  const yy = (date: Date) => String(date.getFullYear()).slice(-2);
+  if (from === to) return `${start.getDate()} ${month(start)} ${yy(start)}`;
+  if (from.slice(0, 7) === to.slice(0, 7)) {
+    return `${start.getDate()}–${end.getDate()} ${month(start)} ${yy(start)}`;
+  }
+  return `${start.getDate()} ${month(start)} – ${end.getDate()} ${month(end)} ${yy(end)}`;
+}
+
 function MetricCard({
   emoji,
   tone,
@@ -184,6 +204,9 @@ export function ProfitabilityManager({
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllMargins, setShowAllMargins] = useState(false);
+  const [openUtilidad, setOpenUtilidad] = useState(true);
+  const [openMargenes, setOpenMargenes] = useState(false);
+  const [openGastos, setOpenGastos] = useState(false);
 
   const today = todayMexicoYmd();
 
@@ -221,16 +244,16 @@ export function ProfitabilityManager({
     const configuredVariable = Math.max(variableTotal - visit, 0);
     const total = cogs + fixed + configuredVariable + visit;
     const segments = [
-      { key: 'cogs', label: 'Lo vendido', emoji: '🥕', amount: cogs, color: 'bg-amber-400' },
-      { key: 'fixed', label: 'Fijos', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
+      { key: 'cogs', label: 'Mercancía vendida', emoji: '🥕', amount: cogs, color: 'bg-amber-400' },
+      { key: 'fixed', label: 'Gastos fijos', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
       {
         key: 'variable',
-        label: 'Variables config.',
+        label: 'Otros gastos',
         emoji: '🛍️',
         amount: configuredVariable,
         color: 'bg-orange-400',
       },
-      { key: 'visit', label: 'Gastos visita', emoji: '🛻', amount: visit, color: 'bg-sky-400' },
+      { key: 'visit', label: 'Gastos de visita', emoji: '🛻', amount: visit, color: 'bg-sky-400' },
     ].filter((s) => s.amount > 0);
     return {
       total,
@@ -341,51 +364,84 @@ export function ProfitabilityManager({
   const exportQuery = qs(from, to);
 
   return (
-    <div className="space-y-8">
-      <section className="pv-glass-card space-y-3 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => applyPreset(key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  preset === key
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {PRESET_LABELS[key]}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              disabled={loadingPeriod}
-              onClick={() => loadPeriod(from, to)}
-              className="rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-700 disabled:opacity-50"
-            >
-              {loadingPeriod ? 'Cargando…' : 'Actualizar'}
-            </button>
-            <a
-              href={`/api/export/profit?${exportQuery}`}
-              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
-            >
-              Excel
-            </a>
-            <a
-              href={`/api/export/profit/pdf?${exportQuery}`}
-              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
-            >
-              PDF
-            </a>
-          </div>
-        </div>
-        <p className="text-sm text-slate-600">{activePeriodLabel}</p>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <MetricCard
+          emoji="📅"
+          tone="blue"
+          label="Periodo"
+          value={formatShortRange(from, to)}
+          hint={PRESET_LABELS[preset]}
+        />
+        <MetricCard
+          emoji="🧺"
+          tone="green"
+          label="Vendiste"
+          value={formatMoney(Number(summary?.revenue ?? 0))}
+          hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'}`}
+        />
+        <MetricCard
+          emoji="🧾"
+          tone="amber"
+          label="Te costó"
+          value={formatMoney(
+            Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
+          )}
+          hint="Mercancía vendida + gastos"
+        />
+        <MetricCard
+          emoji={netPositive ? '💚' : '⚠️'}
+          tone={netPositive ? 'profit' : 'loss'}
+          label="Te quedó"
+          value={formatMoney(net)}
+          hint={netPositive ? 'Después de mercancía y gastos' : 'Este periodo quedó abajo'}
+        />
+      </div>
 
-        {preset === 'custom' && (
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openUtilidad}
+        onToggle={(event) => setOpenUtilidad(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Utilidad"
+          hint={`Por categoría · ${activePeriodLabel}`}
+          emoji="📊"
+          iconClass="bg-violet-100"
+          actions={
+            <>
+              <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+                {loadingPeriod ? 'Cargando…' : 'Actualizar'}
+              </ActionChip>
+              <a href={`/api/export/profit?${exportQuery}`}>
+                <ActionChip as="span" emoji="📗">
+                  Excel
+                </ActionChip>
+              </a>
+              <a href={`/api/export/profit/pdf?${exportQuery}`}>
+                <ActionChip as="span" emoji="📄">
+                  PDF
+                </ActionChip>
+              </a>
+            </>
+          }
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
+            <ActionChip
+              key={key}
+              emoji={PRESET_EMOJI[key]}
+              tone={preset === key ? 'emerald' : 'slate'}
+              elevated={preset === key}
+              onClick={() => applyPreset(key)}
+            >
+              {PRESET_LABELS[key]}
+            </ActionChip>
+          ))}
+        </div>
+
+        {preset === 'custom' ? (
           <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
             <label className="text-xs font-medium text-slate-600">
               Desde
@@ -407,95 +463,16 @@ export function ProfitabilityManager({
                 onChange={(e) => setTo(e.target.value)}
               />
             </label>
-            <button
-              type="button"
-              disabled={loadingPeriod}
-              onClick={() => loadPeriod(from, to)}
-              className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-            >
+            <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
               Aplicar rango
-            </button>
+            </ActionChip>
           </div>
-        )}
-      </section>
-
-      {summary && (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            emoji="🧺"
-            tone="green"
-            label="Ventas del periodo"
-            value={formatMoney(Number(summary.revenue))}
-            hint="Lo que entró a caja"
-          />
-          <MetricCard
-            emoji="🥕"
-            tone="amber"
-            label="COGS"
-            value={formatMoney(Number(summary.cogs))}
-            hint="Costo de lo vendido"
-          />
-          <MetricCard
-            emoji="🌿"
-            tone="leaf"
-            label="Utilidad bruta"
-            value={formatMoney(Number(summary.gross_profit))}
-            hint="Ventas − COGS"
-          />
-          <MetricCard
-            emoji="📊"
-            tone="blue"
-            label="Margen bruto"
-            value={`${Number(summary.gross_margin_percent).toFixed(1)}%`}
-            hint="Salud del margen"
-          />
-          <MetricCard
-            emoji="🏠"
-            tone="slate"
-            label="Costos fijos"
-            value={formatMoney(Number(summary.fixed_costs))}
-            hint={
-              preset === 'custom'
-                ? 'Prorrateados si el rango no es mes desde el día 1'
-                : 'Monto completo del mes'
-            }
-          />
-          <MetricCard
-            emoji="🛍️"
-            tone="orange"
-            label="Costos variables"
-            value={formatMoney(Number(summary.variable_costs))}
-            hint="Gastos de las compras"
-          />
-          <MetricCard
-            emoji="🧾"
-            tone="indigo"
-            label="Pedidos"
-            value={String(summary.order_count)}
-            hint="Tickets no cancelados"
-          />
-          <MetricCard
-            emoji={netPositive ? '💚' : '⚠️'}
-            tone={netPositive ? 'profit' : 'loss'}
-            label="Utilidad estimada"
-            value={formatMoney(net)}
-            hint="Tras costos operativos"
-          />
-        </section>
-      )}
-
-      <section className="pv-glass-card">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Utilidad por categoría</h2>
-          <p className="text-sm text-slate-500">
-            Barras por utilidad bruta · {activePeriodLabel}
-          </p>
-        </div>
+        ) : null}
 
         {categories.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-slate-500">Sin ventas en el periodo.</p>
+          <p className="py-6 text-center text-sm text-slate-500">Sin ventas en el periodo.</p>
         ) : (
-          <div className="space-y-4 px-5 py-5">
+          <div className="space-y-4">
             {categories.map((row) => {
               const profit = Number(row.gross_profit);
               const width = Math.max((Math.abs(profit) / categoryMaxProfit) * 100, 4);
@@ -528,12 +505,16 @@ export function ProfitabilityManager({
           </div>
         )}
 
-        {categories.length > 0 && (
-          <details className="border-t border-slate-100">
-            <summary className="cursor-pointer px-5 py-3 text-xs font-medium text-slate-500 hover:text-slate-700">
-              Ver tabla detallada
+        {categories.length > 0 ? (
+          <details className="group rounded-xl border border-slate-100">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+              <p className="text-sm font-medium text-slate-800">Tabla detallada</p>
+              <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
+                <span className="group-open:hidden">Desplegar</span>
+                <span className="hidden group-open:inline">Cerrar</span>
+              </ActionChip>
             </summary>
-            <div className="overflow-x-auto pb-3">
+            <div className="overflow-x-auto border-t border-slate-100 pb-3">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
                   <tr>
@@ -541,7 +522,7 @@ export function ProfitabilityManager({
                     <th className="px-4 py-2">Productos</th>
                     <th className="px-4 py-2">Unidades</th>
                     <th className="px-4 py-2">Ingresos</th>
-                    <th className="px-4 py-2">COGS</th>
+                    <th className="px-4 py-2">Costo</th>
                     <th className="px-4 py-2">Utilidad bruta</th>
                     <th className="px-4 py-2">Margen %</th>
                   </tr>
@@ -562,22 +543,25 @@ export function ProfitabilityManager({
               </table>
             </div>
           </details>
-        )}
-      </section>
+        ) : null}
+      </details>
 
-      <section className="pv-glass-card">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Márgenes por producto</h2>
-          <p className="text-sm text-slate-500">
-            Inventario a costo {formatMoney(totals.inventoryCost)} · a venta {formatMoney(totals.inventorySale)} ·
-            margen promedio {totals.avgMargin.toFixed(1)}%
-          </p>
-        </div>
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openMargenes}
+        onToggle={(event) => setOpenMargenes(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Márgenes por producto"
+          hint={`Inventario a costo ${formatMoney(totals.inventoryCost)} · a venta ${formatMoney(totals.inventorySale)} · promedio ${totals.avgMargin.toFixed(1)}%`}
+          emoji="🥬"
+          iconClass="bg-emerald-100"
+        />
 
         {sortedMargins.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-slate-500">Sin productos con margen.</p>
+          <p className="py-6 text-center text-sm text-slate-500">Sin productos con margen.</p>
         ) : (
-          <div className="px-5 py-5">
+          <div>
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleMargins.map((row) => {
                 const pct = Number(row.margin_percent);
@@ -613,27 +597,33 @@ export function ProfitabilityManager({
                 );
               })}
             </div>
-            {sortedMargins.length > 12 && (
-              <button
-                type="button"
+            {sortedMargins.length > 12 ? (
+              <ActionChip
+                className="mt-4"
+                emoji="📋"
                 onClick={() => setShowAllMargins((v) => !v)}
-                className="mt-4 text-xs font-semibold text-emerald-800 hover:underline"
               >
                 {showAllMargins ? 'Ver menos' : `Ver todos (${sortedMargins.length})`}
-              </button>
-            )}
+              </ActionChip>
+            ) : null}
           </div>
         )}
-      </section>
+      </details>
 
-      <section className="pv-glass-card p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-900">Costos del periodo</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Costo de lo vendido, fijos y gastos de visita. Lo comprado y no vendido sigue en inventario.
-        </p>
+      <details
+        className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+        open={openGastos}
+        onToggle={(event) => setOpenGastos(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Gastos del mes"
+          hint="Mercancía vendida, renta y gastos de visita. Lo comprado y no vendido sigue en inventario."
+          emoji="🧾"
+          iconClass="bg-amber-100"
+        />
 
-        {summary && costBreakdown.total > 0 && (
-          <div className="mt-5 space-y-4">
+        {summary && costBreakdown.total > 0 ? (
+          <div className="space-y-4">
             <div className="flex h-7 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-100">
               {costBreakdown.segments.map((seg) => (
                 <div
@@ -655,7 +645,7 @@ export function ProfitabilityManager({
               {(['cogs', 'fixed', 'visit'] as const).map((key) => {
                 const seg = costBreakdown.segments.find((s) => s.key === key) ?? {
                   key,
-                  label: key === 'cogs' ? 'Lo vendido' : key === 'fixed' ? 'Fijos' : 'Gastos visita',
+                  label: key === 'cogs' ? 'Mercancía vendida' : key === 'fixed' ? 'Gastos fijos' : 'Gastos de visita',
                   emoji: key === 'cogs' ? '🥕' : key === 'fixed' ? '🏠' : '🛻',
                   amount: 0,
                   color: key === 'cogs' ? 'bg-amber-400' : key === 'fixed' ? 'bg-slate-400' : 'bg-sky-400',
@@ -681,26 +671,27 @@ export function ProfitabilityManager({
             {costBreakdown.segments.some((s) => s.key === 'variable') && (
               <p className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className="inline-block h-2 w-2 rounded-full bg-orange-400" aria-hidden />
-                + Variables configurados{' '}
+                + Otros gastos{' '}
                 {formatMoney(costBreakdown.segments.find((s) => s.key === 'variable')!.amount)} (
                 {costBreakdown.segments.find((s) => s.key === 'variable')!.percent.toFixed(0)}%)
               </p>
             )}
           </div>
-        )}
+        ) : null}
 
-        <details className="mt-5 rounded-xl border border-slate-100">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden">
-            <span className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                Gastos de visita
-                <span className="ml-2 text-xs font-normal text-slate-500">
-                  {visitExpenses.length} registro{visitExpenses.length === 1 ? '' : 's'} ·{' '}
-                  {formatMoney(Number(summary?.visit_expenses ?? 0))}
-                </span>
+        <details className="group rounded-xl border border-slate-100">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <p className="text-sm font-medium text-slate-800">
+              Gastos de visita
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                {visitExpenses.length} registro{visitExpenses.length === 1 ? '' : 's'} ·{' '}
+                {formatMoney(Number(summary?.visit_expenses ?? 0))}
               </span>
-              <span className="text-xs font-semibold text-emerald-800">Ver detalle</span>
-            </span>
+            </p>
+            <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
+              <span className="group-open:hidden">Desplegar</span>
+              <span className="hidden group-open:inline">Cerrar</span>
+            </ActionChip>
           </summary>
           {visitExpenses.length === 0 ? (
             <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">
@@ -727,11 +718,11 @@ export function ProfitabilityManager({
           )}
         </details>
 
-        <div className="mt-6 border-t border-slate-100 pt-5">
-          <h3 className="text-sm font-semibold text-slate-800">Costos fijos y variables configurados</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">Renta, nómina y otros</h3>
           <p className="mt-0.5 text-xs text-slate-500">
-            Renta, nómina, etc. Los fijos mensuales van al 100% en mes en curso / mes anterior; en rango
-            personalizado se prorratean.
+            Gastos fijos del local. En el mes en curso o el anterior se cuenta el monto completo; en un
+            rango a modo se prorratea.
           </p>
 
           <ul className="mt-3 divide-y divide-slate-100">
@@ -749,66 +740,75 @@ export function ProfitabilityManager({
                     {!row.is_active && ' · inactivo'}
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => toggleCost(row)} className="rounded-lg border px-3 py-1">
+                <div className="flex flex-wrap gap-2">
+                  <ActionChip
+                    elevated={false}
+                    emoji={row.is_active ? '⏸️' : '▶️'}
+                    onClick={() => void toggleCost(row)}
+                  >
                     {row.is_active ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button type="button" onClick={() => removeCost(row.id)} className="rounded-lg border px-3 py-1">
+                  </ActionChip>
+                  <ActionChip
+                    elevated={false}
+                    tone="rose"
+                    emoji="🗑️"
+                    onClick={() => void removeCost(row.id)}
+                  >
                     Eliminar
-                  </button>
+                  </ActionChip>
                 </div>
               </li>
             ))}
           </ul>
 
-          <div className="mt-6 grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-2">
-            <input
-              placeholder="Nombre (ej. Renta local)"
-              className="pv-input"
-              value={costForm.name}
-              onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
-            />
-            <DecimalInput
-              placeholder="Monto"
-              className="pv-input"
-              value={costAmountText}
-              onChange={setCostAmountText}
-            />
-            <select
-              className="pv-input"
-              value={costForm.costType}
-              onChange={(e) => setCostForm((f) => ({ ...f, costType: e.target.value as OperatingCostType }))}
-            >
-              {OPERATING_COST_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {OPERATING_COST_TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
-            <select
-              className="pv-input"
-              value={costForm.period}
-              onChange={(e) => setCostForm((f) => ({ ...f, period: e.target.value as OperatingCostPeriod }))}
-            >
-              {OPERATING_COST_PERIODS.map((p) => (
-                <option key={p} value={p}>
-                  {OPERATING_COST_PERIOD_LABELS[p]}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={addCost}
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white md:col-span-2"
-            >
-              Agregar costo
-            </button>
+          <div className="mt-6 min-w-0 rounded-xl bg-slate-50 p-4">
+            <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.55fr)_7.5rem_8.5rem_auto]">
+              <input
+                placeholder="Nombre"
+                className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                value={costForm.name}
+                onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
+              />
+              <DecimalInput
+                placeholder="Monto"
+                className="pv-input min-w-0"
+                groupThousands
+                value={costAmountText}
+                onChange={setCostAmountText}
+              />
+              <select
+                className="pv-input min-w-0"
+                value={costForm.costType}
+                onChange={(e) => setCostForm((f) => ({ ...f, costType: e.target.value as OperatingCostType }))}
+              >
+                {OPERATING_COST_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {OPERATING_COST_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="pv-input min-w-0"
+                value={costForm.period}
+                onChange={(e) => setCostForm((f) => ({ ...f, period: e.target.value as OperatingCostPeriod }))}
+              >
+                {OPERATING_COST_PERIODS.map((p) => (
+                  <option key={p} value={p}>
+                    {OPERATING_COST_PERIOD_LABELS[p]}
+                  </option>
+                ))}
+              </select>
+              <div className="col-span-2 flex justify-end lg:col-span-1">
+                <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
+                  Agregar costo
+                </ActionChip>
+              </div>
+            </div>
           </div>
         </div>
-      </section>
+      </details>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );
 }

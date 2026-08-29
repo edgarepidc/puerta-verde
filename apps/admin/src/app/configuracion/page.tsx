@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
+import { AccountManager } from '@/components/AccountManager';
 import { AdminShell } from '@/components/AdminShell';
 import { BillingManager } from '@/components/BillingManager';
 import { ConfiguracionTabs } from '@/components/ConfiguracionTabs';
@@ -17,6 +18,7 @@ import {
   staffHasPermission,
 } from '@/lib/auth';
 import { parseBranchSettingsFlags } from '@/lib/branch-settings';
+import { emailsByUserId } from '@/lib/staff-emails';
 import { getDefaultTenant } from '@/lib/tenant';
 import { normalizeStaffRole, type StaffRole } from '@puertaverde/shared';
 
@@ -29,12 +31,13 @@ export default async function ConfiguracionPage({
 }) {
   const params = await searchParams;
   if (params.tab === 'cupones') redirect('/promociones?section=cupones');
-  if (params.tab === 'stock') redirect('/?section=stock');
+  if (params.tab === 'stock') redirect('/numeros');
 
   const staff = await getStaffSession();
+  if (!staff) redirect('/login');
   const tenant = await getDefaultTenant();
   const supabase = createAdminClient();
-  const isPlatformAdmin = Boolean(staff?.isPlatformAdmin);
+  const isPlatformAdmin = staff.isPlatformAdmin;
   const permissionMatrix = await loadPermissionMatrix(tenant.organizationId);
   const canManageUsers = staff
     ? staffHasPermission(staff, 'staff.manage', permissionMatrix)
@@ -92,6 +95,7 @@ export default async function ConfiguracionPage({
     : { data: [] };
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const emails = await emailsByUserId(userIds);
   const staffRows = (memberships ?? []).flatMap((row) => {
     const role = normalizeStaffRole(row.role);
     if (!role) return [];
@@ -102,6 +106,7 @@ export default async function ConfiguracionPage({
         role: role as StaffRole,
         full_name: profile?.full_name ?? null,
         phone: profile?.phone ?? null,
+        email: emails.get(row.user_id) ?? null,
       },
     ];
   });
@@ -116,15 +121,18 @@ export default async function ConfiguracionPage({
     : [];
 
   return (
-    <AdminShell title="Configuración" subtitle={tenant.branchName}>
+    <AdminShell title="Ajustes" subtitle={tenant.branchName}>
       <Suspense fallback={<p className="text-sm text-slate-500">Cargando configuración…</p>}>
         <ConfiguracionTabs
           isPlatformAdmin={isPlatformAdmin}
           suscripcion={
-            <BillingManager
-              organization={organization!}
-              canManage={canManageUsers}
-            />
+            <div className="space-y-6">
+              <AccountManager initialEmail={staff.email} initialFullName={staff.fullName} />
+              <BillingManager
+                organization={organization!}
+                canManage={canManageUsers}
+              />
+            </div>
           }
           sucursal={
             <SettingsManager
@@ -135,36 +143,34 @@ export default async function ConfiguracionPage({
               }}
               initialStaff={staffRows}
               canManage={canEditBranch}
-              currentUserId={staff?.userId ?? ''}
+              currentUserId={staff.userId}
             />
           }
           equipo={
-            <div className="space-y-8">
+            <div className="space-y-6">
               <SettingsManager
                 section="staff"
                 initialBranch={branch!}
                 initialStaff={staffRows}
                 canManage={canManageUsers}
-                currentUserId={staff?.userId ?? ''}
+                currentUserId={staff.userId}
+              />
+              <WhatsAppInbox
+                initialMessages={(whatsappMessages ?? []) as Array<{
+                  id: string;
+                  direction: 'inbound' | 'outbound';
+                  recipient_phone: string;
+                  template_key: string | null;
+                  body: string;
+                  status: string;
+                  created_at: string;
+                }>}
               />
               <PermissionsManager
                 initialMatrix={permissionMatrix}
                 canEdit={canEditPerms}
               />
             </div>
-          }
-          whatsapp={
-            <WhatsAppInbox
-              initialMessages={(whatsappMessages ?? []) as Array<{
-                id: string;
-                direction: 'inbound' | 'outbound';
-                recipient_phone: string;
-                template_key: string | null;
-                body: string;
-                status: string;
-                created_at: string;
-              }>}
-            />
           }
           plataforma={
             isPlatformAdmin ? (

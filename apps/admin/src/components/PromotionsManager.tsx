@@ -9,6 +9,7 @@ import {
   type PromotionKind,
 } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseOptionalDecimal } from '@/components/DecimalInput';
 import { uploadProductMedia } from '@/lib/upload-image';
 
@@ -71,6 +72,7 @@ export function PromotionsManager({
   const [saving, setSaving] = useState(false);
   const [broadcastingId, setBroadcastingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openPromos, setOpenPromos] = useState(true);
 
   const activeCount = useMemo(
     () => promotions.filter((p) => p.is_active).length,
@@ -218,31 +220,35 @@ export function PromotionsManager({
   }
 
   return (
-    <div className="space-y-6">
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={openPromos}
+      onToggle={(event) => setOpenPromos(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Cartel en la vitrina"
+        hint={`${promotions.length} promociones · ${activeCount} activas en la tienda`}
+        emoji="🏷️"
+        iconClass="bg-emerald-100"
+        actions={
+          canManage ? (
+            <ActionChip tone="emerald" emoji="🏷️" onClick={openCreate}>
+              Nueva promoción
+            </ActionChip>
+          ) : undefined
+        }
+      />
       {!canManage ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Solo lectura · no tienes permiso para gestionar promociones.
         </p>
       ) : null}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-2xl font-bold text-slate-900">{promotions.length} promociones</p>
-          <p className="text-sm text-slate-500">{activeCount} activas en la tienda pública</p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="pv-btn-primary px-5 py-2 text-sm"
-        >
-          + Nueva promoción
-        </button>
-      </div>
 
       {showForm && (
         <section className="pv-glass-card p-6">
           <h2 className="text-lg font-semibold">{editingId ? 'Editar promoción' : 'Nueva promoción'}</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="block text-sm md:col-span-2">
+          <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-4">
+            <label className="block text-sm md:col-span-4">
               <span className="font-medium text-slate-700">Título</span>
               <input
                 className="pv-input mt-1"
@@ -250,7 +256,7 @@ export function PromotionsManager({
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               />
             </label>
-            <label className="block text-sm md:col-span-2">
+            <label className="block text-sm md:col-span-4">
               <span className="font-medium text-slate-700">Mensaje</span>
               <textarea
                 rows={3}
@@ -262,7 +268,7 @@ export function PromotionsManager({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Tipo</span>
               <select
-                className="pv-input mt-1"
+                className="pv-input mt-1 py-1.5 text-sm"
                 value={form.kind}
                 onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as PromotionKind }))}
               >
@@ -273,8 +279,8 @@ export function PromotionsManager({
                 ))}
               </select>
             </label>
-            {form.kind === 'discount' && (
-              <label className="block text-sm md:col-span-2">
+            {form.kind === 'discount' ? (
+              <label className="block text-sm">
                 <span className="font-medium text-slate-700">Descuento (%)</span>
                 <DecimalInput
                   placeholder="10"
@@ -283,13 +289,13 @@ export function PromotionsManager({
                   onChange={setDiscountText}
                 />
               </label>
-            )}
-            {form.kind === 'discount' && (
+            ) : null}
+            {form.kind === 'discount' ? (
               <>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Producto (opcional)</span>
+                  <span className="font-medium text-slate-700">Producto</span>
                   <select
-                    className="pv-input mt-1"
+                    className="pv-input mt-1 py-1.5 text-sm"
                     value={form.productId ?? ''}
                     onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value, categoryId: '' }))}
                   >
@@ -302,9 +308,9 @@ export function PromotionsManager({
                   </select>
                 </label>
                 <label className="block text-sm">
-                  <span className="font-medium text-slate-700">Categoría (opcional)</span>
+                  <span className="font-medium text-slate-700">Categoría</span>
                   <select
-                    className="pv-input mt-1"
+                    className="pv-input mt-1 py-1.5 text-sm"
                     value={form.categoryId ?? ''}
                     onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value, productId: '' }))}
                   >
@@ -317,8 +323,8 @@ export function PromotionsManager({
                   </select>
                 </label>
               </>
-            )}
-            <label className="block text-sm md:col-span-2">
+            ) : null}
+            <label className="block text-sm md:col-span-4">
               <span className="font-medium text-slate-700">Imagen</span>
               <input
                 className="pv-input mt-1"
@@ -343,7 +349,7 @@ export function PromotionsManager({
                 }}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Inicio (opcional)</span>
               <input
                 type="datetime-local"
@@ -352,7 +358,7 @@ export function PromotionsManager({
                 onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
               />
             </label>
-            <label className="block text-sm">
+            <label className="block text-sm md:col-span-2">
               <span className="font-medium text-slate-700">Fin (opcional)</span>
               <input
                 type="datetime-local"
@@ -361,7 +367,7 @@ export function PromotionsManager({
                 onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
               />
             </label>
-            <label className="flex items-center gap-2 text-sm md:col-span-2">
+            <label className="flex items-center gap-2 text-sm md:col-span-4">
               <input
                 type="checkbox"
                 checked={form.isActive}
@@ -370,19 +376,14 @@ export function PromotionsManager({
               Activa en la tienda
             </label>
           </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={save}
-              className="pv-btn-primary px-5 py-2 text-sm disabled:opacity-50"
-            >
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-            <button type="button" onClick={closeForm} className="pv-btn-secondary px-5 py-2 text-sm">
+          {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ActionChip tone="emerald" emoji="✅" disabled={saving} onClick={() => void save()}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </ActionChip>
+            <ActionChip elevated={false} onClick={closeForm}>
               Cancelar
-            </button>
+            </ActionChip>
           </div>
         </section>
       )}
@@ -403,40 +404,43 @@ export function PromotionsManager({
                 <h3 className="mt-1 text-lg font-semibold text-slate-900">{promo.title}</h3>
                 {promo.body && <p className="mt-2 text-sm text-slate-600">{promo.body}</p>}
               </div>
-              <button
-                type="button"
-                onClick={() => toggleActive(promo)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                  promo.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'
-                }`}
+              <ActionChip
+                elevated={false}
+                tone={promo.is_active ? 'emerald' : 'slate'}
+                onClick={() => void toggleActive(promo)}
               >
                 {promo.is_active ? 'Activa' : 'Inactiva'}
-              </button>
+              </ActionChip>
             </div>
-            <div className="mt-4 flex flex-wrap gap-3 text-sm">
-              <button type="button" onClick={() => openEdit(promo)} className="text-[var(--pv-green-700)] hover:underline">
+            <div className="mt-4 flex flex-wrap gap-2">
+              <ActionChip elevated={false} emoji="✏️" onClick={() => openEdit(promo)}>
                 Editar
-              </button>
-              {promo.is_active && (
-                <button
-                  type="button"
+              </ActionChip>
+              {promo.is_active ? (
+                <ActionChip
+                  elevated={false}
+                  emoji="💬"
                   disabled={broadcastingId === promo.id}
-                  onClick={() => broadcast(promo.id, promo.title)}
-                  className="text-[var(--pv-green-700)] hover:underline disabled:opacity-50"
+                  onClick={() => void broadcast(promo.id, promo.title)}
                 >
-                  {broadcastingId === promo.id ? 'Enviando...' : 'Enviar por WhatsApp'}
-                </button>
-              )}
-              <button type="button" onClick={() => remove(promo.id, promo.title)} className="text-red-600 hover:underline">
+                  {broadcastingId === promo.id ? 'Enviando…' : 'WhatsApp'}
+                </ActionChip>
+              ) : null}
+              <ActionChip
+                elevated={false}
+                tone="rose"
+                emoji="🗑️"
+                onClick={() => void remove(promo.id, promo.title)}
+              >
                 Eliminar
-              </button>
+              </ActionChip>
             </div>
           </article>
         ))}
-        {promotions.length === 0 && (
+        {promotions.length === 0 ? (
           <p className="text-slate-500 md:col-span-2">No hay promociones. Crea la primera para tus vecinos.</p>
-        )}
+        ) : null}
       </div>
-    </div>
+    </details>
   );
 }

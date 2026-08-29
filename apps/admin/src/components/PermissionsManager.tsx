@@ -12,6 +12,8 @@ import {
   type StaffRole,
 } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+
 const EDITABLE_ROLES = STAFF_ROLES.filter((role) => role !== 'owner');
 
 export function PermissionsManager({
@@ -27,6 +29,7 @@ export function PermissionsManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const dirty = useMemo(
     () => JSON.stringify(matrix) !== JSON.stringify(normalizePermissionMatrixInput(initialMatrix)),
@@ -94,48 +97,38 @@ export function PermissionsManager({
   }
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Permisos por perfil</h2>
-          <p className="text-sm text-slate-500">
-            Enciende o apaga capacidades para cada perfil. El propietario siempre tiene acceso total.
-          </p>
-        </div>
-        {canEdit ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="pv-btn-ghost px-4 py-2 text-sm"
-              disabled={saving}
-              onClick={restoreDefaults}
-            >
-              Restaurar defaults
-            </button>
-            <button
-              type="button"
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              disabled={saving || !dirty}
-              onClick={save}
-            >
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-          </div>
-        ) : (
-          <p className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">Solo lectura</p>
-        )}
-      </div>
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Quién puede hacer qué"
+        hint="Propietario ve todo · Administrador lleva la sucursal · Personal cobra y atiende"
+        emoji="🔐"
+        iconClass="bg-slate-100"
+        actions={
+          canEdit ? (
+            <>
+              <ActionChip elevated={false} emoji="↩️" disabled={saving} onClick={() => void restoreDefaults()}>
+                Restaurar
+              </ActionChip>
+              <ActionChip emoji="✅" disabled={saving || !dirty} onClick={() => void save()}>
+                {saving ? 'Guardando…' : 'Guardar'}
+              </ActionChip>
+            </>
+          ) : undefined
+        }
+      />
 
       {!canEdit ? (
         <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Solo el propietario o el gerente de sucursal pueden cambiar estos permisos.
+          Solo el propietario o el administrador pueden cambiar estos permisos.
         </p>
       ) : null}
 
       {error ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
-      {savedAt ? (
-        <p className="text-xs text-emerald-700">Guardado a las {savedAt}.</p>
-      ) : null}
+      {savedAt ? <p className="text-xs text-emerald-700">Guardado a las {savedAt}.</p> : null}
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
         <table className="min-w-full text-left text-sm">
@@ -181,6 +174,6 @@ export function PermissionsManager({
       <p className="text-xs text-slate-500">
         Perfiles editables: {EDITABLE_ROLES.map((role) => STAFF_ROLE_LABELS[role]).join(', ')}.
       </p>
-    </section>
+    </details>
   );
 }

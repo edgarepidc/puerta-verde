@@ -3,11 +3,13 @@
 import { useSearchParams } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { ActionChip } from '@/components/ActionChip';
+
 type PromoSection = 'avisos' | 'cupones';
 
-const TABS: Array<{ id: PromoSection; label: string }> = [
-  { id: 'avisos', label: 'Avisos' },
-  { id: 'cupones', label: 'Cupones' },
+const TABS: Array<{ id: PromoSection; label: string; emoji: string }> = [
+  { id: 'avisos', label: 'Cartel en la vitrina', emoji: '🏷️' },
+  { id: 'cupones', label: 'Código al cobrar', emoji: '🎟️' },
 ];
 
 export function PromotionsTabs({
@@ -26,23 +28,20 @@ export function PromotionsTabs({
     <div className="space-y-6">
       <div className="flex flex-wrap justify-center gap-2">
         {TABS.map((item) => (
-          <button
+          <ActionChip
             key={item.id}
-            type="button"
+            emoji={item.emoji}
+            tone={section === item.id ? 'emerald' : 'slate'}
+            elevated={section === item.id}
             onClick={() => {
               setSection(item.id);
               const url = new URL(window.location.href);
               url.searchParams.set('section', item.id);
               window.history.replaceState({}, '', url);
             }}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              section === item.id
-                ? 'bg-slate-900 text-white'
-                : 'bg-white/70 text-slate-700 hover:bg-white'
-            }`}
           >
             {item.label}
-          </button>
+          </ActionChip>
         ))}
       </div>
       {section === 'avisos' ? avisos : cupones}

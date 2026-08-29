@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   formatMexicoDayLabel,
+  formatMexicoMonthLabel,
   groupByMexicoDay,
+  groupSalesLogByMonth,
   mexicoYmdFromIso,
   nextWorkflowStatus,
   normalizeOrderStatus,
@@ -60,7 +62,38 @@ test('groupByMexicoDay buckets sales and labels Hoy', () => {
   assert.equal(groups[1]?.total, 80);
 });
 
-test('mexicoYmdFromIso and formatMexicoDayLabel handle a calendar date', () => {
-  assert.equal(mexicoYmdFromIso('2026-08-19T23:30:00-06:00'), '2026-08-19');
-  assert.equal(formatMexicoDayLabel('2026-08-17', '2026-08-19').length > 0, true);
+test('groupSalesLogByMonth keeps the current month as days and folds closed months', () => {
+  const today = '2026-09-02';
+  const sections = groupSalesLogByMonth(
+    [
+      { created_at: '2026-09-02T10:00:00-06:00', total: 40 },
+      { created_at: '2026-09-01T18:00:00-06:00', total: 20 },
+      { created_at: '2026-08-31T12:00:00-06:00', total: 80 },
+      { created_at: '2026-08-15T12:00:00-06:00', total: 50 },
+    ],
+    today,
+  );
+
+  assert.equal(sections.length, 3);
+  assert.equal(sections[0]?.kind, 'day');
+  if (sections[0]?.kind === 'day') {
+    assert.equal(sections[0].label, 'Hoy');
+    assert.equal(sections[0].total, 40);
+  }
+  assert.equal(sections[1]?.kind, 'day');
+  if (sections[1]?.kind === 'day') {
+    assert.equal(sections[1].label, 'Ayer');
+  }
+  assert.equal(sections[2]?.kind, 'month');
+  if (sections[2]?.kind === 'month') {
+    assert.equal(sections[2].label, 'Agosto');
+    assert.equal(sections[2].count, 2);
+    assert.equal(sections[2].total, 130);
+    assert.equal(sections[2].days.length, 2);
+  }
+});
+
+test('formatMexicoMonthLabel capitalizes and adds year when needed', () => {
+  assert.equal(formatMexicoMonthLabel('2026-08', '2026-09-01'), 'Agosto');
+  assert.equal(formatMexicoMonthLabel('2025-08', '2026-09-01'), 'Agosto 2025');
 });

@@ -1,24 +1,28 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  PRODUCT_QUALITIES,
   PRODUCT_QUALITY_LABELS,
   PRODUCT_UNITS,
   PRODUCT_UNIT_LABELS,
   VISIT_EXPENSE_PRESETS,
+  calcMarginPercent,
   formatMoney,
   suggestSalePrice,
   type ProductQuality,
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, ChevronDownIcon, FoldableSummary } from '@/components/ActionChip';
+import { CategorySearchSelect } from '@/components/CategorySearchSelect';
 import { LowStockBanner } from '@/components/LowStockBanner';
 import { MarketComparePanel } from '@/components/MarketComparePanel';
 import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
+import { uploadProductMedia } from '@/lib/upload-image';
 
 interface ProductOption {
   id: string;
@@ -34,6 +38,7 @@ interface ProductOption {
     unit: ProductUnit;
     sku?: string | null;
     weigh_at_fulfillment?: boolean;
+    image_url?: string | null;
   };
 }
 
@@ -145,10 +150,32 @@ function resolveExpenseConcept(draft: ExpenseDraft): string {
   return draft.conceptPreset.trim();
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+  sort_order?: number;
+}
+
 interface NewProductDraft {
   name: string;
   unit: ProductUnit;
   salePrice: string;
+  categoryId: string;
+  imageUrl: string;
+  weighAtFulfillment: boolean;
+  isAvailable: boolean;
+}
+
+function emptyNewProduct(name: string, salePrice = ''): NewProductDraft {
+  return {
+    name,
+    unit: 'kg',
+    salePrice,
+    categoryId: '',
+    imageUrl: '',
+    weighAtFulfillment: true,
+    isAvailable: true,
+  };
 }
 
 interface LineDraft {
@@ -218,7 +245,7 @@ function applyAmountChange(line: LineDraft, field: AmountField, raw: string): Li
   return next;
 }
 
-type Tab = 'compra' | 'proveedores' | 'comparar';
+const NEW_SUPPLIER = '__new__';
 
 function todayLocalDate() {
   const now = new Date();
@@ -240,21 +267,47 @@ function monthRange(ym: string): { from: string; to: string } {
   return { from, to };
 }
 
+/** e.g. "del 1 al 31 de agosto del 26" */
+function formatSpokenDateRange(from: string, to: string): string {
+  const start = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
+  const monthName = (date: Date) => date.toLocaleDateString('es-MX', { month: 'long' });
+  const yy = (date: Date) => String(date.getFullYear()).slice(-2);
+
+  if (from === to) {
+    return `el ${start.getDate()} de ${monthName(start)} del ${yy(start)}`;
+  }
+  if (from.slice(0, 7) === to.slice(0, 7)) {
+    return `del ${start.getDate()} al ${end.getDate()} de ${monthName(start)} del ${yy(start)}`;
+  }
+  if (start.getFullYear() === end.getFullYear()) {
+    return `del ${start.getDate()} de ${monthName(start)} al ${end.getDate()} de ${monthName(end)} del ${yy(end)}`;
+  }
+  return `del ${start.getDate()} de ${monthName(start)} del ${yy(start)} al ${end.getDate()} de ${monthName(end)} del ${yy(end)}`;
+}
+
 export function PurchasesManager({
   initialPurchases,
   initialProducts,
   initialSuppliers,
   initialExpenses,
+  initialCategories = [],
   canManage = true,
 }: {
   initialPurchases: PurchaseRow[];
   initialProducts: ProductOption[];
   initialSuppliers: SupplierRow[];
   initialExpenses: ExpenseRow[];
+  initialCategories?: CategoryOption[];
   canManage?: boolean;
 }) {
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>('compra');
+  const [openCompras, setOpenCompras] = useState(true);
+  const [openProveedores, setOpenProveedores] = useState(
+    () => searchParams.get('tab') === 'proveedores',
+  );
+  const [openComparar, setOpenComparar] = useState(() => searchParams.get('tab') === 'comparar');
+  const [openHistorial, setOpenHistorial] = useState(false);
   const [purchases, setPurchases] = useState(initialPurchases);
   const [products, setProducts] = useState(initialProducts);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
@@ -271,6 +324,10 @@ export function PurchasesManager({
   const [purchasedAt, setPurchasedAt] = useState(todayLocalDate());
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine('1')]);
+  const [categories, setCategories] = useState<CategoryOption[]>(initialCategories);
+  const [productModalKey, setProductModalKey] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [supplierName, setSupplierName] = useState('');
   const [supplierPhone, setSupplierPhone] = useState('');
@@ -290,16 +347,29 @@ export function PurchasesManager({
   const [historyTo, setHistoryTo] = useState(todayLocalDate());
 
   useEffect(() => {
+    if (initialCategories.length > 0) return;
+    let cancelled = false;
+    void fetch('/api/categories')
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled || !Array.isArray(payload.categories)) return;
+        setCategories(payload.categories);
+      })
+      .catch(() => {
+        // Categories stay empty; the product modal still works without them.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCategories.length]);
+
+  useEffect(() => {
     const product = searchParams.get('product');
-    const tabParam = searchParams.get('tab') as Tab | 'historial' | null;
-    if (tabParam === 'historial') {
-      setTab('compra');
-    } else if (tabParam && ['compra', 'proveedores', 'comparar'].includes(tabParam)) {
-      setTab(tabParam);
-    }
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'proveedores') setOpenProveedores(true);
+    else if (tabParam === 'comparar') setOpenComparar(true);
     if (product && products.some((row) => row.id === product)) {
       setLines([{ ...emptyLine('prefill'), branchProductId: product }]);
-      setTab('compra');
     }
   }, [searchParams, products]);
 
@@ -310,7 +380,9 @@ export function PurchasesManager({
   );
 
   function lineIsWeigh(line: LineDraft): boolean {
-    if (line.newProduct) return line.newProduct.unit === 'kg';
+    if (line.newProduct) {
+      return line.newProduct.unit === 'kg' && line.newProduct.weighAtFulfillment;
+    }
     return Boolean(productById.get(line.branchProductId)?.product.weigh_at_fulfillment);
   }
 
@@ -547,9 +619,14 @@ export function PurchasesManager({
     setDraft: (next: ExpenseDraft) => void,
     onSubmit: () => void,
     submitLabel: string,
+    compact = false,
   ) {
     return (
-      <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_1fr_auto]">
+      <div
+        className={`grid gap-3 ${
+          compact ? 'md:grid-cols-[1.4fr_0.8fr_auto]' : 'md:grid-cols-[1.2fr_0.8fr_1fr_auto]'
+        }`}
+      >
         <label className="block text-sm">
           <span className="font-medium text-slate-700">Concepto</span>
           <select
@@ -580,30 +657,28 @@ export function PurchasesManager({
             onChange={(value) => setDraft({ ...draft, amount: value })}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Notas</span>
-          <input
-            className="pv-input mt-1"
-            placeholder="Opcional"
-            value={draft.notes}
-            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-          />
-        </label>
+        {compact ? null : (
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">Notas</span>
+            <input
+              className="pv-input mt-1"
+              placeholder="Opcional"
+              value={draft.notes}
+              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+            />
+          </label>
+        )}
         <div className="flex items-end">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onSubmit}
-            className="rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-          >
+          <ActionChip emoji="🧾" disabled={saving} onClick={onSubmit}>
             {saving ? 'Guardando…' : submitLabel}
-          </button>
+          </ActionChip>
         </div>
       </div>
     );
   }
 
   function startNewProduct(lineIndex: number, name: string) {
+    const lineKey = lines[lineIndex]?.key ?? String(Date.now());
     const cost = parseDecimal(lines[lineIndex]?.unitPrice ?? '');
     setLines((prev) =>
       prev.map((row, i) =>
@@ -611,15 +686,15 @@ export function PurchasesManager({
           ? {
               ...row,
               branchProductId: '',
-              newProduct: {
+              newProduct: emptyNewProduct(
                 name,
-                unit: 'kg',
-                salePrice: cost > 0 ? String(suggestSalePrice({ cost }) || '') : '',
-              },
+                cost > 0 ? String(suggestSalePrice({ cost }) || '') : '',
+              ),
             }
           : row,
       ),
     );
+    setProductModalKey(lineKey);
     setError(null);
   }
 
@@ -636,36 +711,113 @@ export function PurchasesManager({
     );
   }
 
+  async function createCategoryForDraft(name: string) {
+    const trimmed = name.trim();
+    const key = productModalKey;
+    if (!trimmed) return;
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, sortOrder: categories.length + 1 }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo crear');
+      const created = result.category as CategoryOption | undefined;
+      if (!created) return;
+      setCategories((prev) => (prev.some((row) => row.id === created.id) ? prev : [...prev, created]));
+      if (!key) return;
+      setLines((prev) =>
+        prev.map((row) =>
+          row.key === key && row.newProduct
+            ? { ...row, newProduct: { ...row.newProduct, categoryId: created.id } }
+            : row,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear categoría');
+    }
+  }
+
+  async function handleNewProductPhoto(file: File | undefined) {
+    const key = productModalKey;
+    if (!file || !key) return;
+    setUploadingPhoto(true);
+    setError(null);
+    try {
+      const url = await uploadProductMedia(file, 'product-media');
+      setLines((prev) =>
+        prev.map((row) =>
+          row.key === key && row.newProduct
+            ? { ...row, newProduct: { ...row.newProduct, imageUrl: url } }
+            : row,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
+
   async function ensureProductsForLines(currentLines: LineDraft[]): Promise<LineDraft[]> {
     const resolved: LineDraft[] = [];
+    const created: ProductOption[] = [];
     for (const line of currentLines) {
       if (!line.newProduct) {
         resolved.push(line);
         continue;
       }
-      const name = line.newProduct.name.trim();
+      const draft = line.newProduct;
+      const name = draft.name.trim();
       if (!name) throw new Error('Cada producto nuevo necesita nombre.');
-      const salePrice = parseDecimal(line.newProduct.salePrice);
+      const salePrice = parseDecimal(draft.salePrice);
       if (!(salePrice > 0)) {
         throw new Error(`Indica el precio de venta de «${name}».`);
       }
+      const unitCost = parseDecimal(line.unitPrice);
       const response = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          unit: line.newProduct.unit,
+          unit: draft.unit,
           price: salePrice,
-          isAvailable: true,
-          isActive: true,
+          unitCost: unitCost > 0 ? unitCost : undefined,
+          categoryId: draft.categoryId || null,
+          imageUrl: draft.imageUrl || null,
+          weighAtFulfillment: Boolean(draft.weighAtFulfillment),
+          isAvailable: draft.isAvailable,
+          isActive: draft.isAvailable,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? `No se pudo crear «${name}»`);
+      const branchProductId = result.branchProductId as string;
+      created.push({
+        id: branchProductId,
+        stock: 0,
+        price: salePrice,
+        last_unit_cost: unitCost > 0 ? unitCost : null,
+        product: {
+          id: result.productId as string,
+          name,
+          unit: draft.unit,
+          weigh_at_fulfillment: Boolean(draft.weighAtFulfillment),
+          image_url: draft.imageUrl || null,
+        },
+      });
       resolved.push({
         ...line,
-        branchProductId: result.branchProductId as string,
+        branchProductId,
         newProduct: null,
+      });
+    }
+    if (created.length > 0) {
+      setProducts((prev) => {
+        const seen = new Set(prev.map((row) => row.id));
+        return [...prev, ...created.filter((row) => !seen.has(row.id))];
       });
     }
     return resolved;
@@ -705,6 +857,24 @@ export function PurchasesManager({
     }
   }
 
+  async function ensureSupplierId(): Promise<string> {
+    if (supplierId && supplierId !== NEW_SUPPLIER) return supplierId;
+    const name = supplierName.trim();
+    if (!name) throw new Error('Indica el proveedor.');
+    const response = await fetch('/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, isActive: true }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? 'No se pudo crear el proveedor');
+    const id = result.supplier?.id as string | undefined;
+    if (!id) throw new Error('No se pudo crear el proveedor');
+    setSupplierId(id);
+    setSupplierName('');
+    return id;
+  }
+
   async function submitPurchase() {
     if (!canManage) {
       setError('No tienes permiso para registrar compras');
@@ -713,6 +883,8 @@ export function PurchasesManager({
     setSaving(true);
     setError(null);
     try {
+      const resolvedSupplierId = await ensureSupplierId();
+      const weighByKey = new Map(lines.map((line) => [line.key, lineIsWeigh(line)]));
       const withProducts = await ensureProductsForLines(lines);
       for (const line of withProducts) {
         if (!line.branchProductId) throw new Error('Cada partida necesita un producto.');
@@ -722,8 +894,7 @@ export function PurchasesManager({
         if (parseDecimal(line.unitPrice) < 0) {
           throw new Error('El precio unitario no puede ser negativo.');
         }
-        const product = productById.get(line.branchProductId);
-        const weigh = Boolean(product?.product.weigh_at_fulfillment);
+        const weigh = weighByKey.get(line.key) ?? false;
         if (weigh && line.pieceCount.trim() && !(parseDecimal(line.pieceCount) > 0)) {
           throw new Error('Las piezas deben ser mayores a cero.');
         }
@@ -733,18 +904,17 @@ export function PurchasesManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          supplierId,
+          supplierId: resolvedSupplierId,
           purchasedAt,
           notes: notes || null,
           items: withProducts.map((line) => {
-            const product = productById.get(line.branchProductId);
-            const weigh = Boolean(product?.product.weigh_at_fulfillment);
+            const weigh = weighByKey.get(line.key) ?? false;
             const pieces = parseDecimal(line.pieceCount);
             return {
               branchProductId: line.branchProductId,
               quantity: parseDecimal(line.quantity),
               unitPrice: parseDecimal(line.unitPrice),
-              quality: line.quality,
+              quality: 'normal',
               ...(weigh && pieces > 0 ? { pieceCount: pieces } : {}),
             };
           }),
@@ -930,87 +1100,74 @@ export function PurchasesManager({
     }
   }
 
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: 'compra', label: 'Nueva compra' },
-    { id: 'proveedores', label: 'Proveedores' },
-    { id: 'comparar', label: 'Comparar proveedores' },
-  ];
+  const productModalIndex = productModalKey
+    ? lines.findIndex((row) => row.key === productModalKey)
+    : -1;
+  const productModalDraft =
+    productModalIndex >= 0 ? (lines[productModalIndex]?.newProduct ?? null) : null;
+  const productModalCost = parseDecimal(lines[productModalIndex]?.unitPrice ?? '');
 
   return (
     <div className="space-y-6">
-      <LowStockBanner products={products} href="/?section=stock" />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={(e) => void handleNewProductPhoto(e.target.files?.[0])}
+      />
+      <LowStockBanner products={products} />
       {!canManage ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Solo lectura · no tienes permiso para registrar o editar compras.
         </p>
       ) : null}
 
-      <div className="flex flex-wrap justify-center gap-2">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setTab(item.id)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              tab === item.id
-                ? 'bg-slate-900 text-white'
-                : 'bg-white/70 text-slate-700 hover:bg-white'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
       {error && (
         <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
       )}
 
-      {tab === 'compra' && (
-        <section className="pv-glass-card space-y-4 p-4 sm:p-6">
-          <div className="flex gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
-              aria-hidden
-            >
-              🛒
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Registrar compra de materia prima
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                Al confirmar se guarda el precio por proveedor y entra al stock. Puedes capturar por
-                volumen (cantidad + total) y el unitario se calcula solo.
-              </p>
-            </div>
-          </div>
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openCompras}
+        onToggle={(event) => setOpenCompras(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Compras"
+          hint="Producto, kilos e importe. El precio por kilo se calcula solo."
+          emoji="🛒"
+          iconClass="bg-emerald-100"
+        />
 
           <div className="grid gap-4 md:grid-cols-3">
-            <label className="block text-sm">
+            <div className="block text-sm">
               <span className="font-medium text-slate-700">Proveedor *</span>
               <select
                 className="pv-input mt-1"
                 value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSupplierId(value);
+                  if (value !== NEW_SUPPLIER) setSupplierName('');
+                }}
               >
-                <option value="">Selecciona...</option>
+                <option value="">Selecciona…</option>
                 {activeSuppliers.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>
                     {supplier.name}
                   </option>
                 ))}
+                <option value={NEW_SUPPLIER}>Nuevo proveedor…</option>
               </select>
-              {activeSuppliers.length === 0 && (
-                <button
-                  type="button"
-                  className="mt-2 text-sm text-emerald-800 underline"
-                  onClick={() => setTab('proveedores')}
-                >
-                  Primero agrega un proveedor
-                </button>
-              )}
-            </label>
+              {supplierId === NEW_SUPPLIER ? (
+                <input
+                  className="pv-input mt-2"
+                  placeholder="Nombre del proveedor"
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                />
+              ) : null}
+            </div>
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Fecha de compra</span>
               <input
@@ -1034,17 +1191,16 @@ export function PurchasesManager({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-medium text-slate-800">Partidas</h3>
-              <button
-                type="button"
-                className="text-sm font-medium text-emerald-800"
+              <ActionChip
+                tone="emerald"
+                emoji="🥬"
                 onClick={() => setLines((prev) => [...prev, emptyLine()])}
               >
-                + Agregar producto
-              </button>
+                Agregar producto
+              </ActionChip>
             </div>
             <p className="text-xs text-slate-500">
-              Llena cualesquiera dos de cantidad (kg), precio unitario o total; el tercero se calcula
-              solo. En productos «Pesar al preparar» puedes capturar también las piezas.
+              Llena dos de cantidad, precio o total; el tercero se calcula solo.
             </p>
 
             {lines.map((line, index) => {
@@ -1059,19 +1215,29 @@ export function PurchasesManager({
                 <div
                   className={`grid gap-3 ${
                     weigh
-                      ? 'md:grid-cols-[minmax(0,1.3fr)_0.7fr_0.7fr_0.7fr_0.8fr_0.8fr_auto]'
-                      : 'md:grid-cols-[minmax(0,1.4fr)_0.9fr_0.9fr_0.9fr_0.9fr_auto]'
+                      ? 'md:grid-cols-[minmax(0,1.4fr)_0.7fr_0.8fr_0.8fr_0.9fr_auto]'
+                      : 'md:grid-cols-[minmax(0,1.6fr)_0.9fr_0.9fr_0.9fr_auto]'
                   }`}
                 >
                   <div className="block text-sm">
                     <span className="font-medium text-slate-700">Producto</span>
                     {line.newProduct ? (
-                      <input
-                        className="pv-input mt-1"
-                        value={line.newProduct.name}
-                        onChange={(e) => updateNewProduct(index, { name: e.target.value })}
-                        placeholder="Nombre del producto"
-                      />
+                      <div className="mt-1 flex min-w-0 items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <input
+                            className="pv-input"
+                            value={line.newProduct.name}
+                            onChange={(e) => updateNewProduct(index, { name: e.target.value })}
+                            placeholder="Nombre del producto"
+                          />
+                        </div>
+                        <ActionChip
+                          elevated={false}
+                          onClick={() => setProductModalKey(line.key)}
+                        >
+                          Editar
+                        </ActionChip>
+                      </div>
                     ) : (
                       <ProductSearchSelect
                         products={products}
@@ -1089,28 +1255,6 @@ export function PurchasesManager({
                       />
                     )}
                   </div>
-                  <label className="block text-sm">
-                    <span className="font-medium text-slate-700">Calidad</span>
-                    <select
-                      className="pv-input mt-1"
-                      value={line.quality}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((row, i) =>
-                            i === index
-                              ? { ...row, quality: e.target.value as ProductQuality }
-                              : row,
-                          ),
-                        )
-                      }
-                    >
-                      {PRODUCT_QUALITIES.map((quality) => (
-                        <option key={quality} value={quality}>
-                          {PRODUCT_QUALITY_LABELS[quality]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                   {weigh ? (
                     <label className="block text-sm">
                       <span className="font-medium text-slate-700">Piezas</span>
@@ -1190,71 +1334,89 @@ export function PurchasesManager({
                 </div>
 
                 {line.newProduct && (
-                  <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
-                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Unidad de venta</span>
-                        <select
-                          className="pv-input mt-1"
-                          value={line.newProduct.unit}
-                          onChange={(e) =>
-                            updateNewProduct(index, { unit: e.target.value as ProductUnit })
-                          }
-                        >
-                          {PRODUCT_UNITS.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {PRODUCT_UNIT_LABELS[unit]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block text-sm">
-                        <span className="font-medium text-slate-700">Precio de venta (tienda)</span>
-                        <DecimalInput
-                          placeholder="0"
-                          className="pv-input mt-1"
-                          value={line.newProduct.salePrice}
-                          onChange={(value) => updateNewProduct(index, { salePrice: value })}
-                        />
-                      </label>
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
-                          onClick={() =>
-                            setLines((prev) =>
-                              prev.map((row, i) =>
-                                i === index ? { ...row, newProduct: null } : row,
-                              ),
-                            )
-                          }
-                        >
-                          Cancelar alta
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-emerald-900/80">
-                      Producto nuevo: se crea al registrar la compra, sin stock previo. El costo
-                      entra con esta partida.
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm">
+                    <p className="min-w-0 text-slate-600">
+                      Producto nuevo · {PRODUCT_UNIT_LABELS[line.newProduct.unit]}
+                      {line.newProduct.unit === 'kg' && line.newProduct.weighAtFulfillment
+                        ? ' · se pide por pieza y se pesa al cobrar'
+                        : ''}
+                      {parseDecimal(line.newProduct.salePrice) > 0
+                        ? ` · venta ${formatMoney(parseDecimal(line.newProduct.salePrice))}`
+                        : ''}
                     </p>
-                    <MarketComparePanel
-                      productName={line.newProduct.name}
-                      unit={line.newProduct.unit}
-                      currentPrice={parseDecimal(line.newProduct.salePrice)}
-                      cost={parseDecimal(line.unitPrice)}
-                      compact
-                      autoSearch
-                      currentPriceLabel="Precio de tienda"
-                      className="border-emerald-200 bg-white"
-                      onPriceChange={(price) =>
-                        updateNewProduct(index, { salePrice: String(price) })
-                      }
-                    />
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <ActionChip elevated={false} onClick={() => setProductModalKey(line.key)}>
+                        Completar ficha
+                      </ActionChip>
+                      <ActionChip
+                        elevated={false}
+                        tone="rose"
+                        onClick={() => {
+                          setProductModalKey((current) => (current === line.key ? null : current));
+                          setLines((prev) =>
+                            prev.map((row, i) =>
+                              i === index ? { ...row, newProduct: null } : row,
+                            ),
+                          );
+                        }}
+                      >
+                        Cancelar alta
+                      </ActionChip>
+                    </div>
                   </div>
                 )}
               </div>
             );
             })}
+          </div>
+
+          <div className="space-y-3 border-t border-slate-200/70 pt-4">
+            <div>
+              <h3 className="font-medium text-slate-800">Gasto de la visita</h3>
+              <p className="text-xs text-slate-500">
+                Gasolina, bolsas u otro egreso de esta fecha. No entra al inventario.
+              </p>
+            </div>
+            {expenses.filter((expense) => expense.expense_date === purchasedAt).length > 0 ? (
+              <ul className="space-y-2">
+                {expenses
+                  .filter((expense) => expense.expense_date === purchasedAt)
+                  .map((expense) => (
+                    <li
+                      key={expense.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900">{expense.concept}</p>
+                        {expense.notes ? (
+                          <p className="text-slate-500">{expense.notes}</p>
+                        ) : null}
+                      </div>
+                      <p className="font-semibold text-slate-900">
+                        {formatMoney(Number(expense.amount))}
+                      </p>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
+            {renderExpenseForm(
+              expenseDraft,
+              setExpenseDraft,
+              () =>
+                void submitExpense(purchasedAt, expenseDraft, () =>
+                  setExpenseDraft(emptyExpenseDraft()),
+                ),
+              'Agregar gasto',
+              true,
+            )}
+            {visitExpenseTotalForDraftDate > 0 ? (
+              <p className="text-sm text-slate-600">
+                Gastos de esta fecha:{' '}
+                <span className="font-semibold text-slate-900">
+                  {formatMoney(visitExpenseTotalForDraftDate)}
+                </span>
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-4">
@@ -1271,76 +1433,99 @@ export function PurchasesManager({
               {saving ? 'Guardando…' : 'Registrar compra'}
             </button>
           </div>
-        </section>
-      )}
+        </details>
 
-      {tab === 'compra' && (
-        <section className="pv-glass-card space-y-4 p-4 sm:p-6">
-          <div className="flex gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl"
-              aria-hidden
-            >
-              🧾
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Otros gastos de la visita
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                Gasolina, bolsas, estacionamiento u otros egresos de la misma fecha (
-                {new Date(`${purchasedAt}T12:00:00`).toLocaleDateString('es-MX')}). No afectan el
-                inventario.
-              </p>
-            </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <div className="pv-glass-card flex gap-3 p-4">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
+            aria-hidden
+          >
+            📅
           </div>
-
-          {expenses.filter((expense) => expense.expense_date === purchasedAt).length > 0 && (
-            <ul className="space-y-2">
-              {expenses
-                .filter((expense) => expense.expense_date === purchasedAt)
-                .map((expense) => (
-                  <li
-                    key={expense.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-900">{expense.concept}</p>
-                      {expense.notes ? (
-                        <p className="text-slate-500">{expense.notes}</p>
-                      ) : null}
-                    </div>
-                    <p className="font-semibold text-slate-900">
-                      {formatMoney(Number(expense.amount))}
-                    </p>
-                  </li>
-                ))}
-            </ul>
-          )}
-
-          {renderExpenseForm(
-            expenseDraft,
-            setExpenseDraft,
-            () =>
-              void submitExpense(purchasedAt, expenseDraft, () =>
-                setExpenseDraft(emptyExpenseDraft()),
-              ),
-            'Agregar gasto',
-          )}
-
-          {visitExpenseTotalForDraftDate > 0 && (
-            <p className="text-sm text-slate-600">
-              Total gastos de esta fecha:{' '}
-              <span className="font-semibold text-slate-900">
-                {formatMoney(visitExpenseTotalForDraftDate)}
-              </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Periodo
             </p>
-          )}
-        </section>
-      )}
+            <p className="mt-0.5 text-sm font-bold leading-snug text-slate-900">
+              {formatSpokenDateRange(historyBounds.from, historyBounds.to)}
+            </p>
+          </div>
+        </div>
+        <div className="pv-glass-card flex gap-3 p-4">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
+            aria-hidden
+          >
+            🛒
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Materia prima
+            </p>
+            <p className="mt-0.5 text-xl font-bold text-emerald-800">
+              {formatMoney(historyTotals.purchaseTotal)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {historyTotals.purchaseCount} compra
+              {historyTotals.purchaseCount === 1 ? '' : 's'}
+            </p>
+          </div>
+        </div>
+        <div className="pv-glass-card flex gap-3 p-4">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl"
+            aria-hidden
+          >
+            🧾
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Otros gastos
+            </p>
+            <p className="mt-0.5 text-xl font-bold text-amber-800">
+              {formatMoney(historyTotals.expenseTotal)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {historyTotals.expenseCount} gasto
+              {historyTotals.expenseCount === 1 ? '' : 's'}
+            </p>
+          </div>
+        </div>
+        <div className="pv-glass-card flex gap-3 p-4">
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xl"
+            aria-hidden
+          >
+            💰
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Total periodo
+            </p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900">
+              {formatMoney(historyTotals.total)}
+            </p>
+            <p className="text-xs text-slate-500">
+              {historyTotals.visitCount} visita
+              {historyTotals.visitCount === 1 ? '' : 's'}
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {tab === 'proveedores' && (
-        <section className="space-y-4">
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openProveedores}
+        onToggle={(event) => setOpenProveedores(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Proveedores"
+          hint="Alta y edición · no hace falta para registrar una visita"
+          emoji="🏪"
+          iconClass="bg-sky-100"
+        />
+        <div className="mt-4 space-y-4">
           <div className="pv-glass-card grid gap-4 p-6 md:grid-cols-2">
             <div className="flex gap-3 md:col-span-2">
               <div
@@ -1384,14 +1569,9 @@ export function PurchasesManager({
               />
             </label>
             <div className="md:col-span-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={saveSupplier}
-                className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-              >
+              <ActionChip emoji="🏪" disabled={saving} onClick={saveSupplier}>
                 {saving ? 'Guardando…' : editingSupplierId ? 'Actualizar proveedor' : 'Guardar proveedor'}
-              </button>
+              </ActionChip>
             </div>
           </div>
 
@@ -1477,28 +1657,25 @@ export function PurchasesManager({
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        </div>
+      </details>
 
-      {tab === 'comparar' && (
-        <section className="pv-glass-card space-y-4 p-4 sm:p-6">
-          <div className="flex gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xl"
-              aria-hidden
-            >
-              ⚖️
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Comparar precios por proveedor
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                Promedio, mínimo y último precio pagado. El proveedor con menor promedio queda
-                primero dentro de cada producto.
-              </p>
-            </div>
-          </div>
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openComparar}
+        onToggle={(event) => setOpenComparar(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Comparar precios"
+          hint="Promedio y último precio por proveedor"
+          emoji="⚖️"
+          iconClass="bg-violet-100"
+        />
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-slate-500">
+            Promedio, mínimo y último precio pagado. El proveedor con menor promedio queda primero
+            dentro de cada producto.
+          </p>
           <div className="grid gap-4 md:grid-cols-3">
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Producto</span>
@@ -1529,14 +1706,9 @@ export function PurchasesManager({
               </select>
             </label>
             <div className="flex items-end">
-              <button
-                type="button"
-                disabled={compareLoading}
-                onClick={loadComparison}
-                className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-              >
+              <ActionChip emoji="⚖️" disabled={compareLoading} onClick={loadComparison}>
                 {compareLoading ? 'Calculando…' : 'Comparar'}
-              </button>
+              </ActionChip>
             </div>
           </div>
 
@@ -1589,31 +1761,24 @@ export function PurchasesManager({
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        </div>
+      </details>
 
-      {tab === 'compra' && (
-        <section className="pv-glass-card space-y-4 p-4 sm:p-6">
-          <div className="flex gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
-              aria-hidden
-            >
-              📋
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Historial de visitas / compras
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                Consulta compras por mes o rango de fechas. Busca por proveedor, producto o notas.
-              </p>
-            </div>
-          </div>
+      <details
+        className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+        open={openHistorial}
+        onToggle={(event) => setOpenHistorial(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Historial"
+          hint="Consulta compras por mes o rango. Busca por proveedor, producto o notas."
+          emoji="📋"
+          iconClass="bg-slate-100"
+        />
 
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3">
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <div className="w-full min-w-0 sm:max-w-md">
+          <div className="min-w-0 rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+              <div className="min-w-0 flex-1 basis-40">
                 <input
                   type="search"
                   className="pv-input pv-search"
@@ -1623,122 +1788,47 @@ export function PurchasesManager({
                   aria-label="Buscar en historial de compras"
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="w-[7.5rem] shrink-0">
                 <select
-                  className="pv-input w-auto min-w-[9rem]"
+                  className="pv-input"
                   value={historyPeriod}
                   onChange={(e) => setHistoryPeriod(e.target.value as 'month' | 'custom')}
                 >
                   <option value="month">Por mes</option>
                   <option value="custom">Rango</option>
                 </select>
-                {historyPeriod === 'month' ? (
+              </div>
+              {historyPeriod === 'month' ? (
+                <div className="w-[11.5rem] shrink-0">
                   <input
                     type="month"
-                    className="pv-input w-auto"
+                    className="pv-input"
                     value={historyMonth}
                     onChange={(e) => setHistoryMonth(e.target.value)}
                   />
-                ) : (
-                  <>
+                </div>
+              ) : (
+                <>
+                  <div className="w-[9.75rem] shrink-0">
                     <input
                       type="date"
-                      className="pv-input w-auto"
+                      className="pv-input"
                       value={historyFrom}
                       onChange={(e) => setHistoryFrom(e.target.value)}
                       aria-label="Desde"
                     />
+                  </div>
+                  <div className="w-[9.75rem] shrink-0">
                     <input
                       type="date"
-                      className="pv-input w-auto"
+                      className="pv-input"
                       value={historyTo}
                       onChange={(e) => setHistoryTo(e.target.value)}
                       aria-label="Hasta"
                     />
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-            <div className="pv-glass-card flex gap-3 p-4">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
-                aria-hidden
-              >
-                📅
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Periodo
-                </p>
-                <p className="mt-0.5 text-sm font-bold text-slate-900">
-                  {historyBounds.from === historyBounds.to
-                    ? historyBounds.from
-                    : `${historyBounds.from} → ${historyBounds.to}`}
-                </p>
-              </div>
-            </div>
-            <div className="pv-glass-card flex gap-3 p-4">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
-                aria-hidden
-              >
-                🛒
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Materia prima
-                </p>
-                <p className="mt-0.5 text-xl font-bold text-emerald-800">
-                  {formatMoney(historyTotals.purchaseTotal)}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {historyTotals.purchaseCount} compra
-                  {historyTotals.purchaseCount === 1 ? '' : 's'}
-                </p>
-              </div>
-            </div>
-            <div className="pv-glass-card flex gap-3 p-4">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl"
-                aria-hidden
-              >
-                🧾
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Otros gastos
-                </p>
-                <p className="mt-0.5 text-xl font-bold text-amber-800">
-                  {formatMoney(historyTotals.expenseTotal)}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {historyTotals.expenseCount} gasto
-                  {historyTotals.expenseCount === 1 ? '' : 's'}
-                </p>
-              </div>
-            </div>
-            <div className="pv-glass-card flex gap-3 bg-slate-900 p-4 text-white">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl"
-                aria-hidden
-              >
-                💰
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
-                  Total periodo
-                </p>
-                <p className="mt-0.5 text-xl font-bold text-white">
-                  {formatMoney(historyTotals.total)}
-                </p>
-                <p className="text-xs text-slate-300">
-                  {historyTotals.visitCount} visita
-                  {historyTotals.visitCount === 1 ? '' : 's'}
-                </p>
-              </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -1791,11 +1881,13 @@ export function PurchasesManager({
                           {formatMoney(group.expenseTotal)}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-slate-900 px-1.5 py-1.5 text-center text-white sm:px-2">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-300 sm:text-[11px]">
+                      <div className="rounded-full border border-slate-200 bg-white px-2 py-1.5 text-center shadow-sm sm:px-3">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 sm:text-[11px]">
                           Total
                         </p>
-                        <p className="text-xs font-semibold sm:text-sm">{formatMoney(group.total)}</p>
+                        <p className="text-xs font-semibold text-slate-900 sm:text-sm">
+                          {formatMoney(group.total)}
+                        </p>
                       </div>
                     </div>
                   </button>
@@ -1846,7 +1938,7 @@ export function PurchasesManager({
                                   {(purchase.items ?? []).map((item) => (
                                     <li key={item.id}>
                                       {item.branch_product?.product?.name ?? 'Producto'}
-                                      {item.quality
+                                      {item.quality && item.quality !== 'normal'
                                         ? ` · ${PRODUCT_QUALITY_LABELS[item.quality] ?? item.quality}`
                                         : ''}{' '}
                                       —{' '}
@@ -1916,7 +2008,11 @@ export function PurchasesManager({
                                 {editDraft.items.map((item) => (
                                   <div
                                     key={item.id}
-                                    className="grid gap-2 rounded-lg bg-slate-50 p-2 md:grid-cols-[1.6fr_0.7fr_0.7fr_0.7fr_0.7fr]"
+                                    className={`grid gap-2 rounded-lg bg-slate-50 p-2 ${
+                                      item.weighAtFulfillment
+                                        ? 'md:grid-cols-[1.6fr_0.7fr_0.7fr_0.7fr_0.7fr]'
+                                        : 'md:grid-cols-[1.8fr_0.8fr_0.8fr_0.8fr]'
+                                    }`}
                                   >
                                     <label className="block text-xs">
                                       Producto
@@ -1931,22 +2027,6 @@ export function PurchasesManager({
                                           Unidad: {item.unitLabel}
                                         </span>
                                       ) : null}
-                                    </label>
-                                    <label className="block text-xs">
-                                      Calidad
-                                      <select
-                                        className="pv-input mt-1"
-                                        value={item.quality}
-                                        onChange={(e) =>
-                                          updateEditItem(item.id, 'quality', e.target.value)
-                                        }
-                                      >
-                                        {PRODUCT_QUALITIES.map((quality) => (
-                                          <option key={quality} value={quality}>
-                                            {PRODUCT_QUALITY_LABELS[quality]}
-                                          </option>
-                                        ))}
-                                      </select>
                                     </label>
                                     {item.weighAtFulfillment ? (
                                       <label className="block text-xs">
@@ -1993,14 +2073,9 @@ export function PurchasesManager({
                                   </div>
                                 ))}
                                 <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    disabled={saving}
-                                    onClick={saveEditPurchase}
-                                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-                                  >
+                                  <ActionChip emoji="✅" disabled={saving} onClick={saveEditPurchase}>
                                     {saving ? 'Guardando…' : 'Guardar cambios'}
-                                  </button>
+                                  </ActionChip>
                                   <button
                                     type="button"
                                     onClick={() => setEditDraft(null)}
@@ -2111,14 +2186,13 @@ export function PurchasesManager({
                                       />
                                     </label>
                                     <div className="flex flex-wrap gap-2 md:col-span-3">
-                                      <button
-                                        type="button"
+                                      <ActionChip
+                                        emoji="🧾"
                                         disabled={saving}
                                         onClick={() => void saveEditExpense()}
-                                        className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                                       >
                                         {saving ? 'Guardando…' : 'Guardar gasto'}
-                                      </button>
+                                      </ActionChip>
                                       <button
                                         type="button"
                                         onClick={() => setEditExpenseDraft(null)}
@@ -2161,8 +2235,235 @@ export function PurchasesManager({
               </div>
             )}
           </div>
-        </section>
-      )}
+        </details>
+      {productModalDraft && productModalIndex >= 0 ? (
+        <div
+          className="pv-modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+          role="presentation"
+          onClick={() => setProductModalKey(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="purchase-product-modal-title"
+            className="pv-glass-card my-4 flex w-max max-w-[calc(100vw-2rem)] flex-col p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="purchase-product-modal-title" className="text-lg font-semibold text-slate-900">
+                Producto nuevo
+              </h2>
+              <ActionChip
+                icon={
+                  <span className="inline-flex rotate-180">
+                    <ChevronDownIcon />
+                  </span>
+                }
+                onClick={() => setProductModalKey(null)}
+              >
+                Cerrar
+              </ActionChip>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Se crea al registrar la compra. El costo entra con esta partida, sin stock previo.
+            </p>
+
+            <div className="mt-4 flex flex-col gap-4">
+              <label className="block text-sm">
+                <span className="font-medium text-slate-700">Nombre</span>
+                <input
+                  autoFocus
+                  className="pv-input mt-1"
+                  value={productModalDraft.name}
+                  onChange={(e) => updateNewProduct(productModalIndex, { name: e.target.value })}
+                />
+              </label>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block w-40 shrink-0 text-sm">
+                  <span className="font-medium text-slate-700">Categoría</span>
+                  <CategorySearchSelect
+                    categories={categories}
+                    value={productModalDraft.categoryId}
+                    onChange={(id) => updateNewProduct(productModalIndex, { categoryId: id })}
+                    onCreate={(name) => void createCategoryForDraft(name)}
+                  />
+                </label>
+                <label className="block w-28 shrink-0 text-sm">
+                  <span className="font-medium text-slate-700">Unidad</span>
+                  <select
+                    className="pv-input mt-1"
+                    value={productModalDraft.unit}
+                    onChange={(e) => {
+                      const unit = e.target.value as ProductUnit;
+                      updateNewProduct(productModalIndex, {
+                        unit,
+                        weighAtFulfillment:
+                          unit === 'kg'
+                            ? productModalDraft.unit === 'kg'
+                              ? productModalDraft.weighAtFulfillment
+                              : true
+                            : false,
+                      });
+                    }}
+                  >
+                    {PRODUCT_UNITS.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {PRODUCT_UNIT_LABELS[unit]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block w-36 shrink-0 text-sm">
+                  <span className="font-medium text-slate-700">Precio de venta</span>
+                  <div className="mt-1 inline-flex w-full items-center gap-2 rounded-full border border-emerald-200 bg-white py-1 pl-1 pr-3 shadow-[0_2px_10px_rgba(16,185,129,0.28)] focus-within:bg-emerald-50">
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800"
+                      aria-hidden
+                    >
+                      $
+                    </span>
+                    <DecimalInput
+                      min={0}
+                      placeholder="0"
+                      className="min-w-0 flex-1 bg-transparent text-sm font-medium text-emerald-900 outline-none"
+                      value={productModalDraft.salePrice}
+                      onChange={(value) =>
+                        updateNewProduct(productModalIndex, { salePrice: value })
+                      }
+                    />
+                  </div>
+                </label>
+                {productModalCost > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 pb-0.5">
+                    <ActionChip as="span" emoji="🧾">
+                      Costo {formatMoney(productModalCost)}
+                    </ActionChip>
+                    {parseDecimal(productModalDraft.salePrice) > 0 ? (
+                      <ActionChip as="span" tone="emerald" emoji="%">
+                        Margen{' '}
+                        {calcMarginPercent(
+                          parseDecimal(productModalDraft.salePrice),
+                          productModalCost,
+                        ).toFixed(0)}
+                        %
+                      </ActionChip>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {productModalDraft.imageUrl ? (
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                    <Image
+                      src={productModalDraft.imageUrl}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-400"
+                    aria-hidden
+                  >
+                    📷
+                  </span>
+                )}
+                <ActionChip
+                  elevated={false}
+                  disabled={uploadingPhoto}
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  {uploadingPhoto
+                    ? 'Subiendo…'
+                    : productModalDraft.imageUrl
+                      ? 'Cambiar foto'
+                      : 'Subir foto'}
+                </ActionChip>
+                {productModalDraft.imageUrl ? (
+                  <ActionChip
+                    tone="rose"
+                    elevated={false}
+                    onClick={() => updateNewProduct(productModalIndex, { imageUrl: '' })}
+                  >
+                    Eliminar foto
+                  </ActionChip>
+                ) : null}
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={productModalDraft.isAvailable}
+                  onChange={(e) =>
+                    updateNewProduct(productModalIndex, { isAvailable: e.target.checked })
+                  }
+                />
+                Visible en tienda
+              </label>
+              {productModalDraft.unit === 'kg' ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={productModalDraft.weighAtFulfillment}
+                    onChange={(e) =>
+                      updateNewProduct(productModalIndex, {
+                        weighAtFulfillment: e.target.checked,
+                      })
+                    }
+                  />
+                  <span>
+                    <span className="font-medium text-slate-800">
+                      Se pide por pieza y se pesa al cobrar
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      El cliente pide piezas; tú pesas en kg y el total sale del precio por kilo.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+            </div>
+
+            <details className="group mt-4 min-w-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/60 p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-slate-800">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-base"
+                    aria-hidden
+                  >
+                    🏪
+                  </span>
+                  Comparar con súper
+                </span>
+                <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
+                  <span className="group-open:hidden">Desplegar</span>
+                  <span className="hidden group-open:inline">Cerrar</span>
+                </ActionChip>
+              </summary>
+              <div className="mt-3 w-0 min-w-full overflow-x-auto">
+                <MarketComparePanel
+                  productName={productModalDraft.name}
+                  unit={productModalDraft.unit}
+                  currentPrice={parseDecimal(productModalDraft.salePrice)}
+                  cost={productModalCost}
+                  autoSearch
+                  currentPriceLabel="Precio de tienda"
+                  onPriceChange={(price) =>
+                    updateNewProduct(productModalIndex, { salePrice: String(price) })
+                  }
+                />
+              </div>
+            </details>
+
+            <div className="mt-5 flex justify-end">
+              <ActionChip tone="emerald" emoji="✅" onClick={() => setProductModalKey(null)}>
+                Listo
+              </ActionChip>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

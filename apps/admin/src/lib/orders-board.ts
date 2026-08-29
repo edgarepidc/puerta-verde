@@ -44,10 +44,16 @@ export interface OrderBoardRow {
   branch: { name: string; slug: string };
 }
 
-function deliveredSinceIso(days = 30): string {
-  const probe = new Date(`${todayMexicoYmd()}T12:00:00-06:00`);
-  probe.setDate(probe.getDate() - days);
-  return probe.toISOString();
+function deliveredSinceIso(): string {
+  const today = todayMexicoYmd();
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const monthsAgo = 2;
+  const absolute = year * 12 + (month - 1) - monthsAgo;
+  const startYear = Math.floor(absolute / 12);
+  const startMonth = (absolute % 12) + 1;
+  const startYmd = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+  return new Date(`${startYmd}T00:00:00-06:00`).toISOString();
 }
 
 function normalizeItems(raw: unknown): OrderBoardItemPreview[] {

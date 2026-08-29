@@ -11,6 +11,8 @@ import {
   type SubscriptionStatus,
 } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+
 export function BillingManager({
   organization,
   canManage,
@@ -26,6 +28,7 @@ export function BillingManager({
 }) {
   const [loading, setLoading] = useState<'basic' | 'pro' | 'portal' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const trialDays = daysUntilTrialEnd(organization.trial_ends_at);
 
@@ -61,25 +64,32 @@ export function BillingManager({
     }
   }
 
+  const trialHint =
+    trialDays !== null && organization.subscription_status === 'trialing'
+      ? ` · ${trialDays} días de prueba`
+      : '';
+
   return (
-    <section className="pv-glass-card p-6">
-      <h2 className="text-lg font-semibold text-slate-900">Suscripción</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Plan actual: <strong>{PLAN_LABELS[organization.subscription_plan]}</strong> ·{' '}
-        {STATUS_LABELS[organization.subscription_status]}
-        {trialDays !== null && organization.subscription_status === 'trialing' && (
-          <> · {trialDays} días de prueba restantes</>
-        )}
-      </p>
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Suscripción"
+        hint={`${PLAN_LABELS[organization.subscription_plan]} · ${STATUS_LABELS[organization.subscription_status]}${trialHint}`}
+        emoji="💳"
+        iconClass="bg-amber-100"
+      />
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      {canManage && (
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+      {canManage ? (
+        <div className="grid gap-4 md:grid-cols-2">
           {(['basic', 'pro'] as const).map((plan) => (
-            <div key={plan} className="pv-glass-item rounded-xl p-4">
+            <div key={plan} className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
               <h3 className="font-semibold text-slate-900">{PLAN_LABELS[plan]}</h3>
-              <p className="mt-1 text-2xl font-bold text-[var(--pv-green-800)]">
+              <p className="mt-1 text-2xl font-bold text-emerald-800">
                 ${PLAN_PRICES_MXN[plan]}
                 <span className="text-sm font-normal text-slate-500">/mes</span>
               </p>
@@ -88,29 +98,29 @@ export function BillingManager({
                   ? '1 sucursal, tienda web y panel admin.'
                   : 'Multi-sucursal, reportes avanzados y soporte prioritario.'}
               </p>
-              <button
-                type="button"
+              <ActionChip
+                className="mt-4"
+                tone={organization.subscription_plan === plan ? 'slate' : 'emerald'}
+                emoji={organization.subscription_plan === plan ? '✅' : '💳'}
                 disabled={loading !== null || organization.subscription_plan === plan}
-                onClick={() => startCheckout(plan)}
-                className="pv-btn-primary mt-4 px-4 py-2 text-sm disabled:opacity-50"
+                onClick={() => void startCheckout(plan)}
               >
-                {loading === plan ? 'Redirigiendo...' : organization.subscription_plan === plan ? 'Plan actual' : 'Elegir plan'}
-              </button>
+                {loading === plan
+                  ? 'Redirigiendo…'
+                  : organization.subscription_plan === plan
+                    ? 'Plan actual'
+                    : 'Elegir plan'}
+              </ActionChip>
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {canManage && organization.stripe_customer_id && (
-        <button
-          type="button"
-          disabled={loading !== null}
-          onClick={openPortal}
-          className="pv-btn-secondary mt-4 px-4 py-2 text-sm"
-        >
-          {loading === 'portal' ? 'Abriendo...' : 'Administrar facturación en Stripe'}
-        </button>
-      )}
-    </section>
+      {canManage && organization.stripe_customer_id ? (
+        <ActionChip emoji="🧾" disabled={loading !== null} onClick={() => void openPortal()}>
+          {loading === 'portal' ? 'Abriendo…' : 'Administrar facturación'}
+        </ActionChip>
+      ) : null}
+    </details>
   );
 }

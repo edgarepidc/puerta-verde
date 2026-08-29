@@ -104,3 +104,59 @@ export function groupByMexicoDay<T extends { created_at: string; total: number |
       items: groupItems,
     }));
 }
+
+export function formatMexicoMonthLabel(ym: string, today = todayMexicoYmd()): string {
+  if (!/^\d{4}-\d{2}$/.test(ym)) return ym;
+  const year = Number(ym.slice(0, 4));
+  const month = Number(ym.slice(5, 7));
+  const probe = new Date(Date.UTC(year, month - 1, 15));
+  const raw = new Intl.DateTimeFormat('es-MX', { month: 'long', timeZone: 'UTC' }).format(probe);
+  const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+  if (String(year) === today.slice(0, 4)) return label;
+  return `${label} ${year}`;
+}
+
+export type SalesLogSection<T> =
+  | ({ kind: 'day' } & MexicoDayGroup<T>)
+  | {
+      kind: 'month';
+      ym: string;
+      label: string;
+      count: number;
+      total: number;
+      days: MexicoDayGroup<T>[];
+    };
+
+/** Current month stays as days. Closed months collapse to one foldable group. */
+export function groupSalesLogByMonth<T extends { created_at: string; total: number | string }>(
+  items: T[],
+  today = todayMexicoYmd(),
+): SalesLogSection<T>[] {
+  const currentYm = today.slice(0, 7);
+  const currentDays: MexicoDayGroup<T>[] = [];
+  const months = new Map<string, MexicoDayGroup<T>[]>();
+
+  for (const day of groupByMexicoDay(items, today)) {
+    const ym = day.ymd.slice(0, 7);
+    if (ym === currentYm) {
+      currentDays.push(day);
+    } else {
+      const list = months.get(ym) ?? [];
+      list.push(day);
+      months.set(ym, list);
+    }
+  }
+
+  const monthSections: SalesLogSection<T>[] = [...months.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([ym, days]) => ({
+      kind: 'month' as const,
+      ym,
+      label: formatMexicoMonthLabel(ym, today),
+      count: days.reduce((sum, day) => sum + day.count, 0),
+      total: days.reduce((sum, day) => sum + day.total, 0),
+      days,
+    }));
+
+  return [...currentDays.map((day) => ({ kind: 'day' as const, ...day })), ...monthSections];
+}

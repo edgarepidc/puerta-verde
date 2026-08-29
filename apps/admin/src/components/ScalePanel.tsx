@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionChip } from '@/components/ActionChip';
 import { useSerialScale } from '@/hooks/useSerialScale';
 
 export function ScalePanel({
@@ -21,21 +22,13 @@ export function ScalePanel({
           </p>
         </div>
         {connected ? (
-          <button
-            type="button"
-            onClick={() => void disconnect()}
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm"
-          >
+          <ActionChip emoji="🔌" onClick={() => void disconnect()}>
             Desconectar
-          </button>
+          </ActionChip>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connect()}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
+          <ActionChip tone="emerald" emoji="⚖️" onClick={() => void connect()}>
             Conectar báscula
-          </button>
+          </ActionChip>
         )}
       </div>
       {connected && (

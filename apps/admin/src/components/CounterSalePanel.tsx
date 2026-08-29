@@ -20,6 +20,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, ChevronDownIcon } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 import { ScalePanel } from '@/components/ScalePanel';
 import {
@@ -647,17 +648,19 @@ export function CounterSalePanel({
             <h2 className="text-lg font-semibold text-slate-900">Ticket #{receipt.order.order_number}</h2>
             <p className="text-sm text-slate-500">Listo para la impresora de 58 mm</p>
           </div>
-          <button type="button" className="text-sm text-slate-500" onClick={() => setReceipt(null)}>
+          <ActionChip
+            icon={<span className="inline-flex rotate-180"><ChevronDownIcon /></span>}
+            onClick={() => setReceipt(null)}
+          >
             Cerrar
-          </button>
+          </ActionChip>
         </div>
         <div className="flex justify-center bg-slate-50 py-4">
           <ThermalReceipt data={preview} className="pv-thermal-preview" />
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm text-white"
+          <ActionChip
+            emoji="🖨️"
             onClick={async () => {
               setPrintError(null);
               try {
@@ -670,7 +673,7 @@ export function CounterSalePanel({
             }}
           >
             Imprimir ticket
-          </button>
+          </ActionChip>
           <a
             className="rounded-full border border-slate-300 px-4 py-2 text-sm"
             href={whatsappTicketHref(receipt.order.customer_phone, receipt.ticketText)}
@@ -679,16 +682,12 @@ export function CounterSalePanel({
           >
             Enviar por WhatsApp
           </a>
-          <button
-            type="button"
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm"
-            onClick={() => {
+          <ActionChip tone="emerald" emoji="🛒" onClick={() => {
               setReceipt(null);
               setOpen(true);
-            }}
-          >
+            }}>
             Nueva venta
-          </button>
+          </ActionChip>
         </div>
         {printError ? <p className="text-xs text-rose-700">{printError}</p> : null}
       </section>
@@ -701,18 +700,14 @@ export function CounterSalePanel({
         <div className="shrink-0">
           <h1 className="text-xl font-semibold text-slate-900">Pedidos</h1>
           <p className="text-sm text-slate-500">
-            {queueHint ? queueHint : 'Web y mostrador en un solo tablero'}
+            {queueHint ? queueHint : 'Cola de atención y ventas del día'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {printerChip}
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="shrink-0 whitespace-nowrap rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white"
-          >
-            + Nueva venta
-          </button>
+          <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
+            Nueva venta
+          </ActionChip>
         </div>
       </div>
     );
@@ -729,9 +724,12 @@ export function CounterSalePanel({
               : 'Catálogo compacto, como en la tienda.'}
           </p>
         </div>
-        <button type="button" className="text-sm text-slate-500 hover:text-slate-800" onClick={() => setOpen(false)}>
+        <ActionChip
+          icon={<span className="inline-flex rotate-180"><ChevronDownIcon /></span>}
+          onClick={() => setOpen(false)}
+        >
           Cerrar
-        </button>
+        </ActionChip>
       </div>
 
       {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
@@ -1155,22 +1153,22 @@ export function CounterSalePanel({
               ) : null}
               <span className="text-sm font-semibold text-slate-900">{formatMoney(payableTotal)}</span>
             </div>
-            <button
-              type="button"
+            <ActionChip
+              tone="emerald"
+              emoji="💵"
               disabled={
                 saving ||
                 cart.length === 0 ||
                 (paymentMethod === 'cash' && (cashShort || !amountReceived.trim()))
               }
               onClick={submitSale}
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
               {saving
                 ? 'Registrando…'
                 : changeDue != null
                   ? `Cobrar · cambio ${formatMoney(changeDue)}`
                   : 'Cobrar y entregar'}
-            </button>
+            </ActionChip>
           </div>
         </aside>
       </div>

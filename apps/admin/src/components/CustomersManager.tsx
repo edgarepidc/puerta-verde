@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 
 import { formatMoney } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+
 interface CustomerRow {
   id: string;
   phone: string;
@@ -63,6 +65,8 @@ export function CustomersManager({
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openFrecuentes, setOpenFrecuentes] = useState(true);
+  const [openClientes, setOpenClientes] = useState(true);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -93,17 +97,25 @@ export function CustomersManager({
 
   return (
     <div className="space-y-6">
-      {frequentCustomers.length > 0 && (
-        <section className="pv-glass-card p-5">
-          <h2 className="text-lg font-semibold text-slate-900">Frecuentes esta semana</h2>
-          <p className="text-sm text-slate-500">Top 10 por pedidos en los últimos 7 días</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      {frequentCustomers.length > 0 ? (
+        <details
+          className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+          open={openFrecuentes}
+          onToggle={(event) => setOpenFrecuentes(event.currentTarget.open)}
+        >
+          <FoldableSummary
+            title="Frecuentes esta semana"
+            hint="Top 10 por pedidos en los últimos 7 días"
+            emoji="⭐"
+            iconClass="bg-amber-100"
+          />
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {frequentCustomers.map((customer) => (
               <button
                 key={customer.id}
                 type="button"
                 className="rounded-xl border border-slate-200/80 bg-white/60 p-3 text-left hover:bg-emerald-50"
-                onClick={() => openDetail(customer.id)}
+                onClick={() => void openDetail(customer.id)}
               >
                 <p className="truncate text-sm font-medium text-slate-900">
                   {customer.full_name || 'Sin nombre'}
@@ -115,28 +127,33 @@ export function CustomersManager({
               </button>
             ))}
           </div>
-        </section>
-      )}
+        </details>
+      ) : null}
+
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={openClientes}
+      onToggle={(event) => setOpenClientes(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Clientes"
+        hint={`${customers.length} registrados por celular`}
+        emoji="🧑"
+        iconClass="bg-sky-100"
+        actions={
+          <input
+            type="search"
+            className="h-9 w-36 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-52"
+            placeholder="Buscar…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar nombre o celular"
+          />
+        }
+      />
 
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="pv-glass-card p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Clientes</h2>
-            <p className="text-sm text-slate-500">{customers.length} registrados por celular</p>
-          </div>
-          <label className="block text-sm">
-            <span className="sr-only">Buscar</span>
-            <input
-              className="pv-input w-56"
-              placeholder="Buscar nombre o celular"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="mt-4 overflow-x-auto">
+      <section className="min-w-0 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="text-slate-500">
               <tr>
@@ -179,10 +196,9 @@ export function CustomersManager({
               )}
             </tbody>
           </table>
-        </div>
       </section>
 
-      <section className="pv-glass-card p-6">
+      <section className="min-w-0">
         {!selectedId && (
           <p className="text-sm text-slate-500">
             Selecciona un cliente para ver su historial y qué suele comprar.
@@ -204,9 +220,11 @@ export function CustomersManager({
                 href={`https://wa.me/${detail.customer.phone.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 inline-block text-sm font-medium text-emerald-800 underline"
+                className="mt-2 inline-flex"
               >
-                WhatsApp
+                <ActionChip as="span" emoji="💬" tone="emerald">
+                  WhatsApp
+                </ActionChip>
               </a>
             </div>
 
@@ -249,13 +267,16 @@ export function CustomersManager({
               </ul>
             </div>
 
-            <Link href="/" className="inline-block text-sm text-emerald-800 underline">
-              Ir a pedidos
+            <Link href="/" className="inline-flex">
+              <ActionChip as="span" emoji="🧾">
+                Ir a pedidos
+              </ActionChip>
             </Link>
           </div>
         )}
       </section>
     </div>
+    </details>
     </div>
   );
 }

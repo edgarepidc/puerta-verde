@@ -8,6 +8,7 @@ import {
   type CouponDiscountType,
 } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal, parseOptionalDecimal } from '@/components/DecimalInput';
 
 interface CouponRow {
@@ -71,6 +72,7 @@ export function CouponsManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openCupones, setOpenCupones] = useState(true);
 
   const sorted = useMemo(
     () =>
@@ -175,22 +177,24 @@ export function CouponsManager({
   }
 
   return (
-    <section className="space-y-6">
-      <div className="pv-glass-card space-y-4 p-6">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Cupones de descuento</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Códigos con vigencia para la tienda web y venta mostrador. Pueden ser porcentaje o monto
-            fijo.
-          </p>
-        </div>
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={openCupones}
+      onToggle={(event) => setOpenCupones(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Código al cobrar"
+        hint="Vigencia para tienda web y mostrador · porcentaje o monto"
+        emoji="🎟️"
+        iconClass="bg-amber-100"
+      />
 
         {!canManage ? (
           <p className="text-sm text-slate-500">Solo lectura · no tienes permiso para editar cupones.</p>
         ) : null}
 
         {canManage ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 md:grid-cols-4">
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Código</span>
               <input
@@ -200,7 +204,7 @@ export function CouponsManager({
                 placeholder="VERANO10"
               />
             </label>
-            <label className="block text-sm">
+            <label className="block text-sm md:col-span-3">
               <span className="font-medium text-slate-700">Descripción (opcional)</span>
               <input
                 className="pv-input mt-1"
@@ -214,7 +218,7 @@ export function CouponsManager({
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Tipo</span>
               <select
-                className="pv-input mt-1"
+                className="pv-input mt-1 py-1.5 text-sm"
                 value={form.discountType}
                 onChange={(e) =>
                   setForm((current) => ({
@@ -241,25 +245,7 @@ export function CouponsManager({
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Vigencia desde</span>
-              <input
-                type="datetime-local"
-                className="pv-input mt-1"
-                value={form.startsAt}
-                onChange={(e) => setForm((current) => ({ ...current, startsAt: e.target.value }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Vigencia hasta</span>
-              <input
-                type="datetime-local"
-                className="pv-input mt-1"
-                value={form.endsAt}
-                onChange={(e) => setForm((current) => ({ ...current, endsAt: e.target.value }))}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Máx. usos (opcional)</span>
+              <span className="font-medium text-slate-700">Máx. usos</span>
               <input
                 className="pv-input mt-1"
                 inputMode="numeric"
@@ -269,7 +255,7 @@ export function CouponsManager({
               />
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-slate-700">Pedido mínimo $ (opcional)</span>
+              <span className="font-medium text-slate-700">Pedido mínimo $</span>
               <DecimalInput
                 className="pv-input mt-1"
                 value={form.minOrderAmount}
@@ -279,7 +265,25 @@ export function CouponsManager({
                 placeholder="0"
               />
             </label>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Vigencia desde</span>
+              <input
+                type="datetime-local"
+                className="pv-input mt-1"
+                value={form.startsAt}
+                onChange={(e) => setForm((current) => ({ ...current, startsAt: e.target.value }))}
+              />
+            </label>
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-slate-700">Vigencia hasta</span>
+              <input
+                type="datetime-local"
+                className="pv-input mt-1"
+                value={form.endsAt}
+                onChange={(e) => setForm((current) => ({ ...current, endsAt: e.target.value }))}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm md:col-span-4">
               <input
                 type="checkbox"
                 checked={form.isActive}
@@ -287,32 +291,21 @@ export function CouponsManager({
               />
               Cupón activo
             </label>
-            {error ? <p className="text-sm text-rose-700 sm:col-span-2">{error}</p> : null}
-            <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={save}
-                className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
+            {error ? <p className="text-sm text-rose-700 md:col-span-4">{error}</p> : null}
+            <div className="flex flex-wrap gap-2 md:col-span-4">
+              <ActionChip tone="emerald" emoji="🎟️" disabled={saving} onClick={save}>
                 {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear cupón'}
-              </button>
+              </ActionChip>
               {editingId ? (
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={resetForm}
-                  className="rounded-full border border-slate-300 px-4 py-2 text-sm"
-                >
+                <ActionChip elevated={false} disabled={saving} onClick={resetForm}>
                   Cancelar
-                </button>
+                </ActionChip>
               ) : null}
             </div>
           </div>
         ) : null}
-      </div>
 
-      <div className="pv-glass-card overflow-hidden p-0">
+      <div className="overflow-x-auto rounded-2xl border border-slate-100">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
@@ -358,21 +351,18 @@ export function CouponsManager({
                 </td>
                 {canManage ? (
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-slate-700 hover:underline"
-                        onClick={() => startEdit(row)}
-                      >
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <ActionChip elevated={false} emoji="✏️" onClick={() => startEdit(row)}>
                         Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-rose-700 hover:underline"
-                        onClick={() => remove(row)}
+                      </ActionChip>
+                      <ActionChip
+                        elevated={false}
+                        tone="rose"
+                        emoji="🗑️"
+                        onClick={() => void remove(row)}
                       >
                         Eliminar
-                      </button>
+                      </ActionChip>
                     </div>
                   </td>
                 ) : null}
@@ -391,6 +381,6 @@ export function CouponsManager({
           </tbody>
         </table>
       </div>
-    </section>
+    </details>
   );
 }

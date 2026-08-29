@@ -5,7 +5,9 @@ export {
   ORDER_STATUS_LABELS,
   ORDER_WORKFLOW_STATUSES,
   formatMexicoDayLabel,
+  formatMexicoMonthLabel,
   groupByMexicoDay,
+  groupSalesLogByMonth,
   isOrderStatus,
   isOrderWorkflowStatus,
   mexicoYmdFromIso,
@@ -17,6 +19,7 @@ export {
   type MexicoDayGroup,
   type OrderStatus,
   type OrderWorkflowStatus,
+  type SalesLogSection,
 } from './order-status';
 
 export {

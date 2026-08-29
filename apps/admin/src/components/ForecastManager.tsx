@@ -11,6 +11,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import { LowStockBanner } from '@/components/LowStockBanner';
 import { ThermalPrinterChip } from '@/components/ThermalPrinterChip';
@@ -63,6 +64,12 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   current: 'Mes en curso',
   previous: 'Mes anterior',
   custom: 'Personalizado',
+};
+
+const PRESET_EMOJI: Record<PeriodPreset, string> = {
+  current: '📅',
+  previous: '📆',
+  custom: '✏️',
 };
 
 function detectPreset(from: string, to: string): PeriodPreset {
@@ -362,6 +369,8 @@ export function ForecastManager({
   const [printSelectCount, setPrintSelectCount] = useState('12');
   const [printBusy, setPrintBusy] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [openComprar, setOpenComprar] = useState(true);
+  const [openVentas, setOpenVentas] = useState(false);
   const { status: printerStatus } = useThermalPrinter();
 
   const bannerProducts = useMemo(() => {
@@ -571,12 +580,12 @@ export function ForecastManager({
     <div className="space-y-6">
       <LowStockBanner
         products={bannerProducts}
-        href="/inventario"
+        href="/compras"
         persist
         linkLabel="Ir a comprar"
       />
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <div className="pv-glass-card flex gap-3 p-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl" aria-hidden>
             ⚠️
@@ -597,188 +606,66 @@ export function ForecastManager({
             <p className="text-xs text-slate-500">Mínimo, agotarse o reponer</p>
           </div>
         </div>
-        <div className="pv-glass-card flex gap-3 p-4">
+        <div className="pv-glass-card col-span-2 flex gap-3 p-4 sm:col-span-1">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl" aria-hidden>
             🛒
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">A reponer</p>
             <p className="mt-0.5 text-xl font-bold text-slate-900">{reorderCount}</p>
-            <p className="text-xs text-slate-500">Sugerencia en {horizonDays} días</p>
+            <p className="text-xs text-slate-500">Sugerencia a 7 días</p>
           </div>
         </div>
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl" aria-hidden>
-            📊
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ventas periodo</p>
-            <p className="mt-0.5 text-xl font-bold text-emerald-800">{formatMoney(totalTrend)}</p>
-            <p className="text-xs text-slate-500">{periodLabel}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="pv-glass-card space-y-3 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-slate-900">Periodo de transacciones</h2>
-            <p className="text-sm text-slate-500">{periodLabel}</p>
-          </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs font-medium text-slate-600">
-              Horizonte
-              <input
-                type="number"
-                min={1}
-                max={30}
-                className="pv-input mt-1 block w-20 text-sm"
-                value={horizonDays}
-                onChange={(e) => setHorizonDays(Number(e.target.value))}
-              />
-            </label>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void refresh()}
-              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 disabled:opacity-50"
-            >
-              {loading ? '…' : 'Actualizar'}
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void generateInsights()}
-              className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Resumen IA
-            </button>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => applyPreset(key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                preset === key
-                  ? 'bg-emerald-700 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {PRESET_LABELS[key]}
-            </button>
-          ))}
-        </div>
-        {preset === 'custom' ? (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
-            <label className="text-xs font-medium text-slate-600">
-              Desde
-              <input
-                type="date"
-                max={todayMexicoYmd()}
-                className="pv-input mt-1 block text-sm"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </label>
-            <label className="text-xs font-medium text-slate-600">
-              Hasta
-              <input
-                type="date"
-                max={todayMexicoYmd()}
-                className="pv-input mt-1 block text-sm"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void refreshTrends(from, to)}
-              className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Aplicar rango
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="pv-glass-card p-5">
-          <p className="text-sm text-slate-500">Acumulado · {periodLabel}</p>
-          <h2 className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-slate-900">
-            {formatMoney(totalTrend)}
-          </h2>
-          <p className="mt-3 text-sm font-medium text-slate-700">Ventas por día</p>
-          <p className="text-sm text-slate-500">Monto vendido en caja</p>
-          <div className="mt-3">
-            {series.length > 0 ? (
-              <LineChart series={series} />
-            ) : (
-              <p className="py-10 text-sm text-slate-500">Aún no hay ventas en el periodo.</p>
-            )}
-          </div>
-        </section>
-        <section className="pv-glass-card p-5">
-          <h2 className="font-semibold text-slate-900">Lo que más se vende</h2>
-          <p className="mb-3 text-sm text-slate-500">Prioriza comprar lo que rota</p>
-          {topProducts.length > 0 ? (
-            <BarChart products={topProducts} />
-          ) : (
-            <p className="py-10 text-sm text-slate-500">Sin datos de productos todavía.</p>
-          )}
-        </section>
       </div>
 
-      {insights ? (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-          <h2 className="font-semibold text-emerald-950">Recomendaciones</h2>
-          <p className="mt-2 whitespace-pre-line text-sm text-emerald-900">{insights}</p>
-        </section>
-      ) : null}
-
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Qué hay y qué comprar</h2>
-            <p className="text-sm text-slate-500">
-              {onlyUrgent
-                ? `${sortedRows.length} urgentes (stock bajo, se acaba pronto o hay que reponer)`
-                : `${sortedRows.length} productos · urgentes primero`}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              className="pv-input w-40 text-sm"
-              placeholder="Buscar producto…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {restCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => setOnlyUrgent((v) => !v)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  onlyUrgent
-                    ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    : 'bg-amber-600 text-white'
-                }`}
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openComprar}
+        onToggle={(event) => setOpenComprar(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Qué comprar"
+          hint={
+            onlyUrgent
+              ? `${sortedRows.length} urgentes (stock bajo, se acaba pronto o hay que reponer)`
+              : `${sortedRows.length} productos · urgentes primero`
+          }
+          emoji="🛒"
+          iconClass="bg-emerald-100"
+          actions={
+            <>
+              <input
+                type="search"
+                className="h-9 w-36 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-44"
+                placeholder="Buscar…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Buscar producto"
+              />
+              <ActionChip emoji="🔄" disabled={loading} onClick={() => void refresh()}>
+                {loading ? '…' : 'Actualizar'}
+              </ActionChip>
+              <ActionChip
+                tone="emerald"
+                emoji="🖨️"
+                disabled={printRows.length === 0}
+                onClick={openPrintList}
               >
-                {onlyUrgent ? `Ver el resto (${restCount})` : 'Solo urgentes'}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={openPrintList}
-              disabled={printRows.length === 0}
-              className="rounded-full bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Imprimir lista
-            </button>
-          </div>
-        </div>
+                Imprimir lista
+              </ActionChip>
+            </>
+          }
+        />
+
+        {restCount > 0 ? (
+          <ActionChip
+            emoji={onlyUrgent ? '📋' : '⚠️'}
+            tone={onlyUrgent ? 'slate' : 'emerald'}
+            onClick={() => setOnlyUrgent((v) => !v)}
+          >
+            {onlyUrgent ? `Ver el resto (${restCount})` : 'Solo urgentes'}
+          </ActionChip>
+        ) : null}
 
         {printOpen ? (
           <section className="space-y-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
@@ -791,13 +678,9 @@ export function ForecastManager({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <ThermalPrinterChip />
-                <button
-                  type="button"
-                  onClick={() => setPrintOpen(false)}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700"
-                >
+                <ActionChip elevated={false} onClick={() => setPrintOpen(false)}>
                   Cerrar
-                </button>
+                </ActionChip>
               </div>
             </div>
 
@@ -820,27 +703,15 @@ export function ForecastManager({
                   aria-label="Cuántos productos marcar"
                 />
               </label>
-              <button
-                type="button"
-                className="rounded-full bg-emerald-800 px-2.5 py-1 font-semibold text-white"
-                onClick={() => applyTopSelect(parseDecimal(printSelectCount, 12))}
-              >
+              <ActionChip emoji="✅" tone="emerald" onClick={() => applyTopSelect(parseDecimal(printSelectCount, 12))}>
                 Aplicar
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold"
-                onClick={() => applyTopSelect(printRows.length)}
-              >
+              </ActionChip>
+              <ActionChip emoji="📋" onClick={() => applyTopSelect(printRows.length)}>
                 Todos ({printRows.length})
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold"
-                onClick={() => applyTopSelect(0)}
-              >
+              </ActionChip>
+              <ActionChip elevated={false} onClick={() => applyTopSelect(0)}>
                 Ninguno
-              </button>
+              </ActionChip>
             </div>
 
             <div className="max-h-[28rem] overflow-auto rounded-xl border border-slate-100">
@@ -897,26 +768,22 @@ export function ForecastManager({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+              <ActionChip
+                size="lg"
+                emoji="🖨️"
+                tone="emerald"
                 disabled={printBusy}
                 onClick={() => void handlePrintThermal()}
-                className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
               >
                 {printBusy
                   ? 'Imprimiendo…'
                   : printerStatus === 'ready'
                     ? 'Imprimir ticket'
                     : 'Imprimir en térmica'}
-              </button>
-              <button
-                type="button"
-                disabled={printBusy}
-                onClick={handlePrintBrowser}
-                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-800 disabled:opacity-50"
-              >
+              </ActionChip>
+              <ActionChip emoji="📄" disabled={printBusy} onClick={handlePrintBrowser}>
                 Imprimir / PDF
-              </button>
+              </ActionChip>
               {printError ? <p className="text-sm text-red-600">{printError}</p> : null}
             </div>
           </section>
@@ -975,11 +842,10 @@ export function ForecastManager({
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         {reorder > 0 || below ? (
-                          <Link
-                            href={`/inventario?tab=compra&product=${row.branch_product_id}`}
-                            className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-100"
-                          >
-                            Comprar
+                          <Link href={`/compras?tab=compra&product=${row.branch_product_id}`}>
+                            <ActionChip as="span" tone="emerald" emoji="🛒">
+                              Comprar
+                            </ActionChip>
                           </Link>
                         ) : null}
                       </td>
@@ -990,7 +856,105 @@ export function ForecastManager({
             </table>
           </div>
         )}
-      </section>
+      </details>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openVentas}
+        onToggle={(event) => setOpenVentas(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Ventas del periodo"
+          hint={`${periodLabel} · ${formatMoney(totalTrend)}`}
+          emoji="📈"
+          iconClass="bg-sky-100"
+          actions={
+            <>
+              <ActionChip emoji="🔄" disabled={loading} onClick={() => void refresh()}>
+                {loading ? '…' : 'Actualizar'}
+              </ActionChip>
+              <ActionChip emoji="✨" disabled={loading} onClick={() => void generateInsights()}>
+                Resumen IA
+              </ActionChip>
+            </>
+          }
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
+            <ActionChip
+              key={key}
+              emoji={PRESET_EMOJI[key]}
+              tone={preset === key ? 'emerald' : 'slate'}
+              elevated={preset === key}
+              onClick={() => applyPreset(key)}
+            >
+              {PRESET_LABELS[key]}
+            </ActionChip>
+          ))}
+        </div>
+        {preset === 'custom' ? (
+          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+            <label className="text-xs font-medium text-slate-600">
+              Desde
+              <input
+                type="date"
+                max={todayMexicoYmd()}
+                className="pv-input mt-1 block text-sm"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              Hasta
+              <input
+                type="date"
+                max={todayMexicoYmd()}
+                className="pv-input mt-1 block text-sm"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </label>
+            <ActionChip emoji="📅" disabled={loading} onClick={() => void refreshTrends(from, to)}>
+              Aplicar rango
+            </ActionChip>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+            <p className="text-sm text-slate-500">Acumulado · {periodLabel}</p>
+            <h3 className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-slate-900">
+              {formatMoney(totalTrend)}
+            </h3>
+            <p className="mt-3 text-sm font-medium text-slate-700">Ventas por día</p>
+            <p className="text-sm text-slate-500">Monto vendido en caja</p>
+            <div className="mt-3">
+              {series.length > 0 ? (
+                <LineChart series={series} />
+              ) : (
+                <p className="py-10 text-sm text-slate-500">Aún no hay ventas en el periodo.</p>
+              )}
+            </div>
+          </section>
+          <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+            <h3 className="font-semibold text-slate-900">Lo que más se vende</h3>
+            <p className="mb-3 text-sm text-slate-500">Prioriza comprar lo que rota</p>
+            {topProducts.length > 0 ? (
+              <BarChart products={topProducts} />
+            ) : (
+              <p className="py-10 text-sm text-slate-500">Sin datos de productos todavía.</p>
+            )}
+          </section>
+        </div>
+
+        {insights ? (
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <h3 className="font-semibold text-emerald-950">Recomendaciones</h3>
+            <p className="mt-2 whitespace-pre-line text-sm text-emerald-900">{insights}</p>
+          </section>
+        ) : null}
+      </details>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>

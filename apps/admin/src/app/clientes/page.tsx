@@ -1,4 +1,5 @@
 import { AdminShell } from '@/components/AdminShell';
+import { AjustesNav } from '@/components/AjustesNav';
 import { CustomersManager } from '@/components/CustomersManager';
 import { getStaffSession } from '@/lib/auth';
 import { createAdminClient } from '@puertaverde/supabase/admin';
@@ -85,8 +86,11 @@ export default async function ClientesPage() {
     .slice(0, 10);
 
   return (
-    <AdminShell title="Clientes" subtitle={`CRM ligero · ${staff.branchName}`}>
-      <CustomersManager initialCustomers={enriched} frequentCustomers={frequentCustomers} />
+    <AdminShell title="Ajustes" subtitle={`Clientes · ${staff.branchName}`}>
+      <div className="space-y-6">
+        <AjustesNav current="clientes" isPlatformAdmin={staff.isPlatformAdmin} />
+        <CustomersManager initialCustomers={enriched} frequentCustomers={frequentCustomers} />
+      </div>
     </AdminShell>
   );
 }

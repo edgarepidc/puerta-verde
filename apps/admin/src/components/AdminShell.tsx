@@ -84,7 +84,7 @@ export async function AdminShell({
               Tu suscripción está en estado <strong>{STATUS_LABELS[org.subscription_status]}</strong>.
               Actualiza tu plan en{' '}
               <Link href="/configuracion?tab=suscripcion" className="font-medium underline">
-                Configuración
+                Ajustes
               </Link>{' '}
               para seguir operando sin interrupciones.
             </div>

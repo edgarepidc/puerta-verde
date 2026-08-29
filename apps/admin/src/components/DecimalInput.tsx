@@ -7,10 +7,46 @@ const DECIMAL_PATTERN = /^-?\d*\.?\d*$/;
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange' | 'inputMode'> & {
   value: string;
   onChange: (value: string) => void;
+  /** Group thousands with commas while typing (money). */
+  groupThousands?: boolean;
 };
 
+function formatGrouped(raw: string): string {
+  if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return raw;
+  const negative = raw.startsWith('-');
+  const body = negative ? raw.slice(1) : raw;
+  const dot = body.indexOf('.');
+  const intPart = dot === -1 ? body : body.slice(0, dot);
+  const decPart = dot === -1 ? null : body.slice(dot + 1);
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const sign = negative ? '-' : '';
+  return decPart == null ? `${sign}${grouped}` : `${sign}${grouped}.${decPart}`;
+}
+
+function digitsBeforeCaret(value: string, caret: number): number {
+  return value.slice(0, caret).replace(/\D/g, '').length;
+}
+
+function caretFromDigitCount(value: string, digitCount: number): number {
+  if (digitCount <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (/\d/.test(value[i])) {
+      seen += 1;
+      if (seen === digitCount) return i + 1;
+    }
+  }
+  return value.length;
+}
+
+function parseNumericText(value: string): number {
+  const trimmed = value.trim().replace(/,/g, '');
+  if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === '-.') return Number.NaN;
+  return Number(trimmed);
+}
+
 /** Text input for amounts/qty — avoids sticky leading zeros from controlled type=number. */
-export function DecimalInput({ value, onChange, className, ...rest }: Props) {
+export function DecimalInput({ value, onChange, className, groupThousands = false, ...rest }: Props) {
   return (
     <input
       type="text"
@@ -18,11 +54,21 @@ export function DecimalInput({ value, onChange, className, ...rest }: Props) {
       autoComplete="off"
       className={className}
       {...rest}
-      value={value}
+      value={groupThousands ? formatGrouped(value) : value}
       onChange={(e) => {
-        const raw = e.target.value.replace(',', '.');
+        const input = e.currentTarget;
+        const caret = input.selectionStart ?? input.value.length;
+        const digits = digitsBeforeCaret(input.value, caret);
+        const raw = groupThousands ? input.value.replace(/,/g, '') : input.value.replace(',', '.');
         if (raw === '' || DECIMAL_PATTERN.test(raw)) {
           onChange(raw);
+          if (groupThousands) {
+            const next = formatGrouped(raw);
+            queueMicrotask(() => {
+              const pos = caretFromDigitCount(next, digits);
+              input.setSelectionRange(pos, pos);
+            });
+          }
         }
       }}
     />
@@ -30,14 +76,12 @@ export function DecimalInput({ value, onChange, className, ...rest }: Props) {
 }
 
 export function parseDecimal(value: string, fallback = 0): number {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === '-.') return fallback;
-  const n = Number(trimmed);
+  const n = parseNumericText(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
 export function parseOptionalDecimal(value: string): number | null {
-  const trimmed = value.trim();
+  const trimmed = value.trim().replace(/,/g, '');
   if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === '-.') return null;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;

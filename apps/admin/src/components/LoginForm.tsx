@@ -4,7 +4,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { BrandLogo } from '@/components/BrandLogo';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -20,26 +24,19 @@ export function LoginForm() {
     setError(null);
 
     try {
-      const supabase = createSupabaseBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
       });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
-      if (signInError) {
-        setError('Correo o contraseña incorrectos.');
+      if (!response.ok) {
+        setError(payload?.error ?? 'No se pudo entrar. Inténtalo de nuevo.');
         return;
       }
 
-      const sessionResponse = await fetch('/api/auth/session');
-      if (!sessionResponse.ok) {
-        await supabase.auth.signOut();
-        setError('Tu cuenta no tiene acceso al panel. Pide acceso al administrador.');
-        return;
-      }
-
-      const next = searchParams.get('next') ?? '/';
-      router.push(next);
+      router.push(safeNextPath(searchParams.get('next')));
       router.refresh();
     } catch {
       setError('No se pudo conectar. Recarga la página e inténtalo de nuevo.');
@@ -66,11 +63,11 @@ export function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <label className="block text-sm font-medium text-slate-700">
-              Correo
+              Usuario
               <input
                 type="email"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 className="pv-input mt-1"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

@@ -14,6 +14,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, ChevronDownIcon, FoldableSummary } from '@/components/ActionChip';
 import { CategorySearchSelect } from '@/components/CategorySearchSelect';
 import { CostImportPanel } from '@/components/CostImportPanel';
 import {
@@ -54,8 +55,6 @@ interface ProductRow {
   };
 }
 
-type CatalogTab = 'productos' | 'importar';
-
 const emptyForm: ProductInput = {
   name: '',
   categoryId: '',
@@ -63,7 +62,7 @@ const emptyForm: ProductInput = {
   unit: 'kg',
   price: 0,
   shelfLifeDays: null,
-  weighAtFulfillment: false,
+  weighAtFulfillment: true,
   isAvailable: true,
   isActive: true,
 };
@@ -72,7 +71,7 @@ async function uploadImage(file: File) {
   return uploadProductMedia(file, 'product-media');
 }
 
-type SortKey = 'name' | 'category' | 'price' | 'cost' | 'margin' | 'stock' | 'store';
+type SortKey = 'name' | 'price' | 'stock' | 'store';
 type SortDir = 'asc' | 'desc';
 
 function SortHeader({
@@ -107,6 +106,10 @@ function SortHeader({
   );
 }
 
+function formatStockQty(value: number): string {
+  return Number(value).toFixed(2);
+}
+
 export function ProductsManager({
   initialProducts,
   initialCategories,
@@ -127,14 +130,13 @@ export function ProductsManager({
   const [movements, setMovements] = useState(initialMovements);
   const [form, setForm] = useState(emptyForm);
   const [priceText, setPriceText] = useState('');
-  const [shelfLifeText, setShelfLifeText] = useState('');
   const [editing, setEditing] = useState<{ productId: string; branchProductId: string } | null>(null);
   const [editingRow, setEditingRow] = useState<ProductRow | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<CatalogTab>('productos');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -144,6 +146,8 @@ export function ProductsManager({
   const [stockNotes, setStockNotes] = useState('');
   const [stockError, setStockError] = useState<string | null>(null);
   const [stockSaving, setStockSaving] = useState(false);
+  const [openProductos, setOpenProductos] = useState(true);
+  const [openHistorial, setOpenHistorial] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const sorted = useMemo(() => {
@@ -156,7 +160,7 @@ export function ProductsManager({
         return false;
       }
       if (!q) return true;
-      const hay = `${row.product.name} ${row.product.sku ?? ''} ${row.product.category?.name ?? ''}`.toLowerCase();
+      const hay = `${row.product.name} ${row.product.category?.name ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
     return [...filtered].sort((a, b) => {
@@ -167,17 +171,8 @@ export function ProductsManager({
         return (Number(left) - Number(right)) * dir;
       };
       switch (sortKey) {
-        case 'category':
-          return cmp(a.product.category?.name ?? '', b.product.category?.name ?? '');
         case 'price':
           return cmp(Number(a.price), Number(b.price));
-        case 'cost':
-          return cmp(Number(a.avg_unit_cost), Number(b.avg_unit_cost));
-        case 'margin':
-          return cmp(
-            calcMarginPercent(Number(a.price), Number(a.avg_unit_cost)),
-            calcMarginPercent(Number(b.price), Number(b.avg_unit_cost)),
-          );
         case 'stock':
           return cmp(Number(a.stock), Number(b.stock));
         case 'store': {
@@ -197,37 +192,27 @@ export function ProductsManager({
       return;
     }
     setSortKey(column);
-    setSortDir(column === 'name' || column === 'category' ? 'asc' : 'desc');
+    setSortDir(column === 'name' ? 'asc' : 'desc');
   }
 
   useEffect(() => {
-    if (!showForm && !stockRow) return;
+    if (!showForm) return;
     function onKey(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (stockRow) {
-        closeStock();
-        return;
-      }
-      setShowForm(false);
-      setEditing(null);
-      setEditingRow(null);
-      setForm(emptyForm);
-      setPriceText('');
-      setShelfLifeText('');
-      setError(null);
+      closeForm();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showForm, stockRow]);
+  }, [showForm]);
 
   function openCreate() {
     setEditing(null);
     setEditingRow(null);
     setForm(emptyForm);
     setPriceText('');
-    setShelfLifeText('');
     setError(null);
     setShowForm(true);
+    closeStock();
   }
 
   function openEdit(row: ProductRow) {
@@ -246,11 +231,12 @@ export function ProductsManager({
       isActive: row.product.is_active,
     });
     setPriceText(decimalFromNumber(price));
-    setShelfLifeText(
-      row.product.shelf_life_days ? String(Number(row.product.shelf_life_days)) : '',
-    );
     setError(null);
     setShowForm(true);
+    setStockRow(row);
+    setCountedText(formatStockQty(Number(row.stock)));
+    setStockNotes('');
+    setStockError(null);
   }
 
   function closeForm() {
@@ -259,8 +245,8 @@ export function ProductsManager({
     setEditingRow(null);
     setForm(emptyForm);
     setPriceText('');
-    setShelfLifeText('');
     setError(null);
+    closeStock();
   }
 
   async function refresh() {
@@ -292,7 +278,7 @@ export function ProductsManager({
         price: parseDecimal(priceText),
         categoryId: form.categoryId || null,
         imageUrl: form.imageUrl?.trim() || null,
-        shelfLifeDays: shelfLifeText.trim() ? parseDecimal(shelfLifeText) : null,
+        shelfLifeDays: editingRow?.product.shelf_life_days ?? null,
         weighAtFulfillment: Boolean(form.weighAtFulfillment),
         isAvailable: form.isAvailable,
         isActive: form.isAvailable,
@@ -436,13 +422,6 @@ export function ProductsManager({
     setStockSaving(false);
   }
 
-  function openStock(row: ProductRow) {
-    setStockRow(row);
-    setCountedText(decimalFromNumber(Number(row.stock), false));
-    setStockNotes('');
-    setStockError(null);
-  }
-
   async function submitStock(kind: 'waste' | 'adjustment') {
     if (!stockRow || !canAdjustInventory) return;
     const system = Number(stockRow.stock);
@@ -451,7 +430,7 @@ export function ProductsManager({
       setStockError('Indica un conteo válido (0 o más).');
       return;
     }
-    const delta = Number((counted - system).toFixed(3));
+    const delta = Number((counted - system).toFixed(2));
     if (delta === 0) {
       setStockError('El conteo es igual al stock del sistema.');
       return;
@@ -473,14 +452,33 @@ export function ProductsManager({
           notes:
             stockNotes.trim() ||
             (kind === 'waste'
-              ? `Merma desde catálogo (sistema ${system} → conteo ${counted})`
-              : `Ajuste desde catálogo (sistema ${system} → conteo ${counted})`),
+              ? `Merma desde catálogo (sistema ${formatStockQty(system)} → conteo ${formatStockQty(counted)})`
+              : `Ajuste desde catálogo (sistema ${formatStockQty(system)} → conteo ${formatStockQty(counted)})`),
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
-      await refresh();
-      closeStock();
+      const [productsRes, inventoryRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/inventory'),
+      ]);
+      const payload = await productsRes.json();
+      if (productsRes.ok) {
+        setProducts(payload.products);
+        setCategories(payload.categories);
+        const updated = (payload.products as ProductRow[]).find((row) => row.id === stockRow.id);
+        if (updated) {
+          setStockRow(updated);
+          setEditingRow(updated);
+          setCountedText(formatStockQty(Number(updated.stock)));
+        }
+      }
+      if (inventoryRes.ok) {
+        const inventory = await inventoryRes.json();
+        setMovements(inventory.movements ?? []);
+      }
+      setStockNotes('');
+      setStockError(null);
     } catch (err) {
       setStockError(err instanceof Error ? err.message : 'Error al registrar');
     } finally {
@@ -536,109 +534,95 @@ export function ProductsManager({
         onChange={(e) => void handlePhotoSelected(e.target.files?.[0])}
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-slate-500">Sucursal: {branchName}</p>
-          <p className="text-2xl font-bold text-slate-900">
-            {sorted.length === products.length
-              ? `${products.length} productos`
-              : `${sorted.length} de ${products.length} productos`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {tab === 'productos' ? (
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar…"
-              aria-label="Buscar productos"
-              className="h-10 w-40 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-52"
-            />
-          ) : null}
-          {canManage ? (
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openProductos}
+        onToggle={(event) => setOpenProductos(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Productos"
+          hint={
+            sorted.length === products.length
+              ? `${products.length} en ${branchName}`
+              : `${sorted.length} de ${products.length} · ${branchName}`
+          }
+          emoji="🥬"
+          iconClass="bg-emerald-100"
+          actions={
             <>
-              <button
-                type="button"
-                onClick={() => setTab(tab === 'importar' ? 'productos' : 'importar')}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  tab === 'importar'
-                    ? 'bg-slate-900 text-white'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {tab === 'importar' ? 'Ver productos' : 'Importar Excel'}
-              </button>
-              {tab === 'productos' ? (
-                <button type="button" onClick={openCreate} className="pv-btn-primary px-5 py-2 text-sm">
-                  + Agregar producto
-                </button>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar…"
+                aria-label="Buscar productos"
+                className="h-9 w-36 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-400 sm:w-44"
+              />
+              {canManage ? (
+                <>
+                  <ActionChip
+                    icon={
+                      showImport ? (
+                        <span className="inline-flex rotate-180">
+                          <ChevronDownIcon />
+                        </span>
+                      ) : undefined
+                    }
+                    emoji={showImport ? undefined : '📋'}
+                    onClick={() => setShowImport((open) => !open)}
+                  >
+                    {showImport ? 'Cerrar lista' : 'Cargar lista'}
+                  </ActionChip>
+                  <ActionChip tone="emerald" emoji="🥬" onClick={openCreate}>
+                    Agregar producto
+                  </ActionChip>
+                </>
               ) : null}
             </>
+          }
+        />
+
+        <div className="mt-4 space-y-4">
+          {categories.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'all', label: 'Todas' },
+                ...categories.map((category) => ({ id: category.id, label: category.name })),
+                ...(products.some((row) => !row.product.category_id)
+                  ? [{ id: 'none', label: 'Sin categoría' }]
+                  : []),
+              ].map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(chip.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    categoryFilter === chip.id
+                      ? 'border border-emerald-200 bg-white text-emerald-900 shadow-[0_2px_10px_rgba(16,185,129,0.28)]'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           ) : null}
-        </div>
-      </div>
 
-      {tab === 'productos' && categories.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { id: 'all', label: 'Todas' },
-            ...categories.map((category) => ({ id: category.id, label: category.name })),
-            ...(products.some((row) => !row.product.category_id)
-              ? [{ id: 'none', label: 'Sin categoría' }]
-              : []),
-          ].map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => setCategoryFilter(chip.id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                categoryFilter === chip.id
-                  ? 'bg-slate-900 text-white'
-                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+          {showImport ? <CostImportPanel onImported={refresh} /> : null}
 
-      {tab === 'importar' && <CostImportPanel onImported={refresh} />}
-
-      {tab === 'productos' && (
-        <div className="pv-glass-card overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-500">
                 <tr>
                   <SortHeader label="Producto" column="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortHeader label="Categoría" column="category" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortHeader label="Precio" column="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortHeader label="Costo" column="cost" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortHeader label="Margen" column="margin" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortHeader
-                    label="Stock"
-                    column="stock"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="min-w-[13rem]"
-                  />
+                  <SortHeader label="Stock" column="stock" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortHeader label="Tienda" column="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <th className="px-3 py-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((row) => {
                   const stock = Number(row.stock);
-                  const minStock = Number(
-                    row.min_stock ??
-                      getDefaultLowStockThreshold({
-                        unit: row.product.unit,
-                        name: row.product.name,
-                        categoryName: row.product.category?.name,
-                      }),
-                  );
                   const low = isLowStock({
                     stock,
                     unit: row.product.unit,
@@ -646,8 +630,20 @@ export function ProductsManager({
                     name: row.product.name,
                     categoryName: row.product.category?.name,
                   });
+                  const visible = row.is_available && row.product.is_active;
                   return (
-                  <tr key={row.id} className="border-t border-slate-100">
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer border-t border-slate-100 hover:bg-slate-50/80"
+                    onClick={() => openEdit(row)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openEdit(row);
+                      }
+                    }}
+                    tabIndex={0}
+                  >
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         {row.product.image_url ? (
@@ -657,51 +653,31 @@ export function ProductsManager({
                         ) : null}
                         <div>
                           <p className="font-medium text-slate-900">{row.product.name}</p>
-                          <p className="text-xs text-slate-500">{PRODUCT_UNIT_LABELS[row.product.unit]}</p>
+                          <p className="text-xs text-slate-500">
+                            {PRODUCT_UNIT_LABELS[row.product.unit]}
+                            {row.product.category?.name ? ` · ${row.product.category.name}` : ''}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-slate-600">{row.product.category?.name ?? '—'}</td>
                     <td className="px-3 py-3 font-medium">{formatMoney(Number(row.price))}</td>
-                    <td className="px-3 py-3 text-slate-500">{formatMoney(Number(row.avg_unit_cost))}</td>
-                    <td className="px-3 py-3 text-slate-500">
-                      {calcMarginPercent(Number(row.price), Number(row.avg_unit_cost)).toFixed(1)}%
-                    </td>
-                    <td className="min-w-[13rem] whitespace-nowrap px-3 py-3">
+                    <td className="whitespace-nowrap px-3 py-3">
                       <p className={low ? 'font-semibold text-amber-800' : 'text-slate-800'}>
                         {stock} {PRODUCT_UNIT_LABELS[row.product.unit]}
-                        <span className="ml-2 font-normal text-slate-500">mín. {minStock}</span>
                       </p>
-                      {canAdjustInventory ? (
-                        <button
-                          type="button"
-                          onClick={() => openStock(row)}
-                          className="mt-1 text-left text-[11px] font-medium text-emerald-800 hover:underline"
-                        >
-                          Merma / ajuste
-                        </button>
-                      ) : null}
                     </td>
                     <td className="px-3 py-3">
                       <button
                         type="button"
-                        onClick={() => toggleAvailability(row)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void toggleAvailability(row);
+                        }}
                         className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          row.is_available && row.product.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-slate-100 text-slate-500'
+                          visible ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'
                         }`}
                       >
-                        {row.is_available && row.product.is_active ? 'Visible' : 'Oculto'}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(row)}
-                        className="pv-btn-secondary px-3 py-1 text-xs"
-                      >
-                        Editar
+                        {visible ? 'Visible' : 'Oculto'}
                       </button>
                     </td>
                   </tr>
@@ -709,17 +685,18 @@ export function ProductsManager({
                 })}
                 {sorted.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
                       {search.trim() || categoryFilter !== 'all'
                         ? 'Ningún producto coincide con la búsqueda o categoría.'
-                        : 'Aún no hay productos en el catálogo.'}
+                        : 'Aún no hay productos.'}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
         </div>
-      )}
+      </details>
 
       {showForm && (
         <div
@@ -731,20 +708,27 @@ export function ProductsManager({
             role="dialog"
             aria-modal="true"
             aria-labelledby="product-modal-title"
-            className="pv-glass-card my-4 w-full max-w-3xl p-6 shadow-xl"
+            className="pv-glass-card my-4 flex w-max max-w-[calc(100vw-2rem)] flex-col p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
               <h2 id="product-modal-title" className="text-lg font-semibold text-slate-900">
                 {editing ? 'Editar producto' : 'Agregar producto'}
               </h2>
-              <button type="button" className="text-sm text-slate-500 hover:text-slate-800" onClick={closeForm}>
+              <ActionChip
+                icon={
+                  <span className="inline-flex rotate-180">
+                    <ChevronDownIcon />
+                  </span>
+                }
+                onClick={closeForm}
+              >
                 Cerrar
-              </button>
+              </ActionChip>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="block text-sm md:col-span-2">
+            <div className="mt-4 flex flex-col gap-4">
+              <label className="block text-sm">
                 <span className="font-medium text-slate-700">Nombre</span>
                 <input
                   autoFocus
@@ -753,7 +737,8 @@ export function ProductsManager({
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 />
               </label>
-              <label className="block text-sm">
+              <div className="flex flex-wrap items-end gap-3">
+              <label className="block w-40 shrink-0 text-sm">
                 <span className="font-medium text-slate-700">Categoría</span>
                 <CategorySearchSelect
                   categories={categories}
@@ -762,7 +747,7 @@ export function ProductsManager({
                   onCreate={(name) => void createCategory(name, true)}
                 />
               </label>
-              <label className="block text-sm">
+              <label className="block w-28 shrink-0 text-sm">
                 <span className="font-medium text-slate-700">Unidad</span>
                 <select
                   className="pv-input mt-1"
@@ -773,7 +758,8 @@ export function ProductsManager({
                       return {
                         ...f,
                         unit,
-                        weighAtFulfillment: unit === 'kg' ? f.weighAtFulfillment : false,
+                        weighAtFulfillment:
+                          unit === 'kg' ? (f.unit === 'kg' ? Boolean(f.weighAtFulfillment) : true) : false,
                       };
                     })
                   }
@@ -785,60 +771,70 @@ export function ProductsManager({
                   ))}
                 </select>
               </label>
-              <label className="block text-sm">
+              <label className="block w-36 shrink-0 text-sm">
                 <span className="font-medium text-slate-700">Precio de venta</span>
-                <DecimalInput
-                  min={0}
-                  placeholder="0"
-                  className="pv-input mt-1"
-                  value={priceText}
-                  onChange={(value) => {
-                    setPriceText(value);
-                    setForm((f) => ({ ...f, price: parseDecimal(value) }));
-                  }}
-                />
+                <div className="mt-1 inline-flex w-full items-center gap-2 rounded-full border border-emerald-200 bg-white py-1 pl-1 pr-3 shadow-[0_2px_10px_rgba(16,185,129,0.28)] focus-within:bg-emerald-50">
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800"
+                    aria-hidden
+                  >
+                    $
+                  </span>
+                  <DecimalInput
+                    min={0}
+                    placeholder="0"
+                    className="min-w-0 flex-1 bg-transparent text-sm font-medium text-emerald-900 outline-none"
+                    value={priceText}
+                    onChange={(value) => {
+                      setPriceText(value);
+                      setForm((f) => ({ ...f, price: parseDecimal(value) }));
+                    }}
+                  />
+                </div>
               </label>
-              <label className="block text-sm">
-                <span className="font-medium text-slate-700">Vida útil (días, opcional)</span>
-                <DecimalInput
-                  placeholder="Ej. 3 para lechuga"
-                  className="pv-input mt-1"
-                  value={shelfLifeText}
-                  onChange={setShelfLifeText}
-                />
-              </label>
-              <div className="block text-sm md:col-span-2">
-                <span className="font-medium text-slate-700">Foto</span>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  {form.imageUrl ? (
-                    <div className="relative h-16 w-16 overflow-hidden rounded-xl">
+              {editingRow && cost > 0 ? (
+                <div className="flex flex-wrap items-center gap-2 pb-0.5">
+                  <ActionChip as="span" emoji="🧾">
+                    Costo {formatMoney(cost)}
+                  </ActionChip>
+                  <ActionChip as="span" tone="emerald" emoji="%">
+                    Margen{' '}
+                    {calcMarginPercent(
+                      parseDecimal(priceText) || Number(editingRow.price),
+                      cost,
+                    ).toFixed(0)}
+                    %
+                  </ActionChip>
+                </div>
+              ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {form.imageUrl ? (
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg">
                       <Image src={form.imageUrl} alt="" fill className="object-cover" unoptimized />
                     </div>
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
-                      Sin foto
-                    </div>
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-400"
+                      aria-hidden
+                    >
+                      📷
+                    </span>
                   )}
-                  <button
-                    type="button"
-                    disabled={uploading}
-                    onClick={openPhotoPicker}
-                    className="pv-btn-secondary px-4 py-2 text-sm disabled:opacity-50"
-                  >
+                  <ActionChip elevated={false} disabled={uploading} onClick={openPhotoPicker}>
                     {uploading ? 'Subiendo…' : form.imageUrl ? 'Cambiar foto' : 'Subir foto'}
-                  </button>
-                  {form.imageUrl && (
-                    <button
-                      type="button"
+                  </ActionChip>
+                  {form.imageUrl ? (
+                    <ActionChip
+                      tone="rose"
+                      elevated={false}
                       onClick={() => setForm((f) => ({ ...f, imageUrl: '' }))}
-                      className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
                     >
                       Eliminar foto
-                    </button>
-                  )}
-                </div>
+                    </ActionChip>
+                  ) : null}
               </div>
-              <label className="flex items-center gap-2 text-sm md:col-span-2">
+              <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={form.isAvailable}
@@ -848,7 +844,8 @@ export function ProductsManager({
                 />
                 Visible en tienda
               </label>
-              <label className="flex items-start gap-2 text-sm md:col-span-2">
+              {form.unit === 'kg' ? (
+              <label className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
                   className="mt-1"
@@ -859,27 +856,136 @@ export function ProductsManager({
                   }
                 />
                 <span>
-                  <span className="font-medium text-slate-800">Pesar al preparar (pedir por pieza)</span>
+                  <span className="font-medium text-slate-800">Se pide por pieza y se pesa al cobrar</span>
                   <span className="mt-0.5 block text-xs text-slate-500">
-                    El cliente pide piezas; al preparar capturas el peso en kg y el total se calcula con el
-                    precio por kilo. Solo aplica si la unidad es kg.
+                    El cliente pide piezas; tú pesas en kg y el total sale del precio por kilo.
                   </span>
                 </span>
               </label>
+              ) : null}
             </div>
 
-            <div className="mt-4">
-              <MarketComparePanel
-                productName={form.name}
-                unit={form.unit}
-                currentPrice={parseDecimal(priceText)}
-                cost={cost}
-                onPriceChange={(price) => {
-                  setForm((f) => ({ ...f, price }));
-                  setPriceText(decimalFromNumber(price, false));
-                }}
-              />
-            </div>
+            <details className="group mt-4 min-w-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/60 p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-slate-800">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-base"
+                    aria-hidden
+                  >
+                    🏪
+                  </span>
+                  Comparar con súper
+                </span>
+                <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
+                  <span className="group-open:hidden">Desplegar</span>
+                  <span className="hidden group-open:inline">Cerrar</span>
+                </ActionChip>
+              </summary>
+              <div className="mt-3 w-0 min-w-full overflow-x-auto">
+                <MarketComparePanel
+                  productName={form.name}
+                  unit={form.unit}
+                  currentPrice={parseDecimal(priceText)}
+                  cost={cost}
+                  onPriceChange={(price) => {
+                    setForm((f) => ({ ...f, price }));
+                    setPriceText(decimalFromNumber(price, false));
+                  }}
+                />
+              </div>
+            </details>
+
+            {editingRow && canAdjustInventory && stockRow ? (
+              <details className="group mt-3 min-w-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/60 p-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-slate-800">
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-base"
+                      aria-hidden
+                    >
+                      🍂
+                    </span>
+                    Ajuste de stock
+                    <span className="font-normal text-slate-500">
+                      En sistema {formatStockQty(Number(stockRow.stock))}{' '}
+                      {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                      {' · '}
+                      mínimo{' '}
+                      {formatStockQty(
+                        Number(
+                          stockRow.min_stock ??
+                            getDefaultLowStockThreshold({
+                              unit: stockRow.product.unit,
+                              name: stockRow.product.name,
+                              categoryName: stockRow.product.category?.name,
+                            }),
+                        ),
+                      )}{' '}
+                      {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                    </span>
+                  </span>
+                  <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
+                    <span className="group-open:hidden">Desplegar</span>
+                    <span className="hidden group-open:inline">Cerrar</span>
+                  </ActionChip>
+                </summary>
+                <div className="mt-4 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block text-sm">
+                      <span className="font-medium text-slate-700">Conteo físico</span>
+                      <DecimalInput
+                        className="pv-input mt-1"
+                        value={countedText}
+                        onChange={setCountedText}
+                        placeholder="Lo que hay ahora"
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="font-medium text-slate-700">Nota (opcional)</span>
+                      <input
+                        className="pv-input mt-1"
+                        value={stockNotes}
+                        onChange={(e) => setStockNotes(e.target.value)}
+                        placeholder="Ej. merma por madurez"
+                      />
+                    </label>
+                  </div>
+                  {(() => {
+                    const system = Number(stockRow.stock);
+                    const counted = parseDecimal(countedText, system);
+                    const delta = Number((counted - system).toFixed(2));
+                    if (!countedText.trim() || delta === 0) return null;
+                    return (
+                      <p className={`text-sm ${delta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
+                        Diferencia: {delta > 0 ? '+' : ''}
+                        {formatStockQty(delta)} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
+                      </p>
+                    );
+                  })()}
+                  {stockError ? <p className="text-sm text-red-600">{stockError}</p> : null}
+                  <div className="flex flex-wrap gap-3">
+                    <ActionChip
+                      size="lg"
+                      tone="rose"
+                      emoji="🍂"
+                      disabled={stockSaving}
+                      onClick={() => void submitStock('waste')}
+                    >
+                      {stockSaving ? 'Guardando…' : 'Registrar merma'}
+                    </ActionChip>
+                    <ActionChip
+                      size="lg"
+                      tone="sky"
+                      emoji="⚖️"
+                      disabled={stockSaving}
+                      onClick={() => void submitStock('adjustment')}
+                    >
+                      {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
+                    </ActionChip>
+                  </div>
+                </div>
+              </details>
+            ) : null}
 
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             <div className="mt-4 flex flex-wrap gap-3">
@@ -912,104 +1018,11 @@ export function ProductsManager({
         </div>
       )}
 
-      {stockRow && (
-        <div
-          className="pv-modal-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
-          role="presentation"
-          onClick={closeStock}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="stock-modal-title"
-            className="pv-glass-card my-4 w-full max-w-md p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <h2 id="stock-modal-title" className="text-lg font-semibold text-slate-900">
-                Merma / ajuste
-              </h2>
-              <button type="button" className="text-sm text-slate-500 hover:text-slate-800" onClick={closeStock}>
-                Cerrar
-              </button>
-            </div>
-            <p className="mt-1 text-sm text-slate-600">{stockRow.product.name}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-xs text-slate-500">Stock en sistema</dt>
-                <dd className="mt-1 font-semibold text-slate-900">
-                  {Number(stockRow.stock)} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
-                </dd>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-3">
-                <dt className="text-xs text-slate-500">Mínimo / deberías tener</dt>
-                <dd className="mt-1 font-semibold text-slate-900">
-                  {Number(
-                    stockRow.min_stock ??
-                      getDefaultLowStockThreshold({
-                        unit: stockRow.product.unit,
-                        name: stockRow.product.name,
-                        categoryName: stockRow.product.category?.name,
-                      }),
-                  )}{' '}
-                  {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
-                </dd>
-              </div>
-            </dl>
-            <label className="mt-4 block text-sm">
-              <span className="font-medium text-slate-700">Conteo físico</span>
-              <DecimalInput
-                className="pv-input mt-1"
-                value={countedText}
-                onChange={setCountedText}
-                placeholder="Lo que hay ahora"
-              />
-            </label>
-            <label className="mt-3 block text-sm">
-              <span className="font-medium text-slate-700">Nota (opcional)</span>
-              <input
-                className="pv-input mt-1"
-                value={stockNotes}
-                onChange={(e) => setStockNotes(e.target.value)}
-                placeholder="Ej. merma por madurez, conteo de anaquel"
-              />
-            </label>
-            {(() => {
-              const system = Number(stockRow.stock);
-              const counted = parseDecimal(countedText, system);
-              const delta = Number((counted - system).toFixed(3));
-              if (!countedText.trim() || delta === 0) return null;
-              return (
-                <p className={`mt-3 text-sm ${delta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
-                  Diferencia: {delta > 0 ? '+' : ''}
-                  {delta} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
-                </p>
-              );
-            })()}
-            {stockError ? <p className="mt-3 text-sm text-red-600">{stockError}</p> : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={stockSaving}
-                onClick={() => void submitStock('waste')}
-                className="rounded-full bg-rose-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {stockSaving ? 'Guardando…' : 'Registrar merma'}
-              </button>
-              <button
-                type="button"
-                disabled={stockSaving}
-                onClick={() => void submitStock('adjustment')}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {tab === 'productos' ? <StockMovementHistory movements={movements} /> : null}
+      <StockMovementHistory
+        movements={movements}
+        open={openHistorial}
+        onToggle={setOpenHistorial}
+      />
     </div>
   );
 }

@@ -1,28 +1,29 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   FULFILLMENT_LABELS,
   ORDER_STATUS_LABELS,
-  ORDER_WORKFLOW_STATUSES,
   PAYMENT_METHOD_LABELS,
   PRODUCT_UNIT_LABELS,
+  formatMexicoMonthLabel,
   formatMoney,
   groupByMexicoDay,
+  groupSalesLogByMonth,
   mexicoYmdFromIso,
   nextWorkflowStatus,
   normalizeOrderStatus,
   orderStatusLabel,
   previousWorkflowStatus,
   todayMexicoYmd,
+  type MexicoDayGroup,
   type OrderStatus,
-  type OrderWorkflowStatus,
   type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
 
+import { ActionChip, WhatsAppGlyph } from '@/components/ActionChip';
 import {
   CounterSalePanel,
   buildTicketText,
@@ -99,17 +100,27 @@ interface OrderItem {
   line_total: number;
 }
 
-const COLUMNS = ORDER_WORKFLOW_STATUSES;
 const REFRESH_MS = 25_000;
 
-const COLUMN_META: Record<
-  OrderWorkflowStatus,
-  { accentClass: string; image: string; empty: string }
-> = {
-  pending: { accentClass: 'pv-glass-card-accent-orange', image: '/orders/pending.png', empty: 'Sin pedidos' },
-  preparing: { accentClass: 'pv-glass-card-accent-blue', image: '/orders/preparing.png', empty: 'Sin pedidos' },
-  delivered: { accentClass: 'pv-glass-card-accent-green', image: '/orders/delivered.png', empty: 'Sin ventas' },
-};
+type BoardFilter = 'hoy' | 'atender' | 'mostrador' | 'web';
+
+function isAttentionOrder(order: Pick<OrderRow, 'status'>): boolean {
+  const status = normalizeOrderStatus(order.status);
+  return status === 'pending' || status === 'preparing';
+}
+
+function matchesChannel(order: Pick<OrderRow, 'source' | 'delivery_notes'>, filter: BoardFilter): boolean {
+  if (filter === 'mostrador') return isCounterSale(order);
+  if (filter === 'web') return !isCounterSale(order);
+  return true;
+}
+
+function statusChipClass(status: OrderStatus): string {
+  if (status === 'pending') return 'bg-amber-100 text-amber-900';
+  if (status === 'preparing') return 'bg-sky-100 text-sky-900';
+  if (status === 'cancelled') return 'bg-slate-100 text-slate-600';
+  return 'bg-emerald-100 text-emerald-800';
+}
 
 export function OrdersBoard({
   initialOrders,
@@ -160,17 +171,12 @@ export function OrdersBoard({
   const [detailError, setDetailError] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const [openDays, setOpenDays] = useState(() => new Set([todayMexicoYmd()]));
+  const [openMonths, setOpenMonths] = useState(() => new Set<string>());
   const [exportOpen, setExportOpen] = useState(false);
   const [exportDates, setExportDates] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<OrderWorkflowStatus>(() => {
-    const firstOpen = initialOrders.find((order) => {
-      const status = normalizeOrderStatus(order.status);
-      return status === 'pending' || status === 'preparing';
-    });
-    return firstOpen ? normalizeOrderStatus(firstOpen.status) as OrderWorkflowStatus : 'pending';
-  });
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>('hoy');
   const [newOrderNotice, setNewOrderNotice] = useState<string | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const knownOrderIdsRef = useRef(new Set(initialOrders.map((order) => order.id)));
@@ -235,10 +241,6 @@ export function OrdersBoard({
               : `${freshOpen.length} pedidos nuevos`,
           );
           playNewOrderChime();
-          const status = normalizeOrderStatus(newest.status);
-          if (status === 'pending' || status === 'preparing') {
-            setMobileTab(status);
-          }
         }
 
         setOrders(nextOrders);
@@ -268,40 +270,92 @@ export function OrdersBoard({
     return () => window.clearTimeout(timeoutId);
   }, [newOrderNotice]);
 
-  const grouped = useMemo(() => {
-    const map: Record<OrderWorkflowStatus, OrderRow[]> = {
-      pending: [],
-      preparing: [],
-      delivered: [],
-    };
+  const searchedOrders = useMemo(() => {
     const needle = orderSearch.trim().toLowerCase();
     const phoneNeedle = needle.replace(/\D/g, '');
 
-    for (const order of orders) {
+    return orders.filter((order) => {
       const status = normalizeOrderStatus(order.status);
-      if (status === 'cancelled') continue;
-      if (status !== 'pending' && status !== 'preparing' && status !== 'delivered') continue;
-
-      if (needle) {
-        const numberHit = String(order.order_number).includes(needle.replace(/^#/, ''));
-        const nameHit = order.customer_name.toLowerCase().includes(needle);
-        const phoneHit =
-          Boolean(phoneNeedle) &&
-          normalizePhoneDigits(order.customer_phone).includes(phoneNeedle);
-        const productHit = (order.items ?? []).some((item) =>
-          item.product_name.toLowerCase().includes(needle),
-        );
-        if (!numberHit && !nameHit && !phoneHit && !productHit) continue;
-      }
-
-      map[status].push(order);
-    }
-    return map;
+      if (status === 'cancelled') return false;
+      if (status !== 'pending' && status !== 'preparing' && status !== 'delivered') return false;
+      if (!needle) return true;
+      const numberHit = String(order.order_number).includes(needle.replace(/^#/, ''));
+      const nameHit = order.customer_name.toLowerCase().includes(needle);
+      const phoneHit =
+        Boolean(phoneNeedle) &&
+        normalizePhoneDigits(order.customer_phone).includes(phoneNeedle);
+      const productHit = (order.items ?? []).some((item) =>
+        item.product_name.toLowerCase().includes(needle),
+      );
+      return numberHit || nameHit || phoneHit || productHit;
+    });
   }, [orders, orderSearch]);
 
   const searchingOrders = orderSearch.trim().length > 0;
+  const todayYmd = todayMexicoYmd();
 
-  const deliveredDays = useMemo(() => groupByMexicoDay(grouped.delivered), [grouped.delivered]);
+  const filterCounts = useMemo(() => {
+    let hoy = 0;
+    let atender = 0;
+    let mostrador = 0;
+    let web = 0;
+    for (const order of searchedOrders) {
+      if (mexicoYmdFromIso(order.created_at) === todayYmd) hoy += 1;
+      if (isAttentionOrder(order)) atender += 1;
+      if (isCounterSale(order)) mostrador += 1;
+      else web += 1;
+    }
+    return { hoy, atender, mostrador, web };
+  }, [searchedOrders, todayYmd]);
+
+  const attentionOrders = useMemo(
+    () =>
+      searchedOrders.filter((order) => {
+        if (!isAttentionOrder(order)) return false;
+        if (boardFilter === 'atender' || boardFilter === 'hoy') return true;
+        return matchesChannel(order, boardFilter);
+      }),
+    [searchedOrders, boardFilter],
+  );
+
+  const logOrders = useMemo(
+    () =>
+      searchedOrders.filter((order) => {
+        if (normalizeOrderStatus(order.status) !== 'delivered') return false;
+        return matchesChannel(order, boardFilter);
+      }),
+    [searchedOrders, boardFilter],
+  );
+
+  const logSections = useMemo(() => groupSalesLogByMonth(logOrders, todayYmd), [logOrders, todayYmd]);
+
+  const currentMonthTotal = useMemo(() => {
+    const ym = todayYmd.slice(0, 7);
+    let total = 0;
+    for (const order of logOrders) {
+      if (mexicoYmdFromIso(order.created_at).slice(0, 7) === ym) {
+        total += Number(order.total);
+      }
+    }
+    return total;
+  }, [logOrders, todayYmd]);
+
+  const exportDays = useMemo(
+    () =>
+      groupByMexicoDay(
+        orders.filter((order) => normalizeOrderStatus(order.status) === 'delivered'),
+      ),
+    [orders],
+  );
+
+  function toggleMonth(ym: string) {
+    setOpenMonths((current) => {
+      const next = new Set(current);
+      if (next.has(ym)) next.delete(ym);
+      else next.add(ym);
+      return next;
+    });
+  }
 
   function toggleDay(ymd: string) {
     setOpenDays((current) => {
@@ -314,7 +368,7 @@ export function OrdersBoard({
 
   function openExportModal() {
     setExportError(null);
-    setExportDates(new Set(deliveredDays.map((day) => day.ymd)));
+    setExportDates(new Set(exportDays.map((day) => day.ymd)));
     setExportOpen(true);
   }
 
@@ -328,7 +382,7 @@ export function OrdersBoard({
   }
 
   function selectAllExportDates() {
-    setExportDates(new Set(deliveredDays.map((day) => day.ymd)));
+    setExportDates(new Set(exportDays.map((day) => day.ymd)));
   }
 
   function clearExportDates() {
@@ -688,8 +742,8 @@ export function OrdersBoard({
   }
 
   return (
-    <div className="space-y-2">
-      <LowStockBanner products={products} href="/?section=stock" />
+    <div className="space-y-3">
+      <LowStockBanner products={products} />
       {newOrderNotice ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p className="min-w-0 font-medium">{newOrderNotice}</p>
@@ -751,145 +805,173 @@ export function OrdersBoard({
         }}
       />
 
-      <div className="flex justify-center gap-1 overflow-x-auto pb-1 lg:hidden">
-        {COLUMNS.map((status) => {
-          const count = grouped[status]?.length ?? 0;
-          const active = mobileTab === status;
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setMobileTab(status)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-white/70 text-slate-600 ring-1 ring-slate-200'
-              }`}
-            >
-              {ORDER_STATUS_LABELS[status]}
-              <span className={`ml-1 tabular-nums ${active ? 'text-white/80' : 'text-slate-400'}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap justify-center gap-2">
+        {(
+          [
+            { id: 'hoy', label: 'Hoy', count: filterCounts.hoy },
+            { id: 'atender', label: 'Por atender', count: filterCounts.atender },
+            { id: 'mostrador', label: 'Mostrador', count: filterCounts.mostrador },
+            { id: 'web', label: 'Web', count: filterCounts.web },
+          ] as const
+        ).map((chip) => (
+          <ActionChip
+            key={chip.id}
+            tone={boardFilter === chip.id ? 'emerald' : 'slate'}
+            elevated={boardFilter === chip.id}
+            onClick={() => setBoardFilter(chip.id)}
+          >
+            {chip.label}
+            {chip.count > 0 ? (
+              <span className="tabular-nums text-slate-500"> · {chip.count}</span>
+            ) : null}
+          </ActionChip>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-2.5">
-        {COLUMNS.map((status) => {
-          const meta = COLUMN_META[status];
-          const columnOrders = grouped[status] ?? [];
-          const deliveredTotal = status === 'delivered'
-            ? columnOrders.reduce((sum, order) => sum + Number(order.total), 0)
-            : 0;
-
-          return (
-          <section
-            key={status}
-            className={`pv-glass-card pv-glass-card-accent ${meta.accentClass} min-w-0 overflow-hidden p-3 ${
-              status === mobileTab ? 'block' : 'hidden lg:block'
-            }`}
-          >
-            <div className="mb-3 flex items-center gap-2.5">
-              <Image
-                src={meta.image}
-                alt=""
-                width={44}
-                height={44}
-                className="h-11 w-11 shrink-0 rounded-xl object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    {ORDER_STATUS_LABELS[status]}
-                  </h2>
-                  {status === 'delivered' && canExportSales ? (
-                    <button
-                      type="button"
-                      onClick={openExportModal}
-                      disabled={deliveredDays.length === 0}
-                      className="shrink-0 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
-                    >
-                      Exportar
-                    </button>
-                  ) : null}
-                </div>
-                <p className="truncate text-[11px] text-slate-400">
-                  {columnOrders.length === 0
-                    ? searchingOrders
-                      ? 'Sin coincidencias'
-                      : meta.empty
-                    : status === 'delivered'
-                      ? `${columnOrders.length} venta${columnOrders.length === 1 ? '' : 's'} · ${formatMoney(deliveredTotal)}`
-                      : `${columnOrders.length} pedido${columnOrders.length === 1 ? '' : 's'}`}
+      {boardFilter === 'atender' ? (
+        <section className="pv-glass-card min-w-0 overflow-hidden p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-slate-800">Por atender</h2>
+            <p className="text-xs text-slate-500">
+              {attentionOrders.length === 0
+                ? searchingOrders
+                  ? 'Sin coincidencias'
+                  : 'Nada por preparar ahora'
+                : `${attentionOrders.length} pedido${attentionOrders.length === 1 ? '' : 's'} web o en curso`}
+            </p>
+          </div>
+          {attentionOrders.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {attentionOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  updatingId={updatingId}
+                  showBranchName={showBranchName}
+                  onOpen={openDetail}
+                  onUpdateStatus={updateStatus}
+                  onMarkPaid={markPaid}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          {attentionOrders.length > 0 ? (
+            <section className="pv-glass-card min-w-0 overflow-hidden border-amber-200/80 p-4">
+              <div className="mb-3 flex items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-slate-800">Por atender</h2>
+                <p className="text-xs text-slate-500">
+                  {attentionOrders.length} pedido{attentionOrders.length === 1 ? '' : 's'}
                 </p>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {attentionOrders.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    updatingId={updatingId}
+                    showBranchName={showBranchName}
+                    onOpen={openDetail}
+                    onUpdateStatus={updateStatus}
+                    onMarkPaid={markPaid}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="pv-glass-card min-w-0 overflow-hidden p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-slate-800">
+                  Ventas
+                  <span className="ml-1.5 font-normal text-slate-500">
+                    {formatMexicoMonthLabel(todayYmd.slice(0, 7), todayYmd)}
+                  </span>
+                </h2>
+                <p className="truncate text-base font-semibold tabular-nums text-slate-800">
+                  {logOrders.length === 0 && searchingOrders
+                    ? 'Sin coincidencias'
+                    : formatMoney(currentMonthTotal)}
+                </p>
+              </div>
+              {canExportSales ? (
+                <ActionChip
+                  elevated={false}
+                  emoji="📥"
+                  disabled={exportDays.length === 0}
+                  onClick={openExportModal}
+                >
+                  Exportar
+                </ActionChip>
+              ) : null}
             </div>
             <div className="space-y-3">
-              {status === 'delivered' ? (
-                deliveredDays.length === 0 ? (
-                  <p className="text-sm text-slate-400">Sin ventas en los últimos 30 días</p>
-                ) : (
-                  deliveredDays.map((day) => {
-                    const open = searchingOrders || openDays.has(day.ymd);
+              {logSections.length === 0 ? (
+                <p className="text-sm text-slate-400">
+                  {searchingOrders ? 'Sin coincidencias' : 'Sin ventas'}
+                </p>
+              ) : (
+                logSections.map((section) => {
+                  if (section.kind === 'month') {
+                    const open = searchingOrders || openMonths.has(section.ym);
                     return (
-                      <div key={day.ymd} className="space-y-2">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            aria-expanded={open}
-                            onClick={() => toggleDay(day.ymd)}
-                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-xs font-medium text-slate-600 hover:bg-white/50"
-                          >
-                            <span className="truncate">
-                              {open ? '▾' : '▸'} {day.label}
-                              <span className="ml-1 font-normal text-slate-400">
-                                · {day.count} {day.count === 1 ? 'venta' : 'ventas'}
-                              </span>
+                      <div key={section.ym} className="space-y-1">
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          onClick={() => toggleMonth(section.ym)}
+                          className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg px-1 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-white/50"
+                        >
+                          <span className="truncate">
+                            {open ? '▾' : '▸'} {section.label}
+                            <span className="ml-1 font-normal text-slate-400">
+                              · {section.count} {section.count === 1 ? 'venta' : 'ventas'}
                             </span>
-                            <span className="shrink-0 tabular-nums">{formatMoney(day.total)}</span>
-                          </button>
-                        </div>
+                          </span>
+                          <span className="shrink-0 tabular-nums text-slate-700">
+                            {formatMoney(section.total)}
+                          </span>
+                        </button>
                         {open
-                          ? day.items.map((order) => (
-                              <OrderCard
-                                key={order.id}
-                                order={order}
-                                updatingId={updatingId}
-                                showBranchName={showBranchName}
-                                onOpen={openDetail}
-                                onUpdateStatus={updateStatus}
-                                onMarkPaid={markPaid}
-                              />
+                          ? section.days.map((day) => (
+                              <div key={day.ymd} className="pl-3">
+                                <SalesDayBlock
+                                  day={day}
+                                  open={searchingOrders || openDays.has(day.ymd)}
+                                  emphasizeTotal={false}
+                                  selectedId={detailId}
+                                  showBranchName={showBranchName}
+                                  onToggle={() => toggleDay(day.ymd)}
+                                  onOpen={openDetail}
+                                />
+                              </div>
                             ))
                           : null}
                       </div>
                     );
-                  })
-                )
-              ) : (
-                <>
-                  {columnOrders.map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      updatingId={updatingId}
+                  }
+
+                  return (
+                    <SalesDayBlock
+                      key={section.ymd}
+                      day={section}
+                      open={searchingOrders || openDays.has(section.ymd)}
+                      emphasizeTotal={section.label === 'Hoy'}
+                      selectedId={detailId}
                       showBranchName={showBranchName}
+                      onToggle={() => toggleDay(section.ymd)}
                       onOpen={openDetail}
-                      onUpdateStatus={updateStatus}
-                      onMarkPaid={markPaid}
                     />
-                  ))}
-                  {columnOrders.length === 0 && (
-                    <p className="text-sm text-slate-400">{meta.empty}</p>
-                  )}
-                </>
+                  );
+                })
               )}
             </div>
           </section>
-          );
-        })}
-      </div>
+        </>
+      )}
 
       {exportOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
@@ -926,7 +1008,7 @@ export function OrdersBoard({
             </div>
 
             <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-              {deliveredDays.map((day) => {
+              {exportDays.map((day) => {
                 const checked = exportDates.has(day.ymd);
                 return (
                   <li key={day.ymd}>
@@ -1298,13 +1380,9 @@ export function OrdersBoard({
                             aria-label="Cantidad a agregar"
                           />
                         )}
-                        <button
-                          type="button"
-                          className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
-                          onClick={queueAddProduct}
-                        >
+                        <ActionChip emoji="🥬" onClick={queueAddProduct}>
                           Agregar
-                        </button>
+                        </ActionChip>
                       </div>
                       {addIsWeigh ? (
                         <p className="text-[11px] text-slate-500">
@@ -1343,35 +1421,32 @@ export function OrdersBoard({
               )}
             </p>
             {detailError ? <p className="mt-2 text-sm text-rose-700">{detailError}</p> : null}
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-nowrap gap-2 overflow-x-auto">
               {canEditOrders && !detailEditing ? (
-                <button
-                  type="button"
+                <ActionChip
+                  elevated={false}
                   disabled={detailLoading || detailSaving}
-                  className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm disabled:opacity-50"
                   onClick={() => {
                     setDetailError(null);
                     resetEditDraft(detailItems, selected.created_at);
                     setDetailEditing(true);
                   }}
                 >
-                  Editar pedido
-                </button>
+                  Editar
+                </ActionChip>
               ) : null}
               {canEditOrders && detailEditing ? (
                 <>
-                  <button
-                    type="button"
+                  <ActionChip
+                    tone="emerald"
                     disabled={detailSaving}
-                    className="inline-flex rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     onClick={saveOrderEdits}
                   >
-                    {detailSaving ? 'Guardando…' : 'Guardar cambios'}
-                  </button>
-                  <button
-                    type="button"
+                    {detailSaving ? 'Guardando…' : 'Guardar'}
+                  </ActionChip>
+                  <ActionChip
+                    elevated={false}
                     disabled={detailSaving}
-                    className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm disabled:opacity-50"
                     onClick={() => {
                       setDetailEditing(false);
                       setDetailError(null);
@@ -1379,15 +1454,14 @@ export function OrdersBoard({
                     }}
                   >
                     Cancelar
-                  </button>
+                  </ActionChip>
                 </>
               ) : null}
               {!detailEditing && normalizeOrderStatus(selected.status) === 'delivered' ? (
                 <>
-                  <button
-                    type="button"
+                  <ActionChip
+                    emoji="🖨️"
                     disabled={detailLoading || detailSaving}
-                    className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-50"
                     onClick={async () => {
                       setPrintError(null);
                       try {
@@ -1399,8 +1473,8 @@ export function OrdersBoard({
                       }
                     }}
                   >
-                    Imprimir ticket
-                  </button>
+                    Imprimir
+                  </ActionChip>
                   <a
                     href={whatsappTicketHref(
                       selected.customer_phone,
@@ -1415,21 +1489,23 @@ export function OrdersBoard({
                     )}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm"
+                    className="inline-flex shrink-0"
                   >
-                    Enviar ticket por WhatsApp
+                    <ActionChip as="span" tone="whatsapp" icon={<WhatsAppGlyph />}>
+                      Enviar
+                    </ActionChip>
                   </a>
                 </>
               ) : null}
               {canDeleteOrders && !detailEditing ? (
-                <button
-                  type="button"
+                <ActionChip
+                  tone="rose"
+                  elevated={false}
                   disabled={detailLoading || detailSaving}
-                  className="inline-flex rounded-full border border-rose-200 px-4 py-2 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                  onClick={deleteOrder}
+                  onClick={() => void deleteOrder()}
                 >
-                  Eliminar pedido
-                </button>
+                  Eliminar
+                </ActionChip>
               ) : null}
             </div>
             {printError ? <p className="mt-2 text-xs text-rose-700">{printError}</p> : null}
@@ -1437,6 +1513,132 @@ export function OrdersBoard({
         </div>
       )}
     </div>
+  );
+}
+
+function SalesDayBlock({
+  day,
+  open,
+  emphasizeTotal,
+  selectedId,
+  showBranchName,
+  onToggle,
+  onOpen,
+}: {
+  day: MexicoDayGroup<OrderRow>;
+  open: boolean;
+  emphasizeTotal: boolean;
+  selectedId: string | null;
+  showBranchName: boolean;
+  onToggle: () => void;
+  onOpen: (orderId: string) => void;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-xs font-medium text-slate-600 hover:bg-white/50"
+      >
+        <span className="truncate">
+          {open ? '▾' : '▸'} {day.label}
+          <span className="ml-1 font-normal text-slate-400">
+            · {day.count} {day.count === 1 ? 'venta' : 'ventas'}
+          </span>
+        </span>
+        <span
+          className={`shrink-0 tabular-nums ${
+            emphasizeTotal ? 'text-sm font-semibold text-slate-800' : ''
+          }`}
+        >
+          {formatMoney(day.total)}
+        </span>
+      </button>
+      {open ? (
+        <div className="overflow-hidden rounded-lg">
+          {day.items.map((order, index) => (
+            <OrderLogRow
+              key={order.id}
+              order={order}
+              selected={selectedId === order.id}
+              stripe={index % 2 === 1}
+              showBranchName={showBranchName}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OrderLogRow({
+  order,
+  selected,
+  stripe,
+  showBranchName,
+  onOpen,
+}: {
+  order: OrderRow;
+  selected: boolean;
+  stripe: boolean;
+  showBranchName: boolean;
+  onOpen: (orderId: string) => void;
+}) {
+  const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
+  const unpaid = order.payment_status !== 'paid';
+  const status = normalizeOrderStatus(order.status);
+  const timeLabel = formatOrderBoardTime(order.created_at);
+  const itemsPreview = summarizeOrderItems(order.items ?? []);
+  const counterSale = isCounterSale(order);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(order.id)}
+      className={`flex w-full min-w-0 items-center gap-2 border-b border-slate-200/80 px-2 py-2 text-left text-sm last:border-b-0 ${
+        selected
+          ? 'bg-emerald-50 hover:bg-emerald-50'
+          : unpaid
+            ? 'bg-amber-50/70 hover:bg-amber-50'
+            : stripe
+              ? 'bg-slate-50 hover:bg-slate-100/80'
+              : 'bg-white/50 hover:bg-slate-50/80'
+      }`}
+    >
+      <span className="w-[5.5rem] shrink-0 whitespace-nowrap text-xs tabular-nums text-slate-400">
+        {timeLabel || '—'}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-slate-900">
+          {order.customer_name}
+          <span className="ml-1.5 font-normal text-slate-500">#{order.order_number}</span>
+        </p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 truncate text-xs text-slate-500">
+            {itemsPreview}
+            {showBranchName && branch?.name ? ` · ${branch.name}` : ''}
+            {unpaid ? ' · Sin pagar' : ''}
+          </p>
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+              counterSale ? 'bg-slate-100 text-slate-700' : 'bg-sky-100 text-sky-800'
+            }`}
+          >
+            {counterSale ? 'Mostrador' : 'En línea'}
+          </span>
+        </div>
+      </div>
+      <span className="shrink-0 self-center tabular-nums font-medium text-slate-800">
+        {formatMoney(Number(order.total))}
+      </span>
+      <span
+        className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline ${statusChipClass(status)}`}
+      >
+        {ORDER_STATUS_LABELS[status]}
+      </span>
+    </button>
   );
 }
 

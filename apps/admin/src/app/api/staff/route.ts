@@ -4,6 +4,7 @@ import { STAFF_ROLES, normalizeStaffRole, type StaffRole } from '@puertaverde/sh
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { loadPermissionMatrix, requireStaffApi, requireStaffPermission, staffHasPermission } from '@/lib/auth';
+import { emailsByUserId } from '@/lib/staff-emails';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
@@ -31,6 +32,7 @@ export async function GET() {
       : { data: [] };
 
     const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const emails = await emailsByUserId(userIds);
 
     const staff = (memberships ?? []).flatMap((row) => {
       const role = normalizeStaffRole(row.role);
@@ -42,6 +44,7 @@ export async function GET() {
           role,
           full_name: profile?.full_name ?? null,
           phone: profile?.phone ?? null,
+          email: emails.get(row.user_id) ?? null,
         },
       ];
     });

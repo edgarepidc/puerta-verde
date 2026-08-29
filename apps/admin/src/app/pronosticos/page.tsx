@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Pronósticos quedó integrado en Ventas → Transacciones y pronóstico. */
+/** Qué comprar vive en Números. */
 export default function PronosticosRedirectPage() {
-  redirect('/?section=stock');
+  redirect('/numeros');
 }

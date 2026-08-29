@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { formatMoney } from '@puertaverde/shared';
 
+import { ActionChip } from '@/components/ActionChip';
 import type { CostImportPreviewRow } from '@/lib/cost-import';
 
 export function CostImportPanel({ onImported }: { onImported: () => Promise<void> }) {
@@ -88,10 +89,9 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
     <section className="pv-glass-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Importar catálogo desde Excel</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Cargar lista</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Carga masiva de catálogo (nombre, categoría, unidad y precio de venta). Costo y cantidad son
-            opcionales; las entradas del día a día van en Compras.
+            Excel o CSV con nombre, categoría, unidad y precio. Costo y cantidad son opcionales.
           </p>
         </div>
         <a
@@ -127,14 +127,9 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
           {loading ? 'Procesando…' : 'Vista previa'}
         </button>
         {previewRows.length > 0 && (
-          <button
-            type="button"
-            disabled={loading}
-            onClick={handleImport}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <ActionChip emoji="📥" disabled={loading} onClick={handleImport}>
             Confirmar importación
-          </button>
+          </ActionChip>
         )}
       </div>
 

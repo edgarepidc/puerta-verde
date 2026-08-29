@@ -5,6 +5,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import type { PromotionKind } from '@puertaverde/shared';
 
 import { AdminShell } from '@/components/AdminShell';
+import { AjustesNav } from '@/components/AjustesNav';
 import { CouponsManager } from '@/components/CouponsManager';
 import { PromotionsManager } from '@/components/PromotionsManager';
 import { PromotionsTabs } from '@/components/PromotionsTabs';
@@ -52,8 +53,10 @@ export default async function PromotionsPage() {
     ]);
 
   return (
-    <AdminShell title="Promociones" subtitle={`Avisos y cupones · ${tenant.branchName}`}>
-      <Suspense fallback={<p className="text-sm text-slate-500">Cargando…</p>}>
+    <AdminShell title="Ajustes" subtitle={`Promos · ${tenant.branchName}`}>
+      <div className="space-y-6">
+        <AjustesNav current="promos" isPlatformAdmin={staff.isPlatformAdmin} />
+        <Suspense fallback={<p className="text-sm text-slate-500">Cargando…</p>}>
         <PromotionsTabs
           avisos={
             <PromotionsManager
@@ -98,6 +101,7 @@ export default async function PromotionsPage() {
           }
         />
       </Suspense>
+      </div>
     </AdminShell>
   );
 }

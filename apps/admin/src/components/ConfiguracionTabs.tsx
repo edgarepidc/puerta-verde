@@ -3,19 +3,22 @@
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 
+import { AjustesNav, type AjustesCurrent } from '@/components/AjustesNav';
+
 type ConfigTab = 'suscripcion' | 'sucursal' | 'equipo' | 'whatsapp' | 'plataforma';
 
-const BASE_TABS: Array<{ id: ConfigTab; label: string }> = [
-  { id: 'suscripcion', label: 'Suscripción' },
-  { id: 'sucursal', label: 'Sucursal' },
-  { id: 'equipo', label: 'Equipo' },
-  { id: 'whatsapp', label: 'WhatsApp' },
-];
+const BASE_TABS: ConfigTab[] = ['sucursal', 'equipo', 'suscripcion'];
 
 function resolveTab(raw: string | null, allowed: ConfigTab[]): ConfigTab {
-  if (raw === 'usuarios' || raw === 'permisos') return 'equipo';
+  if (raw === 'usuarios' || raw === 'permisos' || raw === 'whatsapp') return 'equipo';
   if (raw && allowed.includes(raw as ConfigTab)) return raw as ConfigTab;
-  return 'suscripcion';
+  return 'sucursal';
+}
+
+function toAjustesCurrent(tab: ConfigTab): AjustesCurrent {
+  if (tab === 'suscripcion') return 'cuenta';
+  if (tab === 'whatsapp') return 'equipo';
+  return tab;
 }
 
 export function ConfiguracionTabs({
@@ -23,56 +26,37 @@ export function ConfiguracionTabs({
   suscripcion,
   sucursal,
   equipo,
-  whatsapp,
   plataforma,
 }: {
   isPlatformAdmin: boolean;
   suscripcion: ReactNode;
   sucursal: ReactNode;
   equipo: ReactNode;
-  whatsapp: ReactNode;
   plataforma?: ReactNode;
 }) {
   const searchParams = useSearchParams();
-  const tabs = useMemo(
-    () =>
-      isPlatformAdmin
-        ? [...BASE_TABS, { id: 'plataforma' as const, label: 'Plataforma' }]
-        : BASE_TABS,
+  const allowed = useMemo(
+    () => (isPlatformAdmin ? [...BASE_TABS, 'plataforma' as const] : BASE_TABS),
     [isPlatformAdmin],
   );
-  const [tab, setTab] = useState<ConfigTab>(() =>
-    resolveTab(searchParams.get('tab'), tabs.map((item) => item.id)),
-  );
+  const [tab, setTab] = useState<ConfigTab>(() => resolveTab(searchParams.get('tab'), allowed));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap justify-center gap-2">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              setTab(item.id);
-              const url = new URL(window.location.href);
-              url.searchParams.set('tab', item.id);
-              window.history.replaceState({}, '', url);
-            }}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              tab === item.id
-                ? 'bg-slate-900 text-white'
-                : 'bg-white/70 text-slate-700 hover:bg-white'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <AjustesNav
+        current={toAjustesCurrent(tab)}
+        isPlatformAdmin={isPlatformAdmin}
+        onSelectConfigTab={(id) => {
+          setTab(id === 'whatsapp' ? 'equipo' : id);
+          const url = new URL(window.location.href);
+          url.searchParams.set('tab', id === 'whatsapp' ? 'equipo' : id);
+          window.history.replaceState({}, '', url);
+        }}
+      />
 
       {tab === 'suscripcion' && suscripcion}
       {tab === 'sucursal' && sucursal}
       {tab === 'equipo' && equipo}
-      {tab === 'whatsapp' && whatsapp}
       {tab === 'plataforma' && isPlatformAdmin ? plataforma : null}
     </div>
   );

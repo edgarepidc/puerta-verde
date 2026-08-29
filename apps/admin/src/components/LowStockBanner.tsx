@@ -20,9 +20,9 @@ const AUTO_HIDE_MS = 10_000;
 
 export function LowStockBanner({
   products,
-  href = '/?section=stock',
+  href = '/numeros',
   persist = false,
-  linkLabel = 'Ver transacciones y pronóstico',
+  linkLabel = 'Ver qué comprar',
 }: {
   products: LowStockProduct[];
   href?: string;

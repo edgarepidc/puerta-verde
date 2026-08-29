@@ -4,16 +4,19 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-const NAV = [
+const NAV: Array<{ href: string; label: string; aliases?: readonly string[] }> = [
   { href: '/', label: 'Ventas' },
-  { href: '/productos', label: 'Catálogo' },
-  { href: '/inventario', label: 'Compras' },
-  { href: '/clientes', label: 'Clientes' },
-  { href: '/promociones', label: 'Promociones' },
+  { href: '/compras', label: 'Compras' },
+  { href: '/productos', label: 'Productos' },
   { href: '/caja', label: 'Caja' },
-  { href: '/utilidades', label: 'Utilidades' },
-  { href: '/configuracion', label: 'Configuración' },
-] as const;
+  { href: '/numeros', label: 'Números' },
+  { href: '/configuracion', label: 'Ajustes', aliases: ['/promociones', '/clientes'] },
+];
+
+function isActive(pathname: string, href: string, aliases?: readonly string[]) {
+  if (pathname === href || (href !== '/' && pathname.startsWith(href))) return true;
+  return Boolean(aliases?.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`)));
+}
 
 function MenuIcon({ open }: { open: boolean }) {
   return (
@@ -40,10 +43,6 @@ function MenuIcon({ open }: { open: boolean }) {
       )}
     </svg>
   );
-}
-
-function isActive(pathname: string, href: string) {
-  return pathname === href || (href !== '/' && pathname.startsWith(href));
 }
 
 export function AdminNav({ isPlatformAdmin: _isPlatformAdmin = false }: { isPlatformAdmin?: boolean }) {
@@ -81,7 +80,7 @@ export function AdminNav({ isPlatformAdmin: _isPlatformAdmin = false }: { isPlat
         aria-label="Navegación principal"
       >
         {NAV.map((item) => {
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item.href, item.aliases);
           return (
             <Link
               key={item.href}
@@ -120,7 +119,7 @@ export function AdminNav({ isPlatformAdmin: _isPlatformAdmin = false }: { isPlat
             </div>
             <nav className="grid gap-1" aria-label="Navegación móvil">
               {NAV.map((item) => {
-                const active = isActive(pathname, item.href);
+                const active = isActive(pathname, item.href, item.aliases);
                 return (
                   <Link
                     key={item.href}

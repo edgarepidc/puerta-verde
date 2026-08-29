@@ -101,7 +101,7 @@ export default async function ProductsPage() {
 
   return (
     <AdminShell
-      title="Catálogo"
+      title="Productos"
       subtitle={`${tenant.organizationName} · ${tenant.branchName}`}
     >
       <ProductsManager

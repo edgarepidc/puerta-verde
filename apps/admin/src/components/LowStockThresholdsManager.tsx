@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
+import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 
 interface CategoryThreshold {
@@ -40,6 +41,7 @@ export function LowStockThresholdsManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [openMinimos, setOpenMinimos] = useState(false);
 
   const dirty = useMemo(
     () =>
@@ -86,41 +88,35 @@ export function LowStockThresholdsManager({
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex gap-3">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl"
-            aria-hidden
-          >
-            📉
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Mínimo por categoría</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Se considera stock bajo cuando hay menos de este número. El límite aplica a todos los
-              productos de esa categoría en esta sucursal.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {error ? <p className="text-xs text-rose-700">{error}</p> : null}
-          {savedAt && !dirty ? <p className="text-xs text-emerald-700">Guardado</p> : null}
-          {canEdit ? (
-            <button
-              type="button"
-              disabled={saving || !dirty}
-              onClick={() => void save()}
-              className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
-            >
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-          ) : null}
-        </div>
-      </div>
+    <details
+      className="group pv-glass-card space-y-4 p-4 sm:p-6"
+      open={openMinimos}
+      onToggle={(event) => setOpenMinimos(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="Mínimo por categoría"
+        hint="Se considera stock bajo cuando hay menos de este número. El límite aplica a todos los productos de esa categoría."
+        emoji="📉"
+        iconClass="bg-amber-100"
+        actions={
+          canEdit ? (
+            <>
+              {error ? <p className="text-xs text-rose-700">{error}</p> : null}
+              {savedAt && !dirty ? (
+                <ActionChip as="span" emoji="✅" elevated={false}>
+                  Guardado
+                </ActionChip>
+              ) : null}
+              <ActionChip emoji="✅" disabled={saving || !dirty} onClick={() => void save()}>
+                {saving ? 'Guardando…' : 'Guardar'}
+              </ActionChip>
+            </>
+          ) : undefined
+        }
+      />
 
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-500">Aún no hay categorías. Créalas en Catálogo.</p>
+        <p className="text-sm text-slate-500">Aún no hay categorías. Créalas en Productos.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {rows.map((row) => (
@@ -150,6 +146,6 @@ export function LowStockThresholdsManager({
           ))}
         </div>
       )}
-    </section>
+    </details>
   );
 }
