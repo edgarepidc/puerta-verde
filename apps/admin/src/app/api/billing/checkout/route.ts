@@ -2,16 +2,19 @@ import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { canManageStaff, requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getStripe, getStripePriceId } from '@/lib/stripe';
 
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
-  if (!canManageStaff(auth.role)) {
-    return NextResponse.json({ error: 'Sin permisos para gestionar la suscripción' }, { status: 403 });
-  }
+  const denied = await requireStaffPermission(
+    auth,
+    'staff.manage',
+    'Sin permisos para gestionar la suscripción',
+  );
+  if (denied) return denied;
 
   const stripe = getStripe();
   if (!stripe) {

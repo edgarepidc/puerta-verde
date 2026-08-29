@@ -11,5 +11,6 @@ echo "→ Deploying web (puerta-verde-web)..."
 npx vercel deploy --prod --yes --local-config vercel.web.json --project puerta-verde-web
 
 echo "Done."
-echo "  Admin: https://puerta-verde-admin.vercel.app/login"
-echo "  Web:   https://puerta-verde-web.vercel.app"
+echo "  Admin: https://admin.puertaverde.com.mx/login"
+echo "  Web:   https://puertaverde.com.mx"
+echo "  (Demo pausado — no se despliega. Reactívalo en Vercel/Supabase si lo necesitas.)"

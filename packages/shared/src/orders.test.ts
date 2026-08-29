@@ -20,7 +20,29 @@ test('validateGuestCheckout requires unit for delivery', () => {
     fulfillmentType: 'delivery',
     items: [{ branchProductId: 'abc', quantity: 1 }],
   });
-  assert.equal(error, 'Selecciona tu departamento para la entrega.');
+  assert.equal(error, 'Ingresa tu domicilio para la entrega.');
+});
+
+test('validateGuestCheckout accepts free-text delivery unit', () => {
+  const error = validateGuestCheckout({
+    customerName: 'Ana',
+    customerPhone: '5512345678',
+    fulfillmentType: 'delivery',
+    deliveryUnit: 'Calle 12 #45, Col. Centro',
+    items: [{ branchProductId: 'abc', quantity: 1 }],
+  });
+  assert.equal(error, null);
+});
+
+test('validateGuestCheckout allows walk-in without phone', () => {
+  const error = validateGuestCheckout({
+    customerName: '',
+    customerPhone: '',
+    fulfillmentType: 'pickup',
+    walkIn: true,
+    items: [{ branchProductId: 'abc', quantity: 1 }],
+  });
+  assert.equal(error, null);
 });
 
 test('formatMoney uses MXN locale', () => {

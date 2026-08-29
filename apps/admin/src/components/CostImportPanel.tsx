@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { formatMoney } from '@puertaverde/shared';
 
+import { ActionChip } from '@/components/ActionChip';
 import type { CostImportPreviewRow } from '@/lib/cost-import';
 
 export function CostImportPanel({ onImported }: { onImported: () => Promise<void> }) {
@@ -38,7 +39,7 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
       setPreviewRows(payload.rows ?? []);
       setParseErrors(payload.parseErrors ?? []);
       setMessage(
-        `${payload.matchedCount ?? 0} de ${payload.totalCount ?? 0} productos coinciden con tu catálogo.`,
+        `${payload.matchedCount ?? 0} para actualizar · ${payload.createCount ?? 0} nuevos · ${payload.totalCount ?? 0} filas.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al previsualizar');
@@ -49,7 +50,7 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
   }
 
   async function handleImport() {
-    const readyRows = previewRows.filter((row) => row.matched);
+    const readyRows = previewRows;
     if (!readyRows.length) {
       setError('No hay filas listas para importar.');
       return;
@@ -88,9 +89,9 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
     <section className="pv-glass-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Importar costos desde Excel</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Cargar lista</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Sube un archivo .xlsx o .csv con columnas: producto, costo, cantidad (opcional), precio (opcional).
+            Excel o CSV con nombre, categoría, unidad y precio. Costo y cantidad son opcionales.
           </p>
         </div>
         <a
@@ -126,14 +127,9 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
           {loading ? 'Procesando…' : 'Vista previa'}
         </button>
         {previewRows.length > 0 && (
-          <button
-            type="button"
-            disabled={loading}
-            onClick={handleImport}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
+          <ActionChip emoji="📥" disabled={loading} onClick={handleImport}>
             Confirmar importación
-          </button>
+          </ActionChip>
         )}
       </div>
 
@@ -165,17 +161,17 @@ export function CostImportPanel({ onImported }: { onImported: () => Promise<void
                   <td className="px-3 py-2">{row.rowNumber}</td>
                   <td className="px-3 py-2 font-medium">{row.productName}</td>
                   <td className="px-3 py-2">{row.matchedProductName ?? '—'}</td>
-                  <td className="px-3 py-2">{formatMoney(row.unitCost)}</td>
+                  <td className="px-3 py-2">{row.unitCost != null ? formatMoney(row.unitCost) : '—'}</td>
                   <td className="px-3 py-2">{row.quantity ?? '—'}</td>
                   <td className="px-3 py-2">
                     {row.salePrice != null ? formatMoney(row.salePrice) : '—'}
                   </td>
                   <td
                     className={`px-3 py-2 font-medium ${
-                      row.matched ? 'text-green-700' : 'text-red-600'
+                      row.matched ? 'text-green-700' : 'text-sky-700'
                     }`}
                   >
-                    {row.matched ? 'Listo' : 'No encontrado'}
+                    {row.matched ? 'Actualizar' : 'Crear nuevo'}
                   </td>
                 </tr>
               ))}

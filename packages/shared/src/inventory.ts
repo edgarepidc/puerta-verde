@@ -38,4 +38,42 @@ export function validateInventoryMovement(input: InventoryMovementInput): string
   return null;
 }
 
-export const LOW_STOCK_THRESHOLD = 5;
+/** Default for count/volume units (kg, piece, bunch, box, bag, liter). */
+export const LOW_STOCK_THRESHOLD = 3;
+/** Chiles sold by kg: low when under 300 g. */
+export const CHILE_LOW_STOCK_KG = 0.3;
+
+export function isChileProduct(input: {
+  name?: string | null;
+  categoryName?: string | null;
+}): boolean {
+  const name = (input.name ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const category = (input.categoryName ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  return category.includes('chile') || /(^|\s)chiles?\b/.test(name);
+}
+
+export function getDefaultLowStockThreshold(input: {
+  unit: string;
+  name?: string | null;
+  categoryName?: string | null;
+}): number {
+  if (input.unit === 'kg' && isChileProduct(input)) return CHILE_LOW_STOCK_KG;
+  return LOW_STOCK_THRESHOLD;
+}
+
+/** Low stock means strictly below the threshold (“menos de”). */
+export function isLowStock(input: {
+  stock: number;
+  unit: string;
+  minStock?: number | null;
+  name?: string | null;
+  categoryName?: string | null;
+}): boolean {
+  const stock = Number(input.stock);
+  if (!Number.isFinite(stock)) return false;
+  const threshold =
+    input.minStock != null && Number.isFinite(Number(input.minStock))
+      ? Number(input.minStock)
+      : getDefaultLowStockThreshold(input);
+  return stock < threshold;
+}

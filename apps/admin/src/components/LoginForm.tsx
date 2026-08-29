@@ -4,7 +4,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { BrandLogo } from '@/components/BrandLogo';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -19,29 +23,26 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
-    if (signInError) {
-      setError('Correo o contraseña incorrectos.');
+      if (!response.ok) {
+        setError(payload?.error ?? 'No se pudo entrar. Inténtalo de nuevo.');
+        return;
+      }
+
+      router.push(safeNextPath(searchParams.get('next')));
+      router.refresh();
+    } catch {
+      setError('No se pudo conectar. Recarga la página e inténtalo de nuevo.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const sessionResponse = await fetch('/api/auth/session');
-    if (!sessionResponse.ok) {
-      await supabase.auth.signOut();
-      setError('Tu cuenta no tiene acceso al panel. Pide acceso al administrador.');
-      setLoading(false);
-      return;
-    }
-
-    const next = searchParams.get('next') ?? '/';
-    router.push(next);
-    router.refresh();
   }
 
   return (
@@ -49,7 +50,10 @@ export function LoginForm() {
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
       <main className="relative flex min-h-screen items-center justify-center px-4">
         <div className="pv-glass-panel w-full max-w-md p-8 sm:p-10">
-          <div className="mb-6 flex justify-center">
+          <div className="mb-6 flex flex-col items-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Admin
+            </p>
             <BrandLogo href="/" imageClassName="h-20 w-auto sm:h-24" />
           </div>
           <h1 className="text-center text-xl font-bold text-slate-900">Acceso al panel</h1>
@@ -59,11 +63,11 @@ export function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <label className="block text-sm font-medium text-slate-700">
-              Correo
+              Usuario
               <input
                 type="email"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 className="pv-input mt-1"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

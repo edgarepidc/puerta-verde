@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { buildOrderStatusMessage, sendTextMessage } from '@puertaverde/whatsapp';
-import type { OrderStatus } from '@puertaverde/shared';
+import { isOrderStatus, type OrderStatus } from '@puertaverde/shared';
 
 import { requireStaffApi } from '@/lib/auth';
 
@@ -15,6 +15,10 @@ export async function PATCH(request: Request) {
       orderId: string;
       status: OrderStatus;
     };
+
+    if (!orderId || !isOrderStatus(status)) {
+      return NextResponse.json({ error: 'Estado no válido' }, { status: 400 });
+    }
 
     const supabase = createAdminClient();
     const { data: order, error } = await supabase

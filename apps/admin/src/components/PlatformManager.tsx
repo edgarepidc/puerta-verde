@@ -88,8 +88,8 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
           Solo tú (super admin) puedes crear tenants. Se crea la organización, la sucursal y el usuario owner.
         </p>
 
-        <form onSubmit={createOrg} className="mt-6 grid gap-4 md:grid-cols-2">
-          <label className="block text-sm font-medium text-slate-700">
+        <form onSubmit={createOrg} className="mt-6 grid min-w-0 gap-4 md:grid-cols-4">
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
             Nombre de la verdulería
             <input
               className="pv-input mt-1"
@@ -101,7 +101,7 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
             Nombre de la sucursal
             <input
               className="pv-input mt-1"
@@ -110,19 +110,21 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               placeholder="Misma que la verdulería si lo dejas vacío"
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+          <label className="block min-w-0 text-sm font-medium text-slate-700 md:col-span-4">
             Slug de la tienda pública
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-xs text-slate-400">{webUrl}/</span>
-              <input
-                className="pv-input flex-1"
-                value={branchSlug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setBranchSlug(slugifyOrganizationName(e.target.value));
-                }}
-                required
-              />
+            <div className="mt-1 flex min-w-0 items-center gap-2">
+              <span className="shrink-0 text-xs text-slate-400">{webUrl}/</span>
+              <div className="min-w-0 flex-1">
+                <input
+                  className="pv-input"
+                  value={branchSlug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setBranchSlug(slugifyOrganizationName(e.target.value));
+                  }}
+                  required
+                />
+              </div>
             </div>
           </label>
           <label className="block text-sm font-medium text-slate-700">
@@ -134,7 +136,7 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
             Correo del owner
             <input
               type="email"
@@ -144,7 +146,7 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700">
             Contraseña temporal
             <input
               type="password"
@@ -156,10 +158,10 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
             />
           </label>
 
-          {error && <p className="text-sm text-red-600 md:col-span-2">{error}</p>}
-          {success && <p className="text-sm text-[var(--pv-green-700)] md:col-span-2">{success}</p>}
+          {error && <p className="text-sm text-red-600 md:col-span-4">{error}</p>}
+          {success && <p className="text-sm text-[var(--pv-green-700)] md:col-span-4">{success}</p>}
 
-          <button type="submit" disabled={saving} className="pv-btn-primary px-5 py-2.5 text-sm md:col-span-2">
+          <button type="submit" disabled={saving} className="pv-btn-primary px-5 py-2.5 text-sm md:col-span-4">
             {saving ? 'Creando...' : 'Crear verdulería'}
           </button>
         </form>

@@ -6,9 +6,8 @@ import { createServerClient } from '@puertaverde/supabase/client';
 import {
   formatMoney,
   FULFILLMENT_LABELS,
-  ORDER_STATUS_LABELS,
+  orderStatusLabel,
   PRODUCT_UNIT_LABELS,
-  type OrderStatus,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -59,7 +58,7 @@ export default async function OrderTrackingPage({
         </h1>
         <p className="mt-2 text-[var(--pv-green-800)]">
           Hola {order.customer_name}, tu pedido está{' '}
-          <strong>{ORDER_STATUS_LABELS[order.status as OrderStatus]}</strong>.
+          <strong>{orderStatusLabel(order.status)}</strong>.
         </p>
         <p className="mt-1 text-sm text-[var(--pv-green-800)]">
           {FULFILLMENT_LABELS[order.fulfillment_type as keyof typeof FULFILLMENT_LABELS]}

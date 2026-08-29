@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { STAFF_ROLES, type StaffRole } from '@puertaverde/shared';
+import { STAFF_ROLES, normalizeStaffRole, type StaffRole } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { canManageStaff, requireStaffApi } from '@/lib/auth';
+import { loadPermissionMatrix, requireStaffApi, requireStaffPermission, staffHasPermission } from '@/lib/auth';
+import { emailsByUserId } from '@/lib/staff-emails';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET() {
@@ -13,6 +14,7 @@ export async function GET() {
   try {
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
+    const matrix = await loadPermissionMatrix(auth.organizationId);
 
     const { data: memberships, error } = await supabase
       .from('staff_memberships')
@@ -30,19 +32,26 @@ export async function GET() {
       : { data: [] };
 
     const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const emails = await emailsByUserId(userIds);
 
-    const staff = (memberships ?? []).map((row) => {
+    const staff = (memberships ?? []).flatMap((row) => {
+      const role = normalizeStaffRole(row.role);
+      if (!role) return [];
       const profile = profileById.get(row.user_id);
-      return {
-        ...row,
-        full_name: profile?.full_name ?? null,
-        phone: profile?.phone ?? null,
-      };
+      return [
+        {
+          ...row,
+          role,
+          full_name: profile?.full_name ?? null,
+          phone: profile?.phone ?? null,
+          email: emails.get(row.user_id) ?? null,
+        },
+      ];
     });
 
     return NextResponse.json({
       staff,
-      canManage: canManageStaff(auth.role),
+      canManage: staffHasPermission(auth, 'staff.manage', matrix),
       currentUserId: auth.userId,
     });
   } catch (error) {
@@ -57,9 +66,8 @@ export async function POST(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
-  if (!canManageStaff(auth.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para crear usuarios' }, { status: 403 });
-  }
+  const denied = await requireStaffPermission(auth, 'staff.manage', 'No tienes permiso para crear usuarios');
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();

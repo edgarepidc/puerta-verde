@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { validatePromotionInput, type PromotionInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function PATCH(
@@ -12,6 +12,13 @@ export async function PATCH(
 ) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'promotions.manage',
+    'No tienes permiso para gestionar promociones',
+  );
+  if (denied) return denied;
 
   try {
     const { id } = await params;
@@ -31,6 +38,8 @@ export async function PATCH(
         kind: body.kind,
         image_url: body.imageUrl?.trim() || null,
         discount_percent: body.kind === 'discount' ? body.discountPercent ?? null : null,
+        product_id: body.kind === 'discount' ? body.productId || null : null,
+        category_id: body.kind === 'discount' ? body.categoryId || null : null,
         starts_at: body.startsAt || null,
         ends_at: body.endsAt || null,
         is_active: body.isActive,
@@ -57,6 +66,13 @@ export async function DELETE(
 ) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'promotions.manage',
+    'No tienes permiso para gestionar promociones',
+  );
+  if (denied) return denied;
 
   try {
     const { id } = await params;

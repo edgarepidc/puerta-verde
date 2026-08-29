@@ -37,6 +37,7 @@ export interface Database {
           organization_id: string;
           name: string;
           sort_order: number;
+          low_stock_threshold: number;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['product_categories']['Row']> & {
@@ -53,17 +54,19 @@ export interface Database {
           category_id: string | null;
           name: string;
           description: string | null;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
+          sku: string | null;
           image_url: string | null;
           is_active: boolean;
           shelf_life_days: number | null;
+          weigh_at_fulfillment: boolean;
           created_at: string;
           updated_at: string;
         };
         Insert: Partial<Database['public']['Tables']['products']['Row']> & {
           organization_id: string;
           name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box' | 'box';
         };
         Update: Partial<Database['public']['Tables']['products']['Row']>;
         Relationships: [
@@ -93,11 +96,15 @@ export interface Database {
           subtotal: number;
           delivery_fee: number;
           total: number;
+          coupon_id: string | null;
+          coupon_code: string | null;
+          discount_amount: number;
           payment_method: 'cash' | 'card_terminal' | 'transfer' | 'online' | null;
           payment_status: 'pending' | 'paid' | 'refunded';
           paid_at: string | null;
           paid_by: string | null;
           stripe_checkout_session_id: string | null;
+          source: 'web' | 'pos';
           created_at: string;
           updated_at: string;
         };
@@ -109,6 +116,33 @@ export interface Database {
           fulfillment_type: 'delivery' | 'pickup';
         };
         Update: Partial<Database['public']['Tables']['orders']['Row']>;
+        Relationships: [];
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
+          quantity: number;
+          ordered_quantity: number | null;
+          weigh_at_fulfillment: boolean;
+          unit_price: number;
+          line_total: number;
+          unit_cost: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['order_items']['Row']> & {
+          order_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+        };
+        Update: Partial<Database['public']['Tables']['order_items']['Row']>;
         Relationships: [];
       };
       branches: {
@@ -123,6 +157,9 @@ export interface Database {
           pickup_instructions: string | null;
           delivery_fee: number;
           minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
           settings: Json;
           created_at: string;
           updated_at: string;
@@ -142,6 +179,8 @@ export interface Database {
           product_id: string;
           price: number;
           stock: number;
+          piece_stock: number;
+          min_stock: number;
           avg_unit_cost: number;
           last_unit_cost: number | null;
           is_available: boolean;
@@ -176,6 +215,8 @@ export interface Database {
           ends_at: string | null;
           is_active: boolean;
           discount_percent: number | null;
+          product_id: string | null;
+          category_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['promotions']['Row']> & {
@@ -183,6 +224,32 @@ export interface Database {
           title: string;
         };
         Update: Partial<Database['public']['Tables']['promotions']['Row']>;
+        Relationships: [];
+      };
+      coupons: {
+        Row: {
+          id: string;
+          branch_id: string;
+          code: string;
+          description: string | null;
+          discount_type: 'percent' | 'fixed';
+          discount_value: number;
+          starts_at: string | null;
+          ends_at: string | null;
+          is_active: boolean;
+          max_uses: number | null;
+          times_used: number;
+          min_order_amount: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['coupons']['Row']> & {
+          branch_id: string;
+          code: string;
+          discount_type: 'percent' | 'fixed';
+          discount_value: number;
+        };
+        Update: Partial<Database['public']['Tables']['coupons']['Row']>;
         Relationships: [];
       };
       buildings: {
@@ -197,6 +264,54 @@ export interface Database {
           name: string;
         };
         Update: Partial<Database['public']['Tables']['buildings']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'units_building_id_fkey';
+            columns: ['id'];
+            isOneToOne: false;
+            referencedRelation: 'units';
+            referencedColumns: ['building_id'];
+          },
+        ];
+      };
+      units: {
+        Row: {
+          id: string;
+          building_id: string;
+          identifier: string;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['units']['Row']> & {
+          building_id: string;
+          identifier: string;
+        };
+        Update: Partial<Database['public']['Tables']['units']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'units_building_id_fkey';
+            columns: ['building_id'];
+            isOneToOne: false;
+            referencedRelation: 'buildings';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      customers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          phone: string;
+          full_name: string | null;
+          default_unit_id: string | null;
+          whatsapp_opt_in: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['customers']['Row']> & {
+          organization_id: string;
+          phone: string;
+        };
+        Update: Partial<Database['public']['Tables']['customers']['Row']>;
         Relationships: [];
       };
       inventory_movements: {
@@ -251,6 +366,85 @@ export interface Database {
         };
         Update: Partial<Database['public']['Tables']['branch_operating_costs']['Row']>;
         Relationships: [];
+      };
+      suppliers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          phone: string | null;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['suppliers']['Row']> & {
+          organization_id: string;
+          name: string;
+        };
+        Update: Partial<Database['public']['Tables']['suppliers']['Row']>;
+        Relationships: [];
+      };
+      purchases: {
+        Row: {
+          id: string;
+          branch_id: string;
+          supplier_id: string;
+          purchased_at: string;
+          notes: string | null;
+          total_amount: number;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['purchases']['Row']> & {
+          branch_id: string;
+          supplier_id: string;
+        };
+        Update: Partial<Database['public']['Tables']['purchases']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'purchases_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'suppliers';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      purchase_items: {
+        Row: {
+          id: string;
+          purchase_id: string;
+          branch_product_id: string;
+          quantity: number;
+          unit_price: number;
+          line_total: number;
+          quality: 'premium' | 'normal' | 'saldo';
+          piece_count: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['purchase_items']['Row']> & {
+          purchase_id: string;
+          branch_product_id: string;
+          quantity: number;
+          unit_price: number;
+        };
+        Update: Partial<Database['public']['Tables']['purchase_items']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_items_purchase_id_fkey';
+            columns: ['purchase_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchases';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_items_branch_product_id_fkey';
+            columns: ['branch_product_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_products';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       product_lots: {
         Row: {
@@ -318,6 +512,27 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['staff_memberships']['Row']>;
         Relationships: [];
       };
+      expenses: {
+        Row: {
+          id: string;
+          branch_id: string;
+          organization_id: string;
+          concept: string;
+          amount: number;
+          expense_date: string;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['expenses']['Row']> & {
+          branch_id: string;
+          organization_id: string;
+          concept: string;
+          amount: number;
+        };
+        Update: Partial<Database['public']['Tables']['expenses']['Row']>;
+        Relationships: [];
+      };
       daily_cash_closings: {
         Row: {
           id: string;
@@ -327,6 +542,8 @@ export interface Database {
           card_terminal_total: number;
           transfer_total: number;
           notes: string | null;
+          opening_float: number | null;
+          counted_cash: number | null;
           closed_by: string | null;
           created_at: string;
         };
@@ -373,6 +590,9 @@ export interface Database {
           pickup_instructions: string | null;
           delivery_fee: number;
           minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
           org_name: string;
           org_slug: string;
         }>;
@@ -422,6 +642,13 @@ export interface Database {
         };
         Returns: Array<{ new_stock: number; new_avg_unit_cost: number }>;
       };
+      merge_branch_products: {
+        Args: {
+          p_from_branch_product_id: string;
+          p_into_branch_product_id: string;
+        };
+        Returns: undefined;
+      };
       get_branch_discount_percent: {
         Args: { p_branch_id: string };
         Returns: number;
@@ -440,6 +667,16 @@ export interface Database {
         };
         Returns: Array<{ lot_id: string; new_stock: number }>;
       };
+      record_supplier_purchase: {
+        Args: {
+          p_branch_id: string;
+          p_supplier_id: string;
+          p_purchased_at: string | null;
+          p_notes: string | null;
+          p_items: Json;
+        };
+        Returns: Array<{ purchase_id: string; total_amount: number }>;
+      };
       get_lot_traceability: {
         Args: { p_lot_code: string; p_branch_id?: string | null };
         Returns: Array<Record<string, unknown>>;
@@ -449,8 +686,9 @@ export interface Database {
         Returns: Array<{
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           current_stock: number;
+          min_stock: number;
           avg_daily_sales: number;
           forecast_demand: number;
           suggested_reorder: number;
@@ -462,7 +700,7 @@ export interface Database {
         Returns: Array<{
           branch_product_id: string;
           product_name: string;
-          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter';
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           sale_price: number;
           avg_unit_cost: number;
           last_unit_cost: number | null;
@@ -474,7 +712,7 @@ export interface Database {
         }>;
       };
       get_profit_summary: {
-        Args: { p_branch_id: string; p_days?: number };
+        Args: { p_branch_id: string; p_start: string; p_end: string };
         Returns: Array<{
           period_days: number;
           revenue: number;
@@ -483,13 +721,14 @@ export interface Database {
           gross_margin_percent: number;
           fixed_costs: number;
           variable_costs: number;
+          visit_expenses: number;
           operating_costs_total: number;
           estimated_net_profit: number;
           order_count: number;
         }>;
       };
       get_profit_by_category: {
-        Args: { p_branch_id: string; p_days?: number };
+        Args: { p_branch_id: string; p_start: string; p_end: string };
         Returns: Array<{
           category_name: string;
           product_count: number;

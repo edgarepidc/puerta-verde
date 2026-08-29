@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Puerta Verde Admin',
+  title: 'Admin',
   description: 'Panel de administración para verdulerías',
   icons: {
     icon: '/brand/icon.png',

@@ -6,3 +6,106 @@ body {
   color: #0f172a;
   min-height: 100vh;
 }
+
+.pv-thermal-preview {
+  box-sizing: border-box;
+  width: 58mm;
+  padding: 3mm 3mm 6mm;
+  border: 1px dashed #cbd5e1;
+  color: #000;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.pv-thermal-head {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.pv-thermal-logo {
+  display: block;
+  width: 26mm;
+  height: auto;
+  margin: 0 auto 10px;
+}
+
+.pv-thermal-store,
+.pv-thermal-ticket,
+.pv-thermal-head p,
+.pv-thermal-customer,
+.pv-thermal-thanks {
+  margin: 0;
+}
+
+.pv-thermal-customer,
+.pv-thermal-thanks,
+.pv-thermal-footer {
+  text-align: center;
+}
+
+.pv-thermal-thanks {
+  margin-top: 8px;
+}
+
+.pv-thermal-footer {
+  margin: 6px 0 0;
+  font-size: 10px;
+}
+
+.pv-thermal-rule {
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+
+.pv-thermal-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pv-thermal-items li + li {
+  margin-top: 5px;
+}
+
+.pv-thermal-item-name {
+  display: block;
+  font-weight: 700;
+}
+
+.pv-thermal-item-row,
+.pv-thermal-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pv-thermal-total {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+button,
+a[class*='rounded-full'],
+input[type='submit'],
+input[type='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+a[class*='rounded-full'],
+input[type='submit']:not(:disabled),
+input[type='button']:not(:disabled) {
+  transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+button:not(:disabled):active,
+a[class*='rounded-full']:active,
+input[type='submit']:not(:disabled):active,
+input[type='button']:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.92);
+}

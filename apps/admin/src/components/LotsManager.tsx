@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { PRODUCT_UNIT_LABELS, type ProductUnit } from '@puertaverde/shared';
 
 import { ScalePanel } from '@/components/ScalePanel';
+import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 
 interface ProductOption {
   id: string;
@@ -31,15 +32,18 @@ interface LotRow {
 export function LotsManager({
   initialLots,
   products,
+  usbScaleEnabled = false,
 }: {
   initialLots: LotRow[];
   products: ProductOption[];
+  usbScaleEnabled?: boolean;
 }) {
   const [lots, setLots] = useState(initialLots);
   const [branchProductId, setBranchProductId] = useState('');
   const [lotCode, setLotCode] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [unitCost, setUnitCost] = useState(0);
+  const [quantity, setQuantity] = useState('');
+  const [unitCost, setUnitCost] = useState('');
+
   const [gtin, setGtin] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [packDate, setPackDate] = useState('');
@@ -72,8 +76,8 @@ export function LotsManager({
         body: JSON.stringify({
           branchProductId,
           lotCode,
-          quantity,
-          unitCost: unitCost > 0 ? unitCost : null,
+          quantity: parseDecimal(quantity),
+          unitCost: parseDecimal(unitCost) > 0 ? parseDecimal(unitCost) : null,
           gtin: gtin || null,
           supplierName: supplierName || null,
           packDate: packDate || null,
@@ -84,6 +88,8 @@ export function LotsManager({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
       setLotCode('');
+      setQuantity('');
+      setUnitCost('');
       setNotes('');
       await refresh();
     } catch (err) {
@@ -113,9 +119,11 @@ export function LotsManager({
           Registra entrada con código de lote, GTIN y trazabilidad PTI. Las ventas consumen lotes por FIFO (primero por caducar).
         </p>
 
-        <div className="mt-4">
-          <ScalePanel onWeight={(kg) => setQuantity(kg)} />
-        </div>
+        {usbScaleEnabled ? (
+          <div className="mt-4">
+            <ScalePanel onWeight={(kg) => setQuantity(String(kg))} />
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="block text-sm md:col-span-2">
@@ -144,24 +152,20 @@ export function LotsManager({
           </label>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Cantidad *</span>
-            <input
-              type="number"
-              min={0.001}
-              step={0.001}
+            <DecimalInput
+              placeholder="0"
               className="pv-input mt-1"
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={setQuantity}
             />
           </label>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Costo de compra (por unidad) *</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
+            <DecimalInput
+              placeholder="0"
               className="pv-input mt-1"
               value={unitCost}
-              onChange={(e) => setUnitCost(Number(e.target.value))}
+              onChange={setUnitCost}
             />
           </label>
           <label className="block text-sm">

@@ -1,5 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+
+import { FoldableSummary } from '@/components/ActionChip';
+
 interface WhatsAppLogRow {
   id: string;
   direction: 'inbound' | 'outbound';
@@ -11,19 +15,23 @@ interface WhatsAppLogRow {
 }
 
 export function WhatsAppInbox({ initialMessages }: { initialMessages: WhatsAppLogRow[] }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <section className="pv-glass-card p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">WhatsApp</h2>
-          <p className="text-sm text-slate-500">
-            Mensajes entrantes y respuestas automáticas recientes.
-          </p>
-        </div>
-      </div>
+    <details
+      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <FoldableSummary
+        title="WhatsApp"
+        hint="Mensajes enviados y respuestas automáticas recientes"
+        emoji="💬"
+        iconClass="bg-emerald-100"
+      />
 
       {initialMessages.length === 0 ? (
-        <p className="pv-callout p-4 text-sm">Aún no hay mensajes registrados.</p>
+        <p className="text-sm text-slate-500">Aún no hay mensajes registrados.</p>
       ) : (
         <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
           {initialMessages.map((message) => {
@@ -43,12 +51,12 @@ export function WhatsAppInbox({ initialMessages }: { initialMessages: WhatsAppLo
                   <span>{message.recipient_phone}</span>
                   <span>·</span>
                   <span>{new Date(message.created_at).toLocaleString('es-MX')}</span>
-                  {message.template_key && (
+                  {message.template_key ? (
                     <>
                       <span>·</span>
                       <span>{message.template_key}</span>
                     </>
-                  )}
+                  ) : null}
                 </div>
                 <p className="whitespace-pre-wrap text-slate-800">{message.body}</p>
               </article>
@@ -56,6 +64,6 @@ export function WhatsAppInbox({ initialMessages }: { initialMessages: WhatsAppLo
           })}
         </div>
       )}
-    </section>
+    </details>
   );
 }

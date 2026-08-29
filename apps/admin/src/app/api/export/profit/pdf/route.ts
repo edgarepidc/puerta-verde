@@ -1,17 +1,31 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-import { requireStaffApi } from '@/lib/auth';
+import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { fetchProfitReport, profitSummaryLines } from '@/lib/profit-report';
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
-  const { searchParams } = new URL(request.url);
-  const days = Math.min(Math.max(Number(searchParams.get('days') ?? 30), 1), 365);
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.view',
+    'No tienes permiso para ver utilidades',
+  );
+  if (denied) return denied;
 
-  const report = await fetchProfitReport(auth.branchId, days);
+  const { searchParams } = new URL(request.url);
+  let report;
+  try {
+    report = await fetchProfitReport(auth.branchId, searchParams.get('from'), searchParams.get('to'));
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Rango inválido' },
+      { status: 400 },
+    );
+  }
+
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -36,7 +50,7 @@ export async function GET(request: Request) {
   }
 
   writeln('Puerta Verde — Utilidades', 16, true);
-  for (const line of profitSummaryLines(report.summary, auth.branchName, days)) {
+  for (const line of profitSummaryLines(report.summary, auth.branchName, report.periodLabel)) {
     writeln(line);
   }
 
@@ -63,7 +77,7 @@ export async function GET(request: Request) {
   return new Response(Buffer.from(bytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="utilidades-${auth.branchSlug}-${days}d.pdf"`,
+      'Content-Disposition': `attachment; filename="utilidades-${auth.branchSlug}-${report.from}_${report.to}.pdf"`,
     },
   });
 }
