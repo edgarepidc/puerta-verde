@@ -64,7 +64,7 @@ export async function AdminShell({
 
   const displayName =
     staff.fullName?.trim() || staff.email.split('@')[0] || 'equipo';
-  const greeting = `${mexicoDayGreeting()} - ${displayName}`;
+  const hello = mexicoDayGreeting();
 
   return (
     <>
@@ -76,8 +76,9 @@ export async function AdminShell({
               <BrandLogo href="/" imageClassName="h-12 w-auto sm:h-14 md:h-16" priority />
               <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
             </div>
-            <p className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-slate-900 sm:text-xl">
-              {greeting}
+            <p className="min-w-0 flex-1 text-[11px] leading-tight text-slate-500 sm:text-xs">
+              <span className="block truncate">{hello}</span>
+              <span className="block truncate font-semibold text-slate-900">{displayName}</span>
             </p>
             <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
           </div>
