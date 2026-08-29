@@ -147,6 +147,7 @@ export function CounterSalePanel({
   usbScaleEnabled = false,
   printerChip,
   queueHint,
+  boardFilters,
 }: {
   products: CounterProduct[];
   onCreated: (order: CreatedOrder, items: ReceiptItem[]) => void;
@@ -157,6 +158,8 @@ export function CounterSalePanel({
   printerChip?: ReactNode;
   /** Shown when collapsed and the board has open orders. */
   queueHint?: string | null;
+  /** Filter chips for Hoy / Por atender / canal — sit in the collapsed toolbar. */
+  boardFilters?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState('');
@@ -642,6 +645,7 @@ export function CounterSalePanel({
       items: receipt.items,
     };
     return (
+      <>
       <section className="pv-glass-card mb-6 space-y-4 p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -691,19 +695,26 @@ export function CounterSalePanel({
         </div>
         {printError ? <p className="text-xs text-rose-700">{printError}</p> : null}
       </section>
+      {boardFilters ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>
+      ) : null}
+    </>
     );
   }
 
   if (!open) {
     return (
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="shrink-0">
-          <h1 className="text-xl font-semibold text-slate-900">Pedidos</h1>
-          <p className="text-sm text-slate-500">
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2">
+        <div className="w-[7.25rem] shrink-0 sm:w-32">
+          <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
+          <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
             {queueHint ? queueHint : 'Cola de atención y ventas del día'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        {boardFilters ? (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{boardFilters}</div>
+        ) : null}
+        <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2">
           {printerChip}
           <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
             Nueva venta
@@ -714,6 +725,7 @@ export function CounterSalePanel({
   }
 
   return (
+    <>
     <section className="pv-glass-card mb-3 space-y-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -1173,5 +1185,9 @@ export function CounterSalePanel({
         </aside>
       </div>
     </section>
+      {boardFilters ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>
+      ) : null}
+    </>
   );
 }

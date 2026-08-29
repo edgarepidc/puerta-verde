@@ -763,18 +763,42 @@ export function OrdersBoard({
         usbScaleEnabled={usbScaleEnabled}
         printerChip={
           <>
-            <div className="w-44 shrink-0 sm:w-52">
+            <div className="w-28 shrink-0 sm:w-36">
               <input
                 type="search"
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
                 placeholder="Buscar…"
                 title="Buscar cliente, # o producto"
-                className="pv-input h-9 py-1.5 text-sm"
+                className="pv-input h-8 py-1 text-sm"
                 aria-label="Buscar pedidos"
               />
             </div>
             <ThermalPrinterChip />
+          </>
+        }
+        boardFilters={
+          <>
+            {(
+              [
+                { id: 'hoy', label: 'Hoy', count: filterCounts.hoy },
+                { id: 'atender', label: 'Por atender', count: filterCounts.atender },
+                { id: 'mostrador', label: 'Mostrador', count: filterCounts.mostrador },
+                { id: 'web', label: 'Web', count: filterCounts.web },
+              ] as const
+            ).map((chip) => (
+              <ActionChip
+                key={chip.id}
+                tone={boardFilter === chip.id ? 'emerald' : 'slate'}
+                elevated={boardFilter === chip.id}
+                onClick={() => setBoardFilter(chip.id)}
+              >
+                {chip.label}
+                {chip.count > 0 ? (
+                  <span className="tabular-nums text-slate-500"> · {chip.count}</span>
+                ) : null}
+              </ActionChip>
+            ))}
           </>
         }
         queueHint={queueHint}
@@ -804,29 +828,6 @@ export function OrdersBoard({
           setOrders((current) => [row, ...current.filter((existing) => existing.id !== row.id)]);
         }}
       />
-
-      <div className="flex flex-wrap justify-center gap-2">
-        {(
-          [
-            { id: 'hoy', label: 'Hoy', count: filterCounts.hoy },
-            { id: 'atender', label: 'Por atender', count: filterCounts.atender },
-            { id: 'mostrador', label: 'Mostrador', count: filterCounts.mostrador },
-            { id: 'web', label: 'Web', count: filterCounts.web },
-          ] as const
-        ).map((chip) => (
-          <ActionChip
-            key={chip.id}
-            tone={boardFilter === chip.id ? 'emerald' : 'slate'}
-            elevated={boardFilter === chip.id}
-            onClick={() => setBoardFilter(chip.id)}
-          >
-            {chip.label}
-            {chip.count > 0 ? (
-              <span className="tabular-nums text-slate-500"> · {chip.count}</span>
-            ) : null}
-          </ActionChip>
-        ))}
-      </div>
 
       {boardFilter === 'atender' ? (
         <section className="pv-glass-card min-w-0 overflow-hidden p-4">

@@ -72,12 +72,13 @@ export function ThermalPrinterChip() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${ui.card}`}
+        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-xs font-medium shadow-sm ${ui.card}`}
         aria-expanded={open}
-        title="Impresora térmica"
+        aria-label={`Impresora térmica, ${ui.label.toLowerCase()}`}
+        title={`Impresora térmica · ${ui.label}`}
       >
         <span className={`h-2.5 w-2.5 rounded-full ${ui.dot}`} aria-hidden />
-        <span>Térmica · {ui.label}</span>
+        <span>Térmica</span>
       </button>
 
       {open ? (
