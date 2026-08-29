@@ -72,16 +72,14 @@ export async function AdminShell({
       <main className="relative flex min-h-screen flex-col">
         <header className="pv-glass-header relative z-40">
           <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-3 py-2 sm:px-4 md:gap-4">
+            <div className="flex shrink-0 items-center gap-2">
+              <BrandLogo href="/" imageClassName="h-12 w-auto sm:h-14 md:h-16" priority />
+              <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
+            </div>
             <p className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-slate-900 sm:text-xl">
               {greeting}
             </p>
-            <div className="flex shrink-0 items-center gap-2 md:gap-4">
-              <div className="flex items-center gap-2">
-                <BrandLogo href="/" imageClassName="h-10 w-auto sm:h-11 md:h-12" priority />
-                <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
-              </div>
-              <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
-            </div>
+            <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
           </div>
         </header>
 
