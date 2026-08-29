@@ -6,6 +6,7 @@ import { AdminNav } from '@/components/AdminNav';
 import { BranchSwitcher } from '@/components/BranchSwitcher';
 import { LogoutButton } from '@/components/LogoutButton';
 import { getStaffSession } from '@/lib/auth';
+import { mexicoDayGreeting } from '@/lib/mexico-date';
 import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
@@ -61,20 +62,26 @@ export async function AdminShell({
     ? isSubscriptionUsable(org.subscription_status, org.trial_ends_at)
     : true;
 
+  const displayName =
+    staff.fullName?.trim() || staff.email.split('@')[0] || 'equipo';
+  const greeting = `${mexicoDayGreeting()} - ${displayName}`;
+
   return (
     <>
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
       <main className="relative flex min-h-screen flex-col">
         <header className="pv-glass-header relative z-40">
-          <div className="flex w-full items-center justify-between gap-2 px-3 py-1.5 md:justify-center md:gap-4 md:py-2">
-            <div className="flex min-w-0 flex-col items-start gap-0.5 md:items-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 md:text-center">
-                Admin
-              </p>
-              <BrandLogo href="/" imageClassName="h-9 w-auto sm:h-12 md:h-14" priority />
-              <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
+          <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-3 py-2 sm:px-4 md:gap-4">
+            <p className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-slate-900 sm:text-xl">
+              {greeting}
+            </p>
+            <div className="flex shrink-0 items-center gap-2 md:gap-4">
+              <div className="flex items-center gap-2">
+                <BrandLogo href="/" imageClassName="h-10 w-auto sm:h-11 md:h-12" priority />
+                <BranchSwitcher branches={branches} currentBranchId={staff.branchId} />
+              </div>
+              <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
             </div>
-            <AdminNav isPlatformAdmin={staff.isPlatformAdmin} />
           </div>
         </header>
 

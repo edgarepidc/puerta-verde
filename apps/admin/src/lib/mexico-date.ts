@@ -6,6 +6,25 @@ export function todayMexicoYmd(date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: MEXICO_TZ }).format(date);
 }
 
+/** Hour 0–23 in Mexico City. */
+export function mexicoHour(date = new Date()): number {
+  const hour = new Intl.DateTimeFormat('en-GB', {
+    timeZone: MEXICO_TZ,
+    hour: 'numeric',
+    hour12: false,
+    hourCycle: 'h23',
+  }).format(date);
+  const n = Number(hour === '24' ? '0' : hour);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function mexicoDayGreeting(date = new Date()): 'Buenos días' | 'Buenas tardes' | 'Buenas noches' {
+  const hour = mexicoHour(date);
+  if (hour < 12) return 'Buenos días';
+  if (hour < 19) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 /** Day of month (1–31) in Mexico City. */
 export function daysElapsedInMexicoMonth(date = new Date()): number {
   const day = Number(
