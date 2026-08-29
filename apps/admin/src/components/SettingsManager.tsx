@@ -10,6 +10,7 @@ import {
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
+import { PasswordInput } from '@/components/PasswordInput';
 
 interface BranchSettings {
   id: string;
@@ -380,8 +381,7 @@ export function SettingsManager({
                   {canManage && resetting ? (
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <div className="w-56">
-                        <input
-                          type="password"
+                        <PasswordInput
                           className="pv-input"
                           placeholder="Nueva contraseña (mín. 8)"
                           value={resetPassword}
@@ -421,10 +421,10 @@ export function SettingsManager({
                   value={staffForm.email}
                   onChange={(e) => setStaffForm((f) => ({ ...f, email: e.target.value }))}
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Contraseña (mín. 8)"
                   className="pv-input min-w-0 py-1.5 text-sm"
+                  wrapperClassName="min-w-0"
                   value={staffForm.password}
                   onChange={(e) => setStaffForm((f) => ({ ...f, password: e.target.value }))}
                 />

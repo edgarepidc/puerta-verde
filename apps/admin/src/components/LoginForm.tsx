@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { PasswordInput } from '@/components/PasswordInput';
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
@@ -75,11 +76,11 @@ export function LoginForm() {
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Contraseña
-              <input
-                type="password"
+              <PasswordInput
                 required
                 autoComplete="current-password"
-                className="pv-input mt-1"
+                className="pv-input"
+                wrapperClassName="mt-1"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
