@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 
 import { slugifyOrganizationName } from '@puertaverde/shared';
 
+import { PasswordInput } from '@/components/PasswordInput';
+
 interface BranchRow {
   id: string;
   name: string;
@@ -148,9 +150,9 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Contraseña temporal
-            <input
-              type="password"
-              className="pv-input mt-1"
+            <PasswordInput
+              className="pv-input"
+              wrapperClassName="mt-1"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
