@@ -708,7 +708,7 @@ export function CounterSalePanel({
         <div className="w-[7.25rem] shrink-0 sm:w-32">
           <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
           <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
-            {queueHint ? queueHint : 'Cola de atención y ventas del día'}
+            ventas del día
           </p>
         </div>
         {boardFilters ? (
