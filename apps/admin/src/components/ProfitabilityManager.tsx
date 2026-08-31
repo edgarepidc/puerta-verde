@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   formatMoney,
@@ -15,6 +15,13 @@ import {
 } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
+import {
+  PeriodSalesCharts,
+  type PaymentRow,
+  type TopProduct,
+  type TrendPoint,
+  type WeekdayRow,
+} from '@/components/PeriodSalesCharts';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import {
   currentMexicoMonthRange,
@@ -115,19 +122,6 @@ const PRESET_EMOJI: Record<PeriodPreset, string> = {
   custom: '✏️',
 };
 
-function formatShortRange(from: string, to: string): string {
-  const start = new Date(`${from}T12:00:00`);
-  const end = new Date(`${to}T12:00:00`);
-  const month = (date: Date) =>
-    date.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '').toLowerCase();
-  const yy = (date: Date) => String(date.getFullYear()).slice(-2);
-  if (from === to) return `${start.getDate()} ${month(start)} ${yy(start)}`;
-  if (from.slice(0, 7) === to.slice(0, 7)) {
-    return `${start.getDate()}–${end.getDate()} ${month(start)} ${yy(start)}`;
-  }
-  return `${start.getDate()} ${month(start)} – ${end.getDate()} ${month(end)} ${yy(end)}`;
-}
-
 function MetricCard({
   emoji,
   tone,
@@ -222,8 +216,8 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   }
 
   return (
-    <div className="pv-glass-card p-4 sm:p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Cálculo de utilidad</h2>
+    <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+      <h3 className="text-base font-semibold text-slate-900">Cálculo de utilidad</h3>
       <p className="mt-0.5 text-sm text-slate-500">De lo que entró a lo que quedó, paso a paso.</p>
       <ul className="mt-3 divide-y divide-slate-100">
         {steps.map((step, index) => (
@@ -286,7 +280,7 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -336,9 +330,14 @@ export function ProfitabilityManager({
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllMargins, setShowAllMargins] = useState(false);
+  const [openVentas, setOpenVentas] = useState(true);
   const [openUtilidad, setOpenUtilidad] = useState(true);
   const [openMargenes, setOpenMargenes] = useState(false);
   const [openGastos, setOpenGastos] = useState(false);
+  const [series, setSeries] = useState<TrendPoint[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
+  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
 
   const today = todayMexicoYmd();
 
@@ -396,28 +395,43 @@ export function ProfitabilityManager({
     };
   }, [summary]);
 
+  async function applyTrends(payload: {
+    series?: TrendPoint[];
+    topProducts?: TopProduct[];
+    topWeekdays?: WeekdayRow[];
+    paymentBreakdown?: PaymentRow[];
+  }) {
+    setSeries(payload.series ?? []);
+    setTopProducts(payload.topProducts ?? []);
+    setTopWeekdays(payload.topWeekdays ?? []);
+    setPaymentBreakdown(payload.paymentBreakdown ?? []);
+  }
+
   async function loadPeriod(nextFrom: string, nextTo: string) {
     setLoadingPeriod(true);
     setError(null);
     try {
       const query = qs(nextFrom, nextTo);
-      const [marginsRes, costsRes, profitRes, categoriesRes, expensesRes] = await Promise.all([
+      const [marginsRes, costsRes, profitRes, categoriesRes, expensesRes, trendsRes] = await Promise.all([
         fetch('/api/margins'),
         fetch('/api/costs'),
         fetch(`/api/profit?${query}`),
         fetch(`/api/profit/categories?${query}`),
         fetch(`/api/expenses?${query}`),
+        fetch(`/api/forecast/trends?${query}`),
       ]);
       const marginsPayload = await marginsRes.json();
       const costsPayload = await costsRes.json();
       const profitPayload = await profitRes.json();
       const categoriesPayload = await categoriesRes.json();
       const expensesPayload = await expensesRes.json();
+      const trendsPayload = await trendsRes.json();
       if (!marginsRes.ok) throw new Error(marginsPayload.error ?? 'Error márgenes');
       if (!costsRes.ok) throw new Error(costsPayload.error ?? 'Error costos');
       if (!profitRes.ok) throw new Error(profitPayload.error ?? 'Error utilidad');
       if (!categoriesRes.ok) throw new Error(categoriesPayload.error ?? 'Error categorías');
       if (!expensesRes.ok) throw new Error(expensesPayload.error ?? 'Error gastos de visita');
+      if (!trendsRes.ok) throw new Error(trendsPayload.error ?? 'Error ventas del periodo');
       setMargins(marginsPayload.margins);
       setCosts(costsPayload.costs);
       setSummary(profitPayload.summary);
@@ -427,12 +441,26 @@ export function ProfitabilityManager({
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
       setPreset(detectPreset(profitPayload.from ?? nextFrom, profitPayload.to ?? nextTo));
+      await applyTrends(trendsPayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
       setLoadingPeriod(false);
     }
   }
+
+  useEffect(() => {
+    fetch(`/api/forecast/trends?${qs(from, to)}`)
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? 'Error ventas del periodo');
+        await applyTrends(payload);
+      })
+      .catch(() => {
+        /* charts load in the background; period cards still useful */
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function applyPreset(next: PeriodPreset) {
     setPreset(next);
@@ -499,6 +527,102 @@ export function ProfitabilityManager({
 
   return (
     <div className="space-y-6">
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openVentas}
+        onToggle={(event) => setOpenVentas(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Ventas del periodo"
+          hint={`${activePeriodLabel} · ${formatMoney(Number(summary?.revenue ?? 0))}`}
+          emoji="📈"
+          iconClass="bg-sky-100"
+          actions={
+            <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+              {loadingPeriod ? 'Cargando…' : 'Actualizar'}
+            </ActionChip>
+          }
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
+            <ActionChip
+              key={key}
+              emoji={PRESET_EMOJI[key]}
+              tone={preset === key ? 'emerald' : 'slate'}
+              elevated={preset === key}
+              onClick={() => applyPreset(key)}
+            >
+              {PRESET_LABELS[key]}
+            </ActionChip>
+          ))}
+        </div>
+        {preset === 'custom' ? (
+          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+            <label className="text-xs font-medium text-slate-600">
+              Desde
+              <input
+                type="date"
+                max={today}
+                className="pv-input mt-1 block text-sm"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              Hasta
+              <input
+                type="date"
+                max={today}
+                className="pv-input mt-1 block text-sm"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </label>
+            <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+              Aplicar rango
+            </ActionChip>
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+          <MetricCard
+            emoji="🧺"
+            tone="green"
+            label="Vendiste"
+            value={formatMoney(Number(summary?.revenue ?? 0))}
+            hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'}`}
+          />
+          <MetricCard
+            emoji="🧾"
+            tone="amber"
+            label="Te costó"
+            value={formatMoney(
+              Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
+            )}
+            hint="Mercancía + fijos + visita"
+          />
+          <MetricCard
+            emoji={netPositive ? '💚' : '⚠️'}
+            tone={netPositive ? 'profit' : 'loss'}
+            label="Te quedó"
+            value={formatMoney(net)}
+            hint={netPositive ? 'Después de gastos' : 'Este periodo quedó abajo'}
+          />
+        </div>
+
+        <PeriodSalesCharts
+          periodLabel={activePeriodLabel}
+          total={Number(summary?.revenue ?? 0)}
+          series={series}
+          topProducts={topProducts}
+          topWeekdays={topWeekdays}
+          paymentBreakdown={paymentBreakdown}
+        />
+
+        <ProfitBuildUp summary={summary} />
+      </details>
+
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         <MetricCard
           emoji="📦"
@@ -519,41 +643,6 @@ export function ProfitabilityManager({
           }
         />
       </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <MetricCard
-          emoji="📅"
-          tone="blue"
-          label="Periodo"
-          value={formatShortRange(from, to)}
-          hint={PRESET_LABELS[preset]}
-        />
-        <MetricCard
-          emoji="🧺"
-          tone="green"
-          label="Vendiste"
-          value={formatMoney(Number(summary?.revenue ?? 0))}
-          hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'}`}
-        />
-        <MetricCard
-          emoji="🧾"
-          tone="amber"
-          label="Te costó"
-          value={formatMoney(
-            Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
-          )}
-          hint="Mercancía vendida + fijos + visita"
-        />
-        <MetricCard
-          emoji={netPositive ? '💚' : '⚠️'}
-          tone={netPositive ? 'profit' : 'loss'}
-          label="Te quedó"
-          value={formatMoney(net)}
-          hint={netPositive ? 'Después de mercancía y gastos' : 'Este periodo quedó abajo'}
-        />
-      </div>
-
-      <ProfitBuildUp summary={summary} />
 
       <details
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
