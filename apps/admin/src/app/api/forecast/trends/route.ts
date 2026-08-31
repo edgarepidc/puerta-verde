@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     const { data: items, error: itemsError } = orderIds.length
       ? await supabase
           .from('order_items')
-          .select('order_id, quantity, product_name')
+          .select('order_id, quantity, product_name, line_total, unit_cost')
           .in('order_id', orderIds)
       : { data: [], error: null };
 
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     }
 
     const daily = new Map<string, number>();
-    const byProduct = new Map<string, number>();
+    const byProduct = new Map<string, { quantity: number; revenue: number; profit: number }>();
     const byPayment = new Map<string, number>();
 
     for (const order of orders ?? []) {
@@ -84,7 +84,15 @@ export async function GET(request: Request) {
       const day = orderDateById.get(row.order_id);
       if (!day) continue;
       const name = row.product_name || 'Producto';
-      byProduct.set(name, (byProduct.get(name) ?? 0) + Number(row.quantity));
+      const quantity = Number(row.quantity ?? 0);
+      const revenue = Number(row.line_total ?? 0);
+      const profit = revenue - quantity * Number(row.unit_cost ?? 0);
+      const prev = byProduct.get(name) ?? { quantity: 0, revenue: 0, profit: 0 };
+      byProduct.set(name, {
+        quantity: prev.quantity + quantity,
+        revenue: prev.revenue + revenue,
+        profit: prev.profit + profit,
+      });
     }
 
     const series: Array<{ date: string; amount: number }> = [];
@@ -92,10 +100,12 @@ export async function GET(request: Request) {
       series.push({ date: cursor, amount: Number((daily.get(cursor) ?? 0).toFixed(2)) });
     }
 
-    const topProducts = [...byProduct.entries()]
-      .map(([name, quantity]) => ({ name, quantity: Number(quantity.toFixed(3)) }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 8);
+    const topProducts = [...byProduct.entries()].map(([name, stats]) => ({
+      name,
+      quantity: Number(stats.quantity.toFixed(3)),
+      revenue: Number(stats.revenue.toFixed(2)),
+      profit: Number(stats.profit.toFixed(2)),
+    }));
 
     const weekdayBuckets = WEEKDAY_LABELS.map((label, weekday) => ({
       weekday,
