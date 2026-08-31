@@ -158,6 +158,106 @@ function MetricCard({
   );
 }
 
+function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
+  if (!summary) return null;
+
+  const revenue = Number(summary.revenue);
+  const cogs = Number(summary.cogs);
+  const fixed = Number(summary.fixed_costs);
+  const visit = Number(summary.visit_expenses);
+  const other = Math.max(Number(summary.variable_costs) - visit, 0);
+  const net = Number(summary.estimated_net_profit);
+  const netPositive = net >= 0;
+
+  let running = revenue;
+  const steps: Array<{
+    key: string;
+    label: string;
+    hint?: string;
+    delta: number;
+    running: number;
+  }> = [
+    { key: 'in', label: 'Entró · ventas', delta: revenue, running },
+  ];
+
+  running -= cogs;
+  steps.push({
+    key: 'cogs',
+    label: '− Mercancía vendida',
+    hint: 'Costo de lo que sí se vendió, no el inventario',
+    delta: -cogs,
+    running,
+  });
+  running -= fixed;
+  steps.push({
+    key: 'fixed',
+    label: '− Gastos fijos',
+    hint: 'Renta, nómina y otros del local',
+    delta: -fixed,
+    running,
+  });
+  running -= visit;
+  steps.push({
+    key: 'visit',
+    label: '− Gastos de visita',
+    hint: 'Gasolina, diablero, caseta…',
+    delta: -visit,
+    running,
+  });
+  if (other > 0) {
+    running -= other;
+    steps.push({
+      key: 'other',
+      label: '− Otros gastos',
+      delta: -other,
+      running,
+    });
+  }
+
+  return (
+    <div className="pv-glass-card p-4 sm:p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        Cómo se arma Te quedó
+      </p>
+      <ul className="mt-3 divide-y divide-slate-100">
+        {steps.map((step, index) => (
+          <li
+            key={step.key}
+            className="flex items-baseline justify-between gap-3 py-2.5 first:pt-0"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800">{step.label}</p>
+              {step.hint ? <p className="text-xs text-slate-500">{step.hint}</p> : null}
+            </div>
+            <div className="shrink-0 text-right tabular-nums">
+              <p
+                className={`text-sm font-semibold ${
+                  step.delta < 0 ? 'text-slate-600' : 'text-slate-900'
+                }`}
+              >
+                {formatMoney(step.delta)}
+              </p>
+              {index > 0 ? (
+                <p className="text-[11px] text-slate-400">van {formatMoney(step.running)}</p>
+              ) : null}
+            </div>
+          </li>
+        ))}
+        <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
+          <p className="text-sm font-semibold text-slate-900">= Te quedó</p>
+          <p
+            className={`text-lg font-bold tabular-nums ${
+              netPositive ? 'text-emerald-800' : 'text-rose-700'
+            }`}
+          >
+            {formatMoney(net)}
+          </p>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function detectPreset(from: string, to: string): PeriodPreset {
   const current = currentMexicoMonthRange();
   if (from === current.start && to === current.end) return 'current';
@@ -410,7 +510,7 @@ export function ProfitabilityManager({
           value={formatMoney(
             Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
           )}
-          hint="Mercancía vendida + gastos"
+          hint="Mercancía vendida + fijos + visita"
         />
         <MetricCard
           emoji={netPositive ? '💚' : '⚠️'}
@@ -420,6 +520,8 @@ export function ProfitabilityManager({
           hint={netPositive ? 'Después de mercancía y gastos' : 'Este periodo quedó abajo'}
         />
       </div>
+
+      <ProfitBuildUp summary={summary} />
 
       <details
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
