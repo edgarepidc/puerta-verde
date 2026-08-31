@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import {
-  WALK_IN_NAME,
-  WALK_IN_PHONE,
+  resolvePosCustomer,
   validateGuestCheckout,
   type GuestCheckoutInput,
   type PaymentMethod,
@@ -114,9 +113,11 @@ export async function POST(request: Request) {
       items: PosItem[];
     };
 
-    const walkIn = Boolean(body.walkIn);
-    const customerName = walkIn ? (body.customerName.trim() || WALK_IN_NAME) : body.customerName;
-    const customerPhone = walkIn ? WALK_IN_PHONE : body.customerPhone;
+    const customer = resolvePosCustomer(body.customerName ?? '', body.customerPhone ?? '');
+    if ('error' in customer) {
+      return NextResponse.json({ error: customer.error }, { status: 400 });
+    }
+    const { customerName, customerPhone, walkIn } = customer;
 
     const validationError = validateGuestCheckout({
       ...body,

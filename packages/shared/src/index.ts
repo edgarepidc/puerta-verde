@@ -112,6 +112,24 @@ export function isValidMexicanPhone(phone: string): boolean {
   return /^52\d{10}$/.test(normalized);
 }
 
+/** Counter sale: empty phone is walk-in; a partial number is an error. */
+export function resolvePosCustomer(
+  name: string,
+  phone: string,
+): { customerName: string; customerPhone: string; walkIn: boolean } | { error: string } {
+  const rawPhone = phone.trim();
+  const rawName = name.trim();
+  if (rawPhone && !isValidMexicanPhone(rawPhone)) {
+    return { error: 'Ingresa un teléfono válido de 10 dígitos.' };
+  }
+  const walkIn = !isValidMexicanPhone(rawPhone);
+  return {
+    customerName: rawName || WALK_IN_NAME,
+    customerPhone: walkIn ? WALK_IN_PHONE : rawPhone,
+    walkIn,
+  };
+}
+
 export interface GuestCheckoutInput {
   customerName: string;
   customerPhone: string;
