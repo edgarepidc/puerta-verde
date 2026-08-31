@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { PAYMENT_METHOD_LABELS, formatMoney, type PaymentMethod } from '@puertaverde/shared';
+
+import { ActionChip } from '@/components/ActionChip';
 
 export interface TrendPoint {
   date: string;
@@ -12,6 +14,8 @@ export interface TrendPoint {
 export interface TopProduct {
   name: string;
   quantity: number;
+  revenue: number;
+  profit: number;
 }
 
 export interface WeekdayRow {
@@ -36,6 +40,30 @@ const PAYMENT_COLOR: Record<PaymentMethod, string> = {
 };
 
 const WEEKDAY_MEDALS = ['🥇', '🥈', '🥉'];
+const PRODUCT_RANK_LIMIT = 8;
+
+type ProductRankMode = 'quantity' | 'revenue' | 'profit';
+
+const PRODUCT_RANK_MODES: Array<{
+  id: ProductRankMode;
+  label: string;
+  hint: string;
+}> = [
+  { id: 'quantity', label: 'Unidades', hint: 'Prioriza comprar lo que rota' },
+  { id: 'revenue', label: 'Venta', hint: 'Lo que más cobras en caja' },
+  { id: 'profit', label: 'Ingreso', hint: 'Lo que más deja después del costo' },
+];
+
+function productRankValue(product: TopProduct, mode: ProductRankMode) {
+  if (mode === 'revenue') return product.revenue;
+  if (mode === 'profit') return product.profit;
+  return product.quantity;
+}
+
+function formatProductRankValue(product: TopProduct, mode: ProductRankMode) {
+  if (mode === 'quantity') return Number(product.quantity.toFixed(2));
+  return formatMoney(productRankValue(product, mode));
+}
 
 function formatChartDay(ymd: string) {
   return new Date(`${ymd}T12:00:00-06:00`).toLocaleDateString('es-MX', {
@@ -166,12 +194,19 @@ function LineChart({ series }: { series: TrendPoint[] }) {
   );
 }
 
-function ProductBarChart({ products }: { products: TopProduct[] }) {
-  const max = Math.max(...products.map((product) => product.quantity), 1);
+function ProductBarChart({
+  products,
+  mode,
+}: {
+  products: TopProduct[];
+  mode: ProductRankMode;
+}) {
+  const max = Math.max(...products.map((product) => Math.abs(productRankValue(product, mode))), 1);
   return (
     <div className="space-y-2.5">
       {products.map((product) => {
         const color = produceBarColor(product.name);
+        const value = productRankValue(product, mode);
         return (
           <div key={product.name}>
             <div className="mb-1 flex justify-between gap-2 text-sm">
@@ -183,13 +218,13 @@ function ProductBarChart({ products }: { products: TopProduct[] }) {
                 />
                 <span className="truncate">{product.name}</span>
               </span>
-              <span className="tabular-nums text-slate-500">{Number(product.quantity.toFixed(2))}</span>
+              <span className="tabular-nums text-slate-500">{formatProductRankValue(product, mode)}</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full"
                 style={{
-                  width: `${Math.max(6, (product.quantity / max) * 100)}%`,
+                  width: `${Math.max(6, (Math.abs(value) / max) * 100)}%`,
                   backgroundColor: color,
                 }}
               />
@@ -298,6 +333,14 @@ export function PeriodSalesCharts({
   topWeekdays: WeekdayRow[];
   paymentBreakdown: PaymentRow[];
 }) {
+  const [rankMode, setRankMode] = useState<ProductRankMode>('quantity');
+  const rankedProducts = useMemo(() => {
+    return [...topProducts]
+      .sort((a, b) => productRankValue(b, rankMode) - productRankValue(a, rankMode))
+      .slice(0, PRODUCT_RANK_LIMIT);
+  }, [topProducts, rankMode]);
+  const activeRank = PRODUCT_RANK_MODES.find((mode) => mode.id === rankMode) ?? PRODUCT_RANK_MODES[0];
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
@@ -317,10 +360,26 @@ export function PeriodSalesCharts({
         {topWeekdays.length > 0 ? <WeekdayTop rows={topWeekdays} /> : null}
       </section>
       <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-        <h3 className="font-semibold text-slate-900">Lo que más se vende</h3>
-        <p className="mb-3 text-sm text-slate-500">Prioriza comprar lo que rota</p>
-        {topProducts.length > 0 ? (
-          <ProductBarChart products={topProducts} />
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-900">Lo que más se vende</h3>
+            <p className="text-sm text-slate-500">{activeRank.hint}</p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-1.5" role="group" aria-label="Ordenar productos">
+            {PRODUCT_RANK_MODES.map((mode) => (
+              <ActionChip
+                key={mode.id}
+                elevated={rankMode === mode.id}
+                tone={rankMode === mode.id ? 'emerald' : 'slate'}
+                onClick={() => setRankMode(mode.id)}
+              >
+                {mode.label}
+              </ActionChip>
+            ))}
+          </div>
+        </div>
+        {rankedProducts.length > 0 ? (
+          <ProductBarChart products={rankedProducts} mode={rankMode} />
         ) : (
           <p className="py-10 text-sm text-slate-500">Sin datos de productos todavía.</p>
         )}
