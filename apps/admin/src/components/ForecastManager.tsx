@@ -460,13 +460,6 @@ export function ForecastManager({
     }
   }
 
-  const lowStockCount = useMemo(() => forecast.filter(isBelowMin).length, [forecast]);
-  const urgentCount = useMemo(() => forecast.filter(isUrgent).length, [forecast]);
-  const reorderCount = useMemo(
-    () => forecast.filter((r) => Number(r.suggested_reorder) > 0).length,
-    [forecast],
-  );
-
   const sortedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return [...forecast]
@@ -584,39 +577,6 @@ export function ForecastManager({
         persist
         linkLabel="Ir a comprar"
       />
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl" aria-hidden>
-            ⚠️
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stock bajo</p>
-            <p className="mt-0.5 text-xl font-bold text-amber-800">{lowStockCount}</p>
-            <p className="text-xs text-slate-500">Bajo el mínimo configurado</p>
-          </div>
-        </div>
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xl" aria-hidden>
-            ⏳
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Urgentes</p>
-            <p className="mt-0.5 text-xl font-bold text-rose-800">{urgentCount}</p>
-            <p className="text-xs text-slate-500">Mínimo, agotarse o reponer</p>
-          </div>
-        </div>
-        <div className="pv-glass-card col-span-2 flex gap-3 p-4 sm:col-span-1">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl" aria-hidden>
-            🛒
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">A reponer</p>
-            <p className="mt-0.5 text-xl font-bold text-slate-900">{reorderCount}</p>
-            <p className="text-xs text-slate-500">Sugerencia a 7 días</p>
-          </div>
-        </div>
-      </div>
 
       <details
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
