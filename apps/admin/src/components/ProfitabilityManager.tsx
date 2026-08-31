@@ -363,8 +363,31 @@ export function ProfitabilityManager({
   const netPositive = net >= 0;
   const exportQuery = qs(from, to);
 
+  const inventorySpread = totals.inventorySale - totals.inventoryCost;
+
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <MetricCard
+          emoji="📦"
+          tone="slate"
+          label="Inventario a costo"
+          value={formatMoney(totals.inventoryCost)}
+          hint="Lo que pagaste por lo que hay"
+        />
+        <MetricCard
+          emoji="🏷️"
+          tone="leaf"
+          label="Inventario a venta"
+          value={formatMoney(totals.inventorySale)}
+          hint={
+            inventorySpread >= 0
+              ? `Al precio de lista · ${formatMoney(inventorySpread)} de margen`
+              : 'Al precio de lista'
+          }
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <MetricCard
           emoji="📅"
@@ -553,7 +576,7 @@ export function ProfitabilityManager({
       >
         <FoldableSummary
           title="Márgenes por producto"
-          hint={`Inventario a costo ${formatMoney(totals.inventoryCost)} · a venta ${formatMoney(totals.inventorySale)} · promedio ${totals.avgMargin.toFixed(1)}%`}
+          hint={`Margen promedio ${totals.avgMargin.toFixed(1)}%`}
           emoji="🥬"
           iconClass="bg-emerald-100"
         />
