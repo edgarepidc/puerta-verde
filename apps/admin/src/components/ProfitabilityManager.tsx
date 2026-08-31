@@ -330,8 +330,8 @@ export function ProfitabilityManager({
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllMargins, setShowAllMargins] = useState(false);
-  const [openVentas, setOpenVentas] = useState(true);
-  const [openUtilidad, setOpenUtilidad] = useState(true);
+  const [openVentas, setOpenVentas] = useState(false);
+  const [openUtilidad, setOpenUtilidad] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
   const [openGastos, setOpenGastos] = useState(false);
   const [series, setSeries] = useState<TrendPoint[]>([]);
@@ -527,71 +527,58 @@ export function ProfitabilityManager({
 
   return (
     <div className="space-y-6">
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openVentas}
-        onToggle={(event) => setOpenVentas(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Ventas del periodo"
-          hint={`${activePeriodLabel} · ${formatMoney(Number(summary?.revenue ?? 0))}`}
-          emoji="📈"
-          iconClass="bg-sky-100"
-          actions={
-            <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-              {loadingPeriod ? 'Cargando…' : 'Actualizar'}
-            </ActionChip>
-          }
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-            <ActionChip
-              key={key}
-              emoji={PRESET_EMOJI[key]}
-              tone={preset === key ? 'emerald' : 'slate'}
-              elevated={preset === key}
-              onClick={() => applyPreset(key)}
-            >
-              {PRESET_LABELS[key]}
-            </ActionChip>
-          ))}
+      <div className="flex flex-wrap items-center gap-2">
+        {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
+          <ActionChip
+            key={key}
+            emoji={PRESET_EMOJI[key]}
+            tone={preset === key ? 'emerald' : 'slate'}
+            elevated={preset === key}
+            onClick={() => applyPreset(key)}
+          >
+            {PRESET_LABELS[key]}
+          </ActionChip>
+        ))}
+        <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+          {loadingPeriod ? 'Cargando…' : 'Actualizar'}
+        </ActionChip>
+      </div>
+      {preset === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+          <label className="text-xs font-medium text-slate-600">
+            Desde
+            <input
+              type="date"
+              max={today}
+              className="pv-input mt-1 block text-sm"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </label>
+          <label className="text-xs font-medium text-slate-600">
+            Hasta
+            <input
+              type="date"
+              max={today}
+              className="pv-input mt-1 block text-sm"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </label>
+          <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+            Aplicar rango
+          </ActionChip>
         </div>
-        {preset === 'custom' ? (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
-            <label className="text-xs font-medium text-slate-600">
-              Desde
-              <input
-                type="date"
-                max={today}
-                className="pv-input mt-1 block text-sm"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </label>
-            <label className="text-xs font-medium text-slate-600">
-              Hasta
-              <input
-                type="date"
-                max={today}
-                className="pv-input mt-1 block text-sm"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </label>
-            <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-              Aplicar rango
-            </ActionChip>
-          </div>
-        ) : null}
+      ) : null}
 
+      <div className="space-y-2 sm:space-y-3">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
           <MetricCard
             emoji="🧺"
             tone="green"
             label="Vendiste"
             value={formatMoney(Number(summary?.revenue ?? 0))}
-            hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'}`}
+            hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'} · ${activePeriodLabel}`}
           />
           <MetricCard
             emoji="🧾"
@@ -610,6 +597,44 @@ export function ProfitabilityManager({
             hint={netPositive ? 'Después de gastos' : 'Este periodo quedó abajo'}
           />
         </div>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <MetricCard
+            emoji="📦"
+            tone="slate"
+            label="Inventario a costo"
+            value={formatMoney(totals.inventoryCost)}
+            hint="Lo que pagaste por lo que hay"
+          />
+          <MetricCard
+            emoji="🏷️"
+            tone="leaf"
+            label="Inventario a venta"
+            value={formatMoney(totals.inventorySale)}
+            hint={
+              inventorySpread >= 0
+                ? `Al precio de lista · ${formatMoney(inventorySpread)} de margen`
+                : 'Al precio de lista'
+            }
+          />
+        </div>
+      </div>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openVentas}
+        onToggle={(event) => setOpenVentas(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Ventas del periodo"
+          hint={`${activePeriodLabel} · ${formatMoney(Number(summary?.revenue ?? 0))}`}
+          emoji="📈"
+          iconClass="bg-sky-100"
+          actions={
+            <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+              {loadingPeriod ? 'Cargando…' : 'Actualizar'}
+            </ActionChip>
+          }
+        />
 
         <PeriodSalesCharts
           periodLabel={activePeriodLabel}
@@ -622,27 +647,6 @@ export function ProfitabilityManager({
 
         <ProfitBuildUp summary={summary} />
       </details>
-
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <MetricCard
-          emoji="📦"
-          tone="slate"
-          label="Inventario a costo"
-          value={formatMoney(totals.inventoryCost)}
-          hint="Lo que pagaste por lo que hay"
-        />
-        <MetricCard
-          emoji="🏷️"
-          tone="leaf"
-          label="Inventario a venta"
-          value={formatMoney(totals.inventorySale)}
-          hint={
-            inventorySpread >= 0
-              ? `Al precio de lista · ${formatMoney(inventorySpread)} de margen`
-              : 'Al precio de lista'
-          }
-        />
-      </div>
 
       <details
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
@@ -672,48 +676,6 @@ export function ProfitabilityManager({
             </>
           }
         />
-
-        <div className="flex flex-wrap items-center gap-2">
-          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-            <ActionChip
-              key={key}
-              emoji={PRESET_EMOJI[key]}
-              tone={preset === key ? 'emerald' : 'slate'}
-              elevated={preset === key}
-              onClick={() => applyPreset(key)}
-            >
-              {PRESET_LABELS[key]}
-            </ActionChip>
-          ))}
-        </div>
-
-        {preset === 'custom' ? (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
-            <label className="text-xs font-medium text-slate-600">
-              Desde
-              <input
-                type="date"
-                max={today}
-                className="pv-input mt-1 block text-sm"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </label>
-            <label className="text-xs font-medium text-slate-600">
-              Hasta
-              <input
-                type="date"
-                max={today}
-                className="pv-input mt-1 block text-sm"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </label>
-            <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-              Aplicar rango
-            </ActionChip>
-          </div>
-        ) : null}
 
         {categories.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">Sin ventas en el periodo.</p>

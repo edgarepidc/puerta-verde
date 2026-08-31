@@ -204,8 +204,10 @@ function ProductBarChart({ products }: { products: TopProduct[] }) {
 function WeekdayTop({ rows }: { rows: WeekdayRow[] }) {
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
-      <p className="text-sm font-medium text-slate-700">Días que más venden</p>
-      <p className="text-xs text-slate-500">Top 3 · promedio por día de la semana</p>
+      <p className="text-sm font-medium text-slate-700">Mejor promedio por día</p>
+      <p className="text-xs text-slate-500">
+        Top 3 · cuánto venden en promedio ese día, no el total del periodo
+      </p>
       <ol className="mt-2 space-y-2">
         {rows.map((row, index) => (
           <li key={row.weekday} className="flex items-baseline justify-between gap-3 text-sm">
@@ -216,8 +218,11 @@ function WeekdayTop({ rows }: { rows: WeekdayRow[] }) {
                 {row.days} día{row.days === 1 ? '' : 's'}
               </span>
             </span>
-            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-              {formatMoney(row.average)}
+            <span className="shrink-0 text-right">
+              <span className="block font-semibold tabular-nums text-slate-900">
+                {formatMoney(row.average)}
+              </span>
+              <span className="text-[11px] font-normal text-slate-400">promedio / día</span>
             </span>
           </li>
         ))}

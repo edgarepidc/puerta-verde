@@ -153,7 +153,7 @@ export function ForecastManager({
   const [printSelectCount, setPrintSelectCount] = useState('12');
   const [printBusy, setPrintBusy] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
-  const [openComprar, setOpenComprar] = useState(true);
+  const [openComprar, setOpenComprar] = useState(false);
   const { status: printerStatus } = useThermalPrinter();
 
   const bannerProducts = useMemo(() => {

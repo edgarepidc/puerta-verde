@@ -113,9 +113,9 @@ export async function GET(request: Request) {
       .map((row) => ({
         ...row,
         amount: Number(row.amount.toFixed(2)),
-        average: Number((row.amount / row.days).toFixed(2)),
+        average: Number((row.amount / Math.max(row.days, 1)).toFixed(2)),
       }))
-      .sort((a, b) => b.average - a.average || b.amount - a.amount)
+      .sort((a, b) => b.average - a.average || a.days - b.days)
       .slice(0, 3);
 
     const paymentTotal = [...byPayment.values()].reduce((sum, value) => sum + value, 0);
