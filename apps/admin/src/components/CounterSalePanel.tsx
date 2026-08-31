@@ -168,6 +168,7 @@ export function CounterSalePanel({
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState('');
+  const [exactAmount, setExactAmount] = useState(false);
   const [soldOn, setSoldOn] = useState(() => todayMexicoYmd());
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [printTicket, setPrintTicket] = useState(true);
@@ -233,6 +234,11 @@ export function CounterSalePanel({
     paymentMethod === 'cash' &&
     amountReceived.trim() !== '' &&
     receivedAmount < payableTotal;
+
+  useEffect(() => {
+    if (!exactAmount || paymentMethod !== 'cash') return;
+    setAmountReceived(decimalFromNumber(payableTotal, false) || '0');
+  }, [exactAmount, paymentMethod, payableTotal]);
 
   useEffect(() => {
     if (!open || !isValidMexicanPhone(phone)) {
@@ -320,6 +326,7 @@ export function CounterSalePanel({
     setSearch('');
     setPaymentMethod('cash');
     setAmountReceived('');
+    setExactAmount(false);
     setSoldOn(todayMexicoYmd());
     setSendWhatsApp(true);
     setWalkIn(false);
@@ -1060,7 +1067,10 @@ export function CounterSalePanel({
               onChange={(e) => {
                 const next = e.target.value as PaymentMethod;
                 setPaymentMethod(next);
-                if (next !== 'cash') setAmountReceived('');
+                if (next !== 'cash') {
+                  setAmountReceived('');
+                  setExactAmount(false);
+                }
               }}
             >
               {POS_METHODS.map((method) => (
@@ -1072,13 +1082,25 @@ export function CounterSalePanel({
           </label>
           {paymentMethod === 'cash' ? (
             <div className="space-y-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={exactAmount}
+                  onChange={(e) => setExactAmount(e.target.checked)}
+                />
+                Monto exacto
+              </label>
               <label className="block text-sm">
                 <span className="font-medium text-slate-700">¿Con cuánto paga?</span>
                 <DecimalInput
                   className="pv-input mt-1"
                   value={amountReceived}
-                  onChange={setAmountReceived}
+                  onChange={(value) => {
+                    setExactAmount(false);
+                    setAmountReceived(value);
+                  }}
                   placeholder={payableTotal > 0 ? String(payableTotal) : '0'}
+                  disabled={exactAmount}
                 />
               </label>
               {cashShort ? (
@@ -1086,7 +1108,9 @@ export function CounterSalePanel({
                   Faltan {formatMoney(Math.round((payableTotal - receivedAmount) * 100) / 100)}.
                 </p>
               ) : null}
-              {changeDue != null ? (
+              {exactAmount || changeDue === 0 ? (
+                <p className="text-xs text-slate-500">El cliente paga el total, sin cambio.</p>
+              ) : changeDue != null ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Cambio</span>
                   <span className="font-semibold text-emerald-800">{formatMoney(changeDue)}</span>
@@ -1177,9 +1201,11 @@ export function CounterSalePanel({
             >
               {saving
                 ? 'Registrando…'
-                : changeDue != null
-                  ? `Cobrar · cambio ${formatMoney(changeDue)}`
-                  : 'Cobrar y entregar'}
+                : exactAmount || changeDue === 0
+                  ? 'Cobrar y entregar'
+                  : changeDue != null
+                    ? `Cobrar · cambio ${formatMoney(changeDue)}`
+                    : 'Cobrar y entregar'}
             </ActionChip>
           </div>
         </aside>
