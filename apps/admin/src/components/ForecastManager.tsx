@@ -1,15 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
-  PAYMENT_METHOD_LABELS,
   PRODUCT_UNIT_LABELS,
-  formatMoney,
   formatProductQuantity,
   isLowStock,
-  type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -18,12 +15,6 @@ import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import { LowStockBanner } from '@/components/LowStockBanner';
 import { ThermalPrinterChip } from '@/components/ThermalPrinterChip';
 import { useThermalPrinter } from '@/components/ThermalPrinterBar';
-import {
-  currentMexicoMonthRange,
-  formatMexicoPeriodLabel,
-  previousMexicoMonthRange,
-  todayMexicoYmd,
-} from '@/lib/mexico-date';
 import { getThermalPrinterStatus, printThermalShoppingList } from '@/lib/thermal-printer';
 import type { ShoppingListItem } from '@/lib/thermal-ticket';
 
@@ -48,65 +39,6 @@ interface StockProduct {
     unit?: ProductUnit;
     category?: { name?: string | null } | null;
   };
-}
-
-interface TrendPoint {
-  date: string;
-  amount: number;
-}
-
-interface TopProduct {
-  name: string;
-  quantity: number;
-}
-
-interface WeekdayRow {
-  weekday: number;
-  label: string;
-  amount: number;
-  average: number;
-  days: number;
-}
-
-interface PaymentRow {
-  method: PaymentMethod;
-  amount: number;
-  percent: number;
-}
-
-const PAYMENT_BAR_COLOR: Record<PaymentMethod, string> = {
-  cash: '#16a34a',
-  card_terminal: '#0284c7',
-  transfer: '#d97706',
-  online: '#7c3aed',
-};
-
-const WEEKDAY_MEDALS = ['🥇', '🥈', '🥉'];
-
-type PeriodPreset = 'current' | 'previous' | 'custom';
-
-const PRESET_LABELS: Record<PeriodPreset, string> = {
-  current: 'Mes en curso',
-  previous: 'Mes anterior',
-  custom: 'Personalizado',
-};
-
-const PRESET_EMOJI: Record<PeriodPreset, string> = {
-  current: '📅',
-  previous: '📆',
-  custom: '✏️',
-};
-
-function detectPreset(from: string, to: string): PeriodPreset {
-  const current = currentMexicoMonthRange();
-  if (from === current.start && to === current.end) return 'current';
-  const previous = previousMexicoMonthRange();
-  if (from === previous.start && to === previous.end) return 'previous';
-  return 'custom';
-}
-
-function qs(from: string, to: string): string {
-  return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 }
 
 function isBelowMin(row: ForecastRow) {
@@ -201,198 +133,6 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-function formatChartDay(ymd: string) {
-  return new Date(`${ymd}T12:00:00-06:00`).toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
-function produceBarColor(name: string) {
-  const n = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  const rules: Array<[RegExp, string]> = [
-    [/jitomate|tomate|fresa|sandia|manzana roja|chile|pimiento|betabel|remolacha|cereza|pina colada/, '#dc2626'],
-    [/naranja|mandarina|mango|durazno|melon|zanahoria|maracuya|chabacano|calabaza/, '#ea580c'],
-    [/limon|platano|banana|pina|maiz|elote|jengibre|guayaba/, '#ca8a04'],
-    [
-      /aguacate|pepino|calabacin|chayote|ejote|espinaca|lechuga|brocoli|cilantro|perejil|hierbabuena|nopal|apio|esparrago|kiwi|lima|ejotes/,
-      '#16a34a',
-    ],
-    [/uva|berenjena|col morada|morado|fig/, '#7c3aed'],
-    [/blueberry|mora|arandano/, '#2563eb'],
-    [/cebolla|ajo|papa|camote|jicama|champinon|hongo|huevo|coco/, '#a16207'],
-    [/coliflor|repollo|nabo/, '#94a3b8'],
-  ];
-  for (const [pattern, color] of rules) {
-    if (pattern.test(n)) return color;
-  }
-  let hash = 0;
-  for (let i = 0; i < n.length; i += 1) hash = (hash * 31 + n.charCodeAt(i)) >>> 0;
-  const palette = ['#16a34a', '#ca8a04', '#dc2626', '#ea580c', '#2563eb', '#7c3aed', '#0d9488', '#c2410c'];
-  return palette[hash % palette.length];
-}
-
-function LineChart({ series }: { series: TrendPoint[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const width = 640;
-  const height = 180;
-  const pad = 24;
-  const max = Math.max(...series.map((point) => point.amount), 1);
-  const span = Math.max(series.length - 1, 1);
-
-  const coords = series.map((point, index) => {
-    const x = pad + (index / span) * (width - pad * 2);
-    const y = height - pad - (point.amount / max) * (height - pad * 2);
-    return { x, y, ...point };
-  });
-
-  return (
-    <div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-44 w-full"
-        role="img"
-        aria-label="Ventas en pesos por día"
-        onMouseLeave={() => setHover(null)}
-        onMouseMove={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const x = ((event.clientX - rect.left) / rect.width) * width;
-          let best = 0;
-          let bestDist = Infinity;
-          for (let i = 0; i < coords.length; i += 1) {
-            const dist = Math.abs(coords[i].x - x);
-            if (dist < bestDist) {
-              bestDist = dist;
-              best = i;
-            }
-          }
-          setHover(best);
-        }}
-      >
-        <polyline
-          fill="none"
-          stroke="#166534"
-          strokeWidth="2.5"
-          points={coords.map((c) => `${c.x},${c.y}`).join(' ')}
-        />
-        {hover != null ? (
-          <line
-            x1={coords[hover].x}
-            x2={coords[hover].x}
-            y1={pad / 2}
-            y2={height - pad + 4}
-            stroke="#94a3b8"
-            strokeDasharray="3 3"
-          />
-        ) : null}
-        {coords.map((point, index) => (
-          <circle
-            key={point.date}
-            cx={point.x}
-            cy={point.y}
-            r={hover === index ? 5.5 : 3.5}
-            fill={hover === index ? '#14532d' : '#166534'}
-            stroke="#fff"
-            strokeWidth="1.5"
-            className="cursor-pointer"
-            onMouseEnter={() => setHover(index)}
-          >
-            <title>
-              {formatChartDay(point.date)}: {formatMoney(point.amount)}
-            </title>
-          </circle>
-        ))}
-        {series.map((point, index) => {
-          const x = coords[index].x;
-          if (index % Math.ceil(series.length / 6) !== 0 && index !== series.length - 1) return null;
-          return (
-            <text key={point.date} x={x} y={height - 6} textAnchor="middle" className="fill-slate-400 text-[10px]">
-              {point.date.slice(5)}
-            </text>
-          );
-        })}
-      </svg>
-      <p className="mt-1 min-h-5 text-sm text-slate-600">
-        {hover != null ? (
-          <>
-            <span className="font-medium text-slate-900">{formatChartDay(series[hover].date)}</span>
-            {' · '}
-            {formatMoney(series[hover].amount)}
-          </>
-        ) : (
-          <span className="text-slate-400">Pasa el cursor sobre un día</span>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function BarChart({ products }: { products: TopProduct[] }) {
-  const max = Math.max(...products.map((product) => product.quantity), 1);
-  return (
-    <div className="space-y-2.5">
-      {products.map((product) => {
-        const color = produceBarColor(product.name);
-        return (
-          <div key={product.name}>
-            <div className="mb-1 flex justify-between gap-2 text-sm">
-              <span className="flex min-w-0 items-center gap-2 truncate font-medium text-slate-800">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: color }}
-                  aria-hidden
-                />
-                <span className="truncate">{product.name}</span>
-              </span>
-              <span className="tabular-nums text-slate-500">{Number(product.quantity.toFixed(2))}</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${Math.max(6, (product.quantity / max) * 100)}%`,
-                  backgroundColor: color,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PaymentBreakdown({ rows }: { rows: PaymentRow[] }) {
-  const max = Math.max(...rows.map((row) => row.amount), 1);
-  return (
-    <ul className="mt-2 space-y-2.5">
-      {rows.map((row) => (
-        <li key={row.method}>
-          <div className="mb-1 flex justify-between gap-2 text-sm">
-            <span className="font-medium text-slate-800">{PAYMENT_METHOD_LABELS[row.method]}</span>
-            <span className="tabular-nums text-slate-500">
-              {formatMoney(row.amount)}
-              <span className="ml-1.5 text-xs text-slate-400">{row.percent.toFixed(0)}%</span>
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.max(6, (row.amount / max) * 100)}%`,
-                backgroundColor: PAYMENT_BAR_COLOR[row.method],
-              }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function ForecastManager({
   initialForecast,
   stockProducts = [],
@@ -400,19 +140,8 @@ export function ForecastManager({
   initialForecast: ForecastRow[];
   stockProducts?: StockProduct[];
 }) {
-  const initialRange = currentMexicoMonthRange();
   const [forecast, setForecast] = useState(initialForecast);
   const [horizonDays, setHorizonDays] = useState(7);
-  const [from, setFrom] = useState(initialRange.start);
-  const [to, setTo] = useState(initialRange.end);
-  const [preset, setPreset] = useState<PeriodPreset>('current');
-  const [periodLabel, setPeriodLabel] = useState(() =>
-    formatMexicoPeriodLabel(initialRange.start, initialRange.end),
-  );
-  const [series, setSeries] = useState<TrendPoint[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
-  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
   const [insights, setInsights] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -425,7 +154,6 @@ export function ForecastManager({
   const [printBusy, setPrintBusy] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const [openComprar, setOpenComprar] = useState(true);
-  const [openVentas, setOpenVentas] = useState(false);
   const { status: printerStatus } = useThermalPrinter();
 
   const bannerProducts = useMemo(() => {
@@ -438,33 +166,14 @@ export function ForecastManager({
     }));
   }, [stockProducts, forecast]);
 
-  async function refreshTrends(nextFrom = from, nextTo = to) {
-    const response = await fetch(`/api/forecast/trends?${qs(nextFrom, nextTo)}`);
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? 'Error al cargar tendencias');
-    setSeries(payload.series ?? []);
-    setTopProducts(payload.topProducts ?? []);
-    setTopWeekdays(payload.topWeekdays ?? []);
-    setPaymentBreakdown(payload.paymentBreakdown ?? []);
-    setFrom(payload.from ?? nextFrom);
-    setTo(payload.to ?? nextTo);
-    setPeriodLabel(payload.periodLabel ?? formatMexicoPeriodLabel(nextFrom, nextTo));
-    setPreset(detectPreset(payload.from ?? nextFrom, payload.to ?? nextTo));
-  }
-
   async function refresh() {
     setLoading(true);
     setError(null);
     try {
-      const [forecastResponse] = await Promise.all([
-        fetch(`/api/forecast?days=${horizonDays}`).then(async (response) => {
-          const payload = await response.json();
-          if (!response.ok) throw new Error(payload.error ?? 'Error al cargar');
-          return payload;
-        }),
-        refreshTrends(from, to),
-      ]);
-      setForecast(forecastResponse.forecast);
+      const response = await fetch(`/api/forecast?days=${horizonDays}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'Error al cargar');
+      setForecast(payload.forecast);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -492,31 +201,6 @@ export function ForecastManager({
     }
   }
 
-  useEffect(() => {
-    const range = currentMexicoMonthRange();
-    refreshTrends(range.start, range.end).catch(() => {
-      /* ignore first-load chart errors; table still useful */
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function applyPreset(next: PeriodPreset) {
-    setPreset(next);
-    if (next === 'current') {
-      const range = currentMexicoMonthRange();
-      setFrom(range.start);
-      setTo(range.end);
-      void refreshTrends(range.start, range.end);
-      return;
-    }
-    if (next === 'previous') {
-      const range = previousMexicoMonthRange();
-      setFrom(range.start);
-      setTo(range.end);
-      void refreshTrends(range.start, range.end);
-    }
-  }
-
   const sortedRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return [...forecast]
@@ -536,11 +220,6 @@ export function ForecastManager({
       return row.product_name.toLowerCase().includes(q);
     }).length;
   }, [forecast, search]);
-
-  const totalTrend = useMemo(
-    () => series.reduce((sum, point) => sum + point.amount, 0),
-    [series],
-  );
 
   const printRows = useMemo(() => {
     return [...forecast].sort(
@@ -661,6 +340,9 @@ export function ForecastManager({
               />
               <ActionChip emoji="🔄" disabled={loading} onClick={() => void refresh()}>
                 {loading ? '…' : 'Actualizar'}
+              </ActionChip>
+              <ActionChip emoji="✨" disabled={loading} onClick={() => void generateInsights()}>
+                Resumen IA
               </ActionChip>
               <ActionChip
                 tone="emerald"
@@ -873,131 +555,6 @@ export function ForecastManager({
             </table>
           </div>
         )}
-      </details>
-
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openVentas}
-        onToggle={(event) => setOpenVentas(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Ventas del periodo"
-          hint={`${periodLabel} · ${formatMoney(totalTrend)}`}
-          emoji="📈"
-          iconClass="bg-sky-100"
-          actions={
-            <>
-              <ActionChip emoji="🔄" disabled={loading} onClick={() => void refresh()}>
-                {loading ? '…' : 'Actualizar'}
-              </ActionChip>
-              <ActionChip emoji="✨" disabled={loading} onClick={() => void generateInsights()}>
-                Resumen IA
-              </ActionChip>
-            </>
-          }
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-            <ActionChip
-              key={key}
-              emoji={PRESET_EMOJI[key]}
-              tone={preset === key ? 'emerald' : 'slate'}
-              elevated={preset === key}
-              onClick={() => applyPreset(key)}
-            >
-              {PRESET_LABELS[key]}
-            </ActionChip>
-          ))}
-        </div>
-        {preset === 'custom' ? (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
-            <label className="text-xs font-medium text-slate-600">
-              Desde
-              <input
-                type="date"
-                max={todayMexicoYmd()}
-                className="pv-input mt-1 block text-sm"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </label>
-            <label className="text-xs font-medium text-slate-600">
-              Hasta
-              <input
-                type="date"
-                max={todayMexicoYmd()}
-                className="pv-input mt-1 block text-sm"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </label>
-            <ActionChip emoji="📅" disabled={loading} onClick={() => void refreshTrends(from, to)}>
-              Aplicar rango
-            </ActionChip>
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-            <p className="text-sm text-slate-500">Acumulado · {periodLabel}</p>
-            <h3 className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-slate-900">
-              {formatMoney(totalTrend)}
-            </h3>
-            <p className="mt-3 text-sm font-medium text-slate-700">Ventas por día</p>
-            <p className="text-sm text-slate-500">Monto vendido en caja</p>
-            <div className="mt-3">
-              {series.length > 0 ? (
-                <LineChart series={series} />
-              ) : (
-                <p className="py-10 text-sm text-slate-500">Aún no hay ventas en el periodo.</p>
-              )}
-            </div>
-
-            {topWeekdays.length > 0 ? (
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="text-sm font-medium text-slate-700">Días que más venden</p>
-                <p className="text-xs text-slate-500">Top 3 · promedio por día de la semana</p>
-                <ol className="mt-2 space-y-2">
-                  {topWeekdays.map((row, index) => (
-                    <li
-                      key={row.weekday}
-                      className="flex items-baseline justify-between gap-3 text-sm"
-                    >
-                      <span className="min-w-0">
-                        <span aria-hidden>{WEEKDAY_MEDALS[index] ?? `${index + 1}.`}</span>
-                        <span className="ml-1.5 font-medium text-slate-800">{row.label}</span>
-                        <span className="ml-1.5 text-xs text-slate-400">
-                          {row.days} día{row.days === 1 ? '' : 's'}
-                        </span>
-                      </span>
-                      <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-                        {formatMoney(row.average)}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ) : null}
-
-            {paymentBreakdown.length > 0 ? (
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="text-sm font-medium text-slate-700">Por tipo de pago</p>
-                <p className="text-xs text-slate-500">Del periodo · el día a día está en Caja</p>
-                <PaymentBreakdown rows={paymentBreakdown} />
-              </div>
-            ) : null}
-          </section>
-          <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-            <h3 className="font-semibold text-slate-900">Lo que más se vende</h3>
-            <p className="mb-3 text-sm text-slate-500">Prioriza comprar lo que rota</p>
-            {topProducts.length > 0 ? (
-              <BarChart products={topProducts} />
-            ) : (
-              <p className="py-10 text-sm text-slate-500">Sin datos de productos todavía.</p>
-            )}
-          </section>
-        </div>
 
         {insights ? (
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
