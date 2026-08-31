@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server';
 
+import { PAYMENT_METHODS, type PaymentMethod } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 import {
   addMexicoDays,
+  mexicoYmdAtNoonIso,
   mexicoYmdBoundsIso,
   resolveProfitDateRange,
   todayMexicoYmd,
 } from '@/lib/mexico-date';
+
+const WEEKDAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+function mexicoWeekdayIndex(ymd: string): number {
+  return new Date(mexicoYmdAtNoonIso(ymd)).getUTCDay();
+}
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -29,7 +37,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, total')
+      .select('id, created_at, total, payment_method')
       .eq('branch_id', tenant.branchId)
       .neq('status', 'cancelled')
       .gte('created_at', startBound)
@@ -59,10 +67,17 @@ export async function GET(request: Request) {
 
     const daily = new Map<string, number>();
     const byProduct = new Map<string, number>();
+    const byPayment = new Map<string, number>();
 
     for (const order of orders ?? []) {
       const day = todayMexicoYmd(new Date(order.created_at));
-      daily.set(day, (daily.get(day) ?? 0) + Number(order.total ?? 0));
+      const amount = Number(order.total ?? 0);
+      daily.set(day, (daily.get(day) ?? 0) + amount);
+      const method =
+        order.payment_method && (PAYMENT_METHODS as readonly string[]).includes(order.payment_method)
+          ? order.payment_method
+          : 'cash';
+      byPayment.set(method, (byPayment.get(method) ?? 0) + amount);
     }
 
     for (const row of items ?? []) {
@@ -82,12 +97,46 @@ export async function GET(request: Request) {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 8);
 
+    const weekdayBuckets = WEEKDAY_LABELS.map((label, weekday) => ({
+      weekday,
+      label,
+      amount: 0,
+      days: 0,
+    }));
+    for (const point of series) {
+      const weekday = mexicoWeekdayIndex(point.date);
+      weekdayBuckets[weekday].amount += point.amount;
+      weekdayBuckets[weekday].days += 1;
+    }
+    const topWeekdays = weekdayBuckets
+      .filter((row) => row.days > 0)
+      .map((row) => ({
+        ...row,
+        amount: Number(row.amount.toFixed(2)),
+        average: Number((row.amount / row.days).toFixed(2)),
+      }))
+      .sort((a, b) => b.average - a.average || b.amount - a.amount)
+      .slice(0, 3);
+
+    const paymentTotal = [...byPayment.values()].reduce((sum, value) => sum + value, 0);
+    const paymentBreakdown = PAYMENT_METHODS.map((method: PaymentMethod) => {
+      const amount = Number((byPayment.get(method) ?? 0).toFixed(2));
+      return {
+        method,
+        amount,
+        percent: paymentTotal > 0 ? Number(((amount / paymentTotal) * 100).toFixed(1)) : 0,
+      };
+    }).filter((row) => row.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+
     return NextResponse.json({
       from: range.start,
       to: range.end,
       periodLabel: range.label,
       series,
       topProducts,
+      topWeekdays,
+      paymentBreakdown,
     });
   } catch (error) {
     return NextResponse.json(
