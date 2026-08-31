@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  PAYMENT_METHOD_LABELS,
   PRODUCT_UNIT_LABELS,
   formatMoney,
   formatProductQuantity,
   isLowStock,
+  type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -57,6 +59,29 @@ interface TopProduct {
   name: string;
   quantity: number;
 }
+
+interface WeekdayRow {
+  weekday: number;
+  label: string;
+  amount: number;
+  average: number;
+  days: number;
+}
+
+interface PaymentRow {
+  method: PaymentMethod;
+  amount: number;
+  percent: number;
+}
+
+const PAYMENT_BAR_COLOR: Record<PaymentMethod, string> = {
+  cash: '#16a34a',
+  card_terminal: '#0284c7',
+  transfer: '#d97706',
+  online: '#7c3aed',
+};
+
+const WEEKDAY_MEDALS = ['🥇', '🥈', '🥉'];
 
 type PeriodPreset = 'current' | 'previous' | 'custom';
 
@@ -340,6 +365,34 @@ function BarChart({ products }: { products: TopProduct[] }) {
   );
 }
 
+function PaymentBreakdown({ rows }: { rows: PaymentRow[] }) {
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  return (
+    <ul className="mt-2 space-y-2.5">
+      {rows.map((row) => (
+        <li key={row.method}>
+          <div className="mb-1 flex justify-between gap-2 text-sm">
+            <span className="font-medium text-slate-800">{PAYMENT_METHOD_LABELS[row.method]}</span>
+            <span className="tabular-nums text-slate-500">
+              {formatMoney(row.amount)}
+              <span className="ml-1.5 text-xs text-slate-400">{row.percent.toFixed(0)}%</span>
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.max(6, (row.amount / max) * 100)}%`,
+                backgroundColor: PAYMENT_BAR_COLOR[row.method],
+              }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ForecastManager({
   initialForecast,
   stockProducts = [],
@@ -358,6 +411,8 @@ export function ForecastManager({
   );
   const [series, setSeries] = useState<TrendPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
+  const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
   const [insights, setInsights] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -389,6 +444,8 @@ export function ForecastManager({
     if (!response.ok) throw new Error(payload.error ?? 'Error al cargar tendencias');
     setSeries(payload.series ?? []);
     setTopProducts(payload.topProducts ?? []);
+    setTopWeekdays(payload.topWeekdays ?? []);
+    setPaymentBreakdown(payload.paymentBreakdown ?? []);
     setFrom(payload.from ?? nextFrom);
     setTo(payload.to ?? nextTo);
     setPeriodLabel(payload.periodLabel ?? formatMexicoPeriodLabel(nextFrom, nextTo));
@@ -896,6 +953,40 @@ export function ForecastManager({
                 <p className="py-10 text-sm text-slate-500">Aún no hay ventas en el periodo.</p>
               )}
             </div>
+
+            {topWeekdays.length > 0 ? (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="text-sm font-medium text-slate-700">Días que más venden</p>
+                <p className="text-xs text-slate-500">Top 3 · promedio por día de la semana</p>
+                <ol className="mt-2 space-y-2">
+                  {topWeekdays.map((row, index) => (
+                    <li
+                      key={row.weekday}
+                      className="flex items-baseline justify-between gap-3 text-sm"
+                    >
+                      <span className="min-w-0">
+                        <span aria-hidden>{WEEKDAY_MEDALS[index] ?? `${index + 1}.`}</span>
+                        <span className="ml-1.5 font-medium text-slate-800">{row.label}</span>
+                        <span className="ml-1.5 text-xs text-slate-400">
+                          {row.days} día{row.days === 1 ? '' : 's'}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                        {formatMoney(row.average)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+
+            {paymentBreakdown.length > 0 ? (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="text-sm font-medium text-slate-700">Por tipo de pago</p>
+                <p className="text-xs text-slate-500">Del periodo · el día a día está en Caja</p>
+                <PaymentBreakdown rows={paymentBreakdown} />
+              </div>
+            ) : null}
           </section>
           <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
             <h3 className="font-semibold text-slate-900">Lo que más se vende</h3>
