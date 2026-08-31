@@ -14,7 +14,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
-import { ActionChip, ChevronDownIcon, FoldableSummary } from '@/components/ActionChip';
+import { ActionChip, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import {
   currentMexicoMonthRange,
@@ -663,13 +663,10 @@ export function ProfitabilityManager({
         )}
 
         {categories.length > 0 ? (
-          <details className="group rounded-xl border border-slate-100">
+          <details className="group/sub rounded-xl border border-slate-100">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
               <p className="text-sm font-medium text-slate-800">Tabla detallada</p>
-              <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
-                <span className="group-open:hidden">Desplegar</span>
-                <span className="hidden group-open:inline">Cerrar</span>
-              </ActionChip>
+              <NestedFoldChip />
             </summary>
             <div className="overflow-x-auto border-t border-slate-100 pb-3">
               <table className="min-w-full text-sm">
@@ -836,7 +833,7 @@ export function ProfitabilityManager({
           </div>
         ) : null}
 
-        <details className="group rounded-xl border border-slate-100">
+        <details className="group/sub rounded-xl border border-slate-100">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
             <p className="text-sm font-medium text-slate-800">
               Gastos de visita
@@ -845,10 +842,7 @@ export function ProfitabilityManager({
                 {formatMoney(Number(summary?.visit_expenses ?? 0))}
               </span>
             </p>
-            <ActionChip as="span" icon={<ChevronDownIcon />} className="shrink-0">
-              <span className="group-open:hidden">Desplegar</span>
-              <span className="hidden group-open:inline">Cerrar</span>
-            </ActionChip>
+            <NestedFoldChip />
           </summary>
           {visitExpenses.length === 0 ? (
             <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">

@@ -10,10 +10,16 @@ export function WhatsAppGlyph({ className = 'h-3.5 w-3.5' }: { className?: strin
   );
 }
 
-export function ChevronDownIcon({ className = '' }: { className?: string }) {
+export function ChevronDownIcon({
+  className = '',
+  nested = false,
+}: {
+  className?: string;
+  nested?: boolean;
+}) {
   return (
     <svg
-      className={`h-4 w-4 transition group-open:rotate-180 ${className}`}
+      className={`h-4 w-4 transition ${nested ? 'group-open/sub:rotate-180' : 'group-open:rotate-180'} ${className}`}
       viewBox="0 0 20 20"
       fill="currentColor"
       aria-hidden
@@ -165,5 +171,14 @@ export function FoldableSummary({
         </ActionChip>
       </div>
     </summary>
+  );
+}
+
+export function NestedFoldChip() {
+  return (
+    <ActionChip as="span" icon={<ChevronDownIcon nested />} className="shrink-0">
+      <span className="group-open/sub:hidden">Desplegar</span>
+      <span className="hidden group-open/sub:inline">Cerrar</span>
+    </ActionChip>
   );
 }
