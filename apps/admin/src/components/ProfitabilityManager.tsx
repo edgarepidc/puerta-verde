@@ -168,6 +168,13 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   const other = Math.max(Number(summary.variable_costs) - visit, 0);
   const net = Number(summary.estimated_net_profit);
   const netPositive = net >= 0;
+  const gross = Number(summary.gross_profit ?? revenue - cogs);
+  const grossPct =
+    revenue > 0 ? Number(summary.gross_margin_percent ?? (gross / revenue) * 100) : null;
+  const netPct = revenue > 0 ? (net / revenue) * 100 : null;
+
+  const formatPct = (value: number | null) =>
+    value == null ? '—' : `${value.toFixed(1).replace(/^-/, '−')}%`;
 
   let running = revenue;
   const steps: Array<{
@@ -216,9 +223,8 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
 
   return (
     <div className="pv-glass-card p-4 sm:p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        Cómo se arma Te quedó
-      </p>
+      <h2 className="text-lg font-semibold text-slate-900">Cálculo de utilidad</h2>
+      <p className="mt-0.5 text-sm text-slate-500">De lo que entró a lo que quedó, paso a paso.</p>
       <ul className="mt-3 divide-y divide-slate-100">
         {steps.map((step, index) => (
           <li
@@ -244,7 +250,7 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
           </li>
         ))}
         <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
-          <p className="text-sm font-semibold text-slate-900">= Te quedó</p>
+          <p className="text-sm font-semibold text-slate-900">= Utilidad neta</p>
           <p
             className={`text-lg font-bold tabular-nums ${
               netPositive ? 'text-emerald-800' : 'text-rose-700'
@@ -254,6 +260,32 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
           </p>
         </li>
       </ul>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Margen bruto
+          </p>
+          <p className="mt-0.5 text-xl font-bold tabular-nums text-slate-900">{formatPct(grossPct)}</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {formatMoney(gross)} · después de mercancía
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Margen neto
+          </p>
+          <p
+            className={`mt-0.5 text-xl font-bold tabular-nums ${
+              netPositive ? 'text-emerald-800' : 'text-rose-700'
+            }`}
+          >
+            {formatPct(netPct)}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {formatMoney(net)} · después de gastos
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
