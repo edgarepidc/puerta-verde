@@ -104,7 +104,7 @@ export async function GET(request: Request) {
 
     const topProducts = [...byProduct.entries()].map(([name, stats]) => ({
       name,
-      quantity: Number(stats.quantity.toFixed(3)),
+      quantity: Number(stats.quantity.toFixed(2)),
       revenue: Number(stats.revenue.toFixed(2)),
       profit: Number(stats.profit.toFixed(2)),
     }));

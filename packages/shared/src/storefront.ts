@@ -1,4 +1,4 @@
-import { PRODUCT_UNIT_LABELS, type ProductUnit } from './index';
+import { PRODUCT_UNIT_LABELS, formatDecimal, type ProductUnit } from './index';
 import { LOW_STOCK_THRESHOLD } from './inventory';
 
 export type StockStatus = 'out' | 'low' | 'available';
@@ -35,7 +35,7 @@ export function estimatedKgForPieces(
   pieces: number,
   kgPerPiece = DEFAULT_ESTIMATED_KG_PER_PIECE,
 ): number {
-  return Math.round(Math.max(0, pieces) * kgPerPiece * 1000) / 1000;
+  return Math.round(Math.max(0, pieces) * kgPerPiece * 100) / 100;
 }
 
 export function maxPiecesFromStock(
@@ -48,7 +48,7 @@ export function maxPiecesFromStock(
 
 export function formatProductQuantity(quantity: number, unit: ProductUnit): string {
   const label = PRODUCT_UNIT_LABELS[unit];
-  const formatted = unit === 'kg' ? quantity.toFixed(2).replace(/\.?0+$/, '') : String(quantity);
+  const formatted = formatDecimal(quantity);
   return `${formatted} ${label}`;
 }
 

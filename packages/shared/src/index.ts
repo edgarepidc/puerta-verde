@@ -143,10 +143,24 @@ export function isWalkInPhone(phone: string): boolean {
   return normalizePhone(phone) === WALK_IN_PHONE;
 }
 
+export function roundToDecimals(value: number, decimals = 2): number {
+  if (!Number.isFinite(value)) return value;
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+/** At most two decimal places, without trailing zeros. */
+export function formatDecimal(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return '';
+  return String(roundToDecimals(value, decimals));
+}
+
 export function formatMoney(amount: number, currency = 'MXN'): string {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 

@@ -10,6 +10,7 @@ import {
   PRODUCT_UNIT_LABELS,
   VISIT_EXPENSE_PRESETS,
   calcMarginPercent,
+  formatDecimal,
   formatMoney,
   suggestSalePrice,
   type ProductQuality,
@@ -204,7 +205,7 @@ function emptyLine(key = String(Date.now())): LineDraft {
 
 function formatQty(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '';
-  return String(Number(n.toFixed(3)));
+  return String(Number(n.toFixed(2)));
 }
 
 function formatMoneyAmount(n: number): string {
@@ -959,9 +960,9 @@ export function PurchasesManager({
       items: (purchase.items ?? []).map((item) => ({
         id: item.id,
         branchProductId: item.branch_product?.id ?? '',
-        quantity: String(Number(item.quantity)),
-        unitPrice: String(Number(item.unit_price)),
-        lineTotal: String(Number(item.line_total)),
+        quantity: formatQty(Number(item.quantity)),
+        unitPrice: formatMoneyAmount(Number(item.unit_price)),
+        lineTotal: formatMoneyAmount(Number(item.line_total)),
         quality: (item.quality as ProductQuality) || 'normal',
         pieceCount:
           item.piece_count != null && Number(item.piece_count) > 0
@@ -1945,7 +1946,7 @@ export function PurchasesManager({
                                       {item.piece_count != null && Number(item.piece_count) > 0
                                         ? `${Number(item.piece_count)} pza · `
                                         : ''}
-                                      {Number(item.quantity)}{' '}
+                                      {formatDecimal(Number(item.quantity))}{' '}
                                       {item.branch_product?.product?.unit
                                         ? PRODUCT_UNIT_LABELS[item.branch_product.product.unit]
                                         : ''}{' '}

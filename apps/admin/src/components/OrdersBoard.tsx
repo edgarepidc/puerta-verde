@@ -9,6 +9,7 @@ import {
   POS_PAYMENT_METHODS,
   PRODUCT_UNIT_LABELS,
   formatMexicoMonthLabel,
+  formatDecimal,
   formatMoney,
   groupByMexicoDay,
   groupSalesLogByMonth,
@@ -470,7 +471,7 @@ export function OrdersBoard({
 
   function resetEditDraft(items: OrderItem[], createdAt?: string) {
     setEditQuantities(
-      Object.fromEntries(items.map((item) => [item.id, String(Number(item.quantity))])),
+      Object.fromEntries(items.map((item) => [item.id, formatDecimal(Number(item.quantity))])),
     );
     setEditOrderedQuantities(
       Object.fromEntries(
@@ -1218,7 +1219,7 @@ export function OrdersBoard({
                         ) : (
                           <p className="text-xs text-slate-500">
                             {isWeigh && orderedLabel ? `${orderedLabel} · ` : null}
-                            {Number(item.quantity)} {unitLabel} × {formatMoney(Number(item.unit_price))}
+                            {formatDecimal(Number(item.quantity))} {unitLabel} × {formatMoney(Number(item.unit_price))}
                             {isWeigh ? '/kg' : ''}
                           </p>
                         )}

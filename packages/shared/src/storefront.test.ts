@@ -32,3 +32,9 @@ test('getDefaultQuantity is always 1', async () => {
   assert.equal(getDefaultQuantity('piece'), 1);
   assert.equal(getDefaultQuantity('bunch'), 1);
 });
+
+test('formatProductQuantity keeps at most two decimals', async () => {
+  const { formatProductQuantity } = await import('./storefront');
+  assert.equal(formatProductQuantity(2.746, 'kg'), '2.75 kg');
+  assert.equal(formatProductQuantity(3, 'piece'), '3 pieza');
+});

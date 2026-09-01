@@ -8,6 +8,7 @@ import {
   POS_PAYMENT_METHODS,
   PRODUCT_UNIT_LABELS,
   STOCK_STATUS_LABELS,
+  formatDecimal,
   formatMoney,
   getDefaultLowStockThreshold,
   getDefaultQuantity,
@@ -103,7 +104,7 @@ export function buildTicketText(input: {
       item.ordered_quantity != null && Number(item.ordered_quantity) > 0
         ? `${Number(item.ordered_quantity)} pza · `
         : '';
-    return `• ${item.product_name} ${pieceNote}${Number(item.quantity)} ${unit} — ${formatMoney(Number(item.line_total))}`;
+    return `• ${item.product_name} ${pieceNote}${formatDecimal(Number(item.quantity))} ${unit} — ${formatMoney(Number(item.line_total))}`;
   });
   const cashLines =
     input.paymentMethod === 'cash' &&
@@ -382,7 +383,7 @@ export function CounterSalePanel({
           );
         }
         const next = Number(
-          (parseDecimal(existing.quantity) + getQuantityStep(unit)).toFixed(3),
+          (parseDecimal(existing.quantity) + getQuantityStep(unit)).toFixed(2),
         );
         return current.map((item) =>
           item.branchProductId === product.id ? { ...item, quantity: String(next) } : item,
@@ -445,7 +446,7 @@ export function CounterSalePanel({
       current.flatMap((item) => {
         if (item.branchProductId !== productId) return [item];
         if (item.saleMode === 'piece') return [item];
-        const next = Number((parseDecimal(item.quantity) + delta * step).toFixed(3));
+        const next = Number((parseDecimal(item.quantity) + delta * step).toFixed(2));
         if (next <= 0) return [];
         return [{ ...item, quantity: String(next) }];
       }),
@@ -871,7 +872,7 @@ export function CounterSalePanel({
                             item.saleMode === 'piece' && !(parseDecimal(item.quantity) > 0),
                         ) ?? cart.find((item) => item.saleMode === 'piece');
                       if (target) {
-                        updateQty(target.branchProductId, String(Number(kg.toFixed(3))));
+                        updateQty(target.branchProductId, String(Number(kg.toFixed(2))));
                       }
                     }}
                   />
@@ -898,7 +899,7 @@ export function CounterSalePanel({
                           <span className="font-medium text-slate-800">{product.product.name}</span>
                           {weigh && pieceStock > 0 ? (
                             <p className="text-[11px] text-slate-500">
-                              {pieceStock} pza · {Number(product.stock)} kg
+                              {pieceStock} pza · {formatDecimal(Number(product.stock))} kg
                             </p>
                           ) : null}
                         </div>
