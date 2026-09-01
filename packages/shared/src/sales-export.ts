@@ -108,6 +108,10 @@ export function salesExportFilename(input: {
   return `ventas-${slug}-${input.days}d.xlsx`;
 }
 
+function round2(value: number | string): number {
+  return Number(Number(value).toFixed(2));
+}
+
 function formatMexicoTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -137,7 +141,7 @@ export function buildSalesExportTables(
       Fecha: day.ymd,
       Día: formatMexicoDayLabel(day.ymd, today),
       Ventas: day.count,
-      Total: day.total,
+      Total: round2(day.total),
     })),
     sales: sorted.map((order) => ({
       Fecha: mexicoYmdFromIso(order.created_at),
@@ -149,7 +153,7 @@ export function buildSalesExportTables(
       Origen: SOURCE_LABELS[order.source ?? ''] ?? order.source ?? '',
       Pago: PAYMENT_METHOD_LABELS[order.payment_method ?? ''] ?? order.payment_method ?? '',
       'Estado de pago': PAYMENT_STATUS_LABELS[order.payment_status] ?? order.payment_status,
-      Total: Number(order.total),
+      Total: round2(order.total),
     })),
     items: items.flatMap((item) => {
       const order = byId.get(item.order_id);
@@ -158,10 +162,10 @@ export function buildSalesExportTables(
         Fecha: mexicoYmdFromIso(order.created_at),
         Pedido: Number(order.order_number),
         Producto: item.product_name,
-        Cantidad: Number(item.quantity),
+        Cantidad: round2(item.quantity),
         Unidad: UNIT_LABELS[item.unit] ?? item.unit,
-        'Precio unitario': Number(item.unit_price),
-        Importe: Number(item.line_total),
+        'Precio unitario': round2(item.unit_price),
+        Importe: round2(item.line_total),
       }];
     }),
   };

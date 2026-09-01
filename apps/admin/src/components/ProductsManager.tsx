@@ -7,6 +7,7 @@ import {
   PRODUCT_UNIT_LABELS,
   PRODUCT_UNITS,
   calcMarginPercent,
+  formatDecimal,
   formatMoney,
   getDefaultLowStockThreshold,
   isLowStock,
@@ -107,7 +108,7 @@ function SortHeader({
 }
 
 function formatStockQty(value: number): string {
-  return Number(value).toFixed(2);
+  return formatDecimal(value);
 }
 
 export function ProductsManager({
@@ -337,8 +338,8 @@ export function ProductsManager({
 
     if (keeper) {
       const ok = window.confirm(
-        `Hay otro «${row.product.name}» (stock ${Number(keeper.stock)}).\n\n` +
-          `¿Unir este (stock ${Number(row.stock)}) en ese, pasar compras/ventas y eliminar el duplicado?`,
+        `Hay otro «${row.product.name}» (stock ${formatDecimal(Number(keeper.stock))}).\n\n` +
+          `¿Unir este (stock ${formatDecimal(Number(row.stock))}) en ese, pasar compras/ventas y eliminar el duplicado?`,
       );
       if (!ok) return;
       setSaving(true);
@@ -664,7 +665,7 @@ export function ProductsManager({
                     <td className="px-3 py-3 font-medium">{formatMoney(Number(row.price))}</td>
                     <td className="whitespace-nowrap px-3 py-3">
                       <p className={low ? 'font-semibold text-amber-800' : 'text-slate-800'}>
-                        {stock} {PRODUCT_UNIT_LABELS[row.product.unit]}
+                        {formatStockQty(stock)} {PRODUCT_UNIT_LABELS[row.product.unit]}
                       </p>
                     </td>
                     <td className="px-3 py-3">

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { PRODUCT_UNIT_LABELS, formatMoney, type ProductUnit } from '@puertaverde/shared';
+import { PRODUCT_UNIT_LABELS, formatDecimal, formatMoney, type ProductUnit } from '@puertaverde/shared';
 
 export interface SearchableProduct {
   id: string;
@@ -96,7 +96,7 @@ export function ProductSearchSelect({
                 <span className="text-xs text-slate-500">
                   {product.price != null ? `${formatMoney(Number(product.price))}/` : ''}
                   {PRODUCT_UNIT_LABELS[product.product.unit]}
-                  {product.stock != null ? ` · ${Number(product.stock)}` : ''}
+                  {product.stock != null ? ` · ${formatDecimal(Number(product.stock))}` : ''}
                 </span>
               </button>
             </li>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-import { formatMoney, isUnpaidOrder } from '@puertaverde/shared';
+import { formatDecimal, formatMoney, isUnpaidOrder } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 
@@ -238,7 +238,7 @@ export function CustomersManager({
                     <li key={product.name} className="flex justify-between gap-3">
                       <span>{product.name}</span>
                       <span className="text-slate-500">
-                        {Number(product.quantity).toFixed(2)} · {formatMoney(product.revenue)}
+                        {formatDecimal(Number(product.quantity))} · {formatMoney(product.revenue)}
                       </span>
                     </li>
                   ))}

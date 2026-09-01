@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { formatMoney, formatProductUnavailableError, isUnpaidOrder, isValidMexicanPhone, normalizePhone, orderPaymentLabel, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout, withUnavailableProductNames } from './index';
+import { formatDecimal, formatMoney, formatProductUnavailableError, isUnpaidOrder, isValidMexicanPhone, normalizePhone, orderPaymentLabel, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout, withUnavailableProductNames } from './index';
 
 test('normalizePhone adds Mexico country code', () => {
   assert.equal(normalizePhone('5512345678'), '525512345678');
@@ -77,6 +77,13 @@ test('resolvePosCustomer uses a valid phone and defaults the name', () => {
 
 test('formatMoney uses MXN locale', () => {
   assert.match(formatMoney(45.5), /\$45\.50/);
+});
+
+test('formatDecimal keeps at most two places', () => {
+  assert.equal(formatDecimal(2.746), '2.75');
+  assert.equal(formatDecimal(1.2), '1.2');
+  assert.equal(formatDecimal(10), '10');
+  assert.equal(formatDecimal(0.0700000001), '0.07');
 });
 
 test('formatProductUnavailableError includes the product name', () => {

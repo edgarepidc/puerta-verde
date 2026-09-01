@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import {
   INVENTORY_MOVEMENT_LABELS,
+  formatDecimal,
   type InventoryMovementType,
 } from '@puertaverde/shared';
 
@@ -143,7 +144,7 @@ export function StockMovementHistory({
                     }`}
                   >
                     {signed > 0 ? '+' : ''}
-                    {signed}
+                    {formatDecimal(signed)}
                   </p>
                 </div>
               );

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { PRODUCT_UNIT_LABELS, type ProductUnit } from '@puertaverde/shared';
+import { PRODUCT_UNIT_LABELS, formatDecimal, type ProductUnit } from '@puertaverde/shared';
 
 import { ScalePanel } from '@/components/ScalePanel';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
@@ -256,7 +256,7 @@ export function LotsManager({
                   {lot.lot_code} · {lot.branch_product?.product?.name}
                 </p>
                 <p className="text-slate-500">
-                  Restante {Number(lot.quantity_remaining)} / {Number(lot.quantity_received)}
+                  Restante {formatDecimal(Number(lot.quantity_remaining))} / {formatDecimal(Number(lot.quantity_received))}
                   {lot.expires_at && ` · caduca ${new Date(lot.expires_at).toLocaleDateString('es-MX')}`}
                 </p>
                 {lot.pti_label && <p className="font-mono text-xs text-slate-400">{lot.pti_label}</p>}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  formatDecimal,
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
@@ -915,7 +916,7 @@ export function ProfitabilityManager({
                     />
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">
-                    {row.product_count} productos · {Number(row.units_sold).toFixed(1)} unidades
+                    {row.product_count} productos · {formatDecimal(Number(row.units_sold))} unidades
                   </p>
                 </div>
               );
@@ -947,7 +948,7 @@ export function ProfitabilityManager({
                     <tr key={`t-${row.category_name}`} className="border-t border-slate-100">
                       <td className="px-4 py-2 font-medium">{row.category_name}</td>
                       <td className="px-4 py-2">{row.product_count}</td>
-                      <td className="px-4 py-2">{Number(row.units_sold).toFixed(2)}</td>
+                      <td className="px-4 py-2">{formatDecimal(Number(row.units_sold))}</td>
                       <td className="px-4 py-2">{formatMoney(Number(row.revenue))}</td>
                       <td className="px-4 py-2">{formatMoney(Number(row.cogs))}</td>
                       <td className="px-4 py-2 font-semibold">{formatMoney(Number(row.gross_profit))}</td>

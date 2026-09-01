@@ -2,6 +2,8 @@
 
 import type { InputHTMLAttributes } from 'react';
 
+import { formatDecimal } from '@puertaverde/shared';
+
 const DECIMAL_PATTERN = /^-?\d*\.?\d*$/;
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange' | 'inputMode'> & {
@@ -39,6 +41,12 @@ function caretFromDigitCount(value: string, digitCount: number): number {
   return value.length;
 }
 
+function capFractionDigits(value: string, max = 2): string {
+  const dot = value.indexOf('.');
+  if (dot === -1) return value;
+  return value.slice(0, dot + 1 + max);
+}
+
 function parseNumericText(value: string): number {
   const trimmed = value.trim().replace(/,/g, '');
   if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === '-.') return Number.NaN;
@@ -61,9 +69,10 @@ export function DecimalInput({ value, onChange, className, groupThousands = fals
         const digits = digitsBeforeCaret(input.value, caret);
         const raw = groupThousands ? input.value.replace(/,/g, '') : input.value.replace(',', '.');
         if (raw === '' || DECIMAL_PATTERN.test(raw)) {
-          onChange(raw);
+          const nextRaw = capFractionDigits(raw);
+          onChange(nextRaw);
           if (groupThousands) {
-            const next = formatGrouped(raw);
+            const next = formatGrouped(nextRaw);
             queueMicrotask(() => {
               const pos = caretFromDigitCount(next, digits);
               input.setSelectionRange(pos, pos);
@@ -90,5 +99,5 @@ export function parseOptionalDecimal(value: string): number | null {
 export function decimalFromNumber(value: number | null | undefined, blankZero = true): string {
   if (value == null || Number.isNaN(value)) return '';
   if (blankZero && value === 0) return '';
-  return String(value);
+  return formatDecimal(value);
 }

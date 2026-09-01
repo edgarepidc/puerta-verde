@@ -5,6 +5,7 @@ import { PayOnlineButton } from '@/components/PayOnlineButton';
 import { createServerClient } from '@puertaverde/supabase/client';
 import {
   formatMoney,
+  formatDecimal,
   FULFILLMENT_LABELS,
   orderStatusLabel,
   PRODUCT_UNIT_LABELS,
@@ -73,7 +74,7 @@ export default async function OrderTrackingPage({
           }) => (
             <li key={`${item.product_name}-${item.quantity}`} className="flex justify-between gap-3">
               <span>
-                {item.product_name} × {item.quantity}{' '}
+                {item.product_name} × {formatDecimal(Number(item.quantity))}{' '}
                 {PRODUCT_UNIT_LABELS[item.unit as ProductUnit]}
               </span>
               <span>{formatMoney(Number(item.line_total))}</span>

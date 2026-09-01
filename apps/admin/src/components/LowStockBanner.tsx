@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { PRODUCT_UNIT_LABELS, isLowStock, type ProductUnit } from '@puertaverde/shared';
+import { PRODUCT_UNIT_LABELS, formatDecimal, isLowStock, type ProductUnit } from '@puertaverde/shared';
 
 interface LowStockProduct {
   id: string;
@@ -70,7 +70,7 @@ export function LowStockBanner({
             {lowStock
               .map((product) => {
                 const unit = product.product.unit ? PRODUCT_UNIT_LABELS[product.product.unit] : '';
-                return `${product.product.name} (${Number(product.stock)}${unit ? ` ${unit}` : ''})`;
+                return `${product.product.name} (${formatDecimal(Number(product.stock))}${unit ? ` ${unit}` : ''})`;
               })
               .join(' · ')}
           </p>

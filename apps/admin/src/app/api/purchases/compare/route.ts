@@ -130,7 +130,7 @@ export async function GET(request: Request) {
         avg_unit_price: Number(
           (_prices.reduce((sum, price) => sum + price, 0) / _prices.length).toFixed(2),
         ),
-        total_quantity: Number(row.total_quantity.toFixed(3)),
+        total_quantity: Number(row.total_quantity.toFixed(2)),
       }))
       .sort((a, b) => {
         const byProduct = a.product_name.localeCompare(b.product_name, 'es');

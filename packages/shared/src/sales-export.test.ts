@@ -67,9 +67,9 @@ test('buildSalesExportTables groups by Mexico day and keeps line items', () => {
         order_id: 'a',
         product_name: 'Jitomate',
         unit: 'kg',
-        quantity: 1,
-        unit_price: 89,
-        line_total: 89,
+        quantity: 2.7461,
+        unit_price: 89.1,
+        line_total: 245.1234,
       },
     ],
     '2026-08-19',
@@ -89,4 +89,7 @@ test('buildSalesExportTables groups by Mexico day and keeps line items', () => {
   assert.equal(tables.items.length, 1);
   assert.equal(tables.items[0]?.Producto, 'Jitomate');
   assert.equal(tables.items[0]?.Pedido, 1015);
+  assert.equal(tables.items[0]?.Cantidad, 2.75);
+  assert.equal(tables.items[0]?.['Precio unitario'], 89.1);
+  assert.equal(tables.items[0]?.Importe, 245.12);
 });
