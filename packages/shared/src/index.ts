@@ -237,11 +237,13 @@ export {
   calcMarginAmount,
   calcMarginPercent,
   validateOperatingCostInput,
+  costAppliesToRange,
   OPERATING_COST_TYPES,
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPE_LABELS,
   OPERATING_COST_PERIOD_LABELS,
   type OperatingCostInput,
+  type OperatingCostTerm,
   type OperatingCostType,
   type OperatingCostPeriod,
 } from './profitability';

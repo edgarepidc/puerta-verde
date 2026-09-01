@@ -15,11 +15,17 @@ export function ChevronDownIcon({
   nested = false,
 }: {
   className?: string;
-  nested?: boolean;
+  nested?: boolean | 'sub' | 'vis';
 }) {
+  const rotate =
+    nested === 'vis'
+      ? 'group-open/vis:rotate-180'
+      : nested
+        ? 'group-open/sub:rotate-180'
+        : 'group-open:rotate-180';
   return (
     <svg
-      className={`h-4 w-4 transition ${nested ? 'group-open/sub:rotate-180' : 'group-open:rotate-180'} ${className}`}
+      className={`h-4 w-4 transition ${rotate} ${className}`}
       viewBox="0 0 20 20"
       fill="currentColor"
       aria-hidden
@@ -174,7 +180,15 @@ export function FoldableSummary({
   );
 }
 
-export function NestedFoldChip() {
+export function NestedFoldChip({ group = 'sub' }: { group?: 'sub' | 'vis' }) {
+  if (group === 'vis') {
+    return (
+      <ActionChip as="span" icon={<ChevronDownIcon nested="vis" />} className="shrink-0">
+        <span className="group-open/vis:hidden">Desplegar</span>
+        <span className="hidden group-open/vis:inline">Cerrar</span>
+      </ActionChip>
+    );
+  }
   return (
     <ActionChip as="span" icon={<ChevronDownIcon nested />} className="shrink-0">
       <span className="group-open/sub:hidden">Desplegar</span>

@@ -10,9 +10,11 @@ import {
   OPERATING_COST_TYPE_LABELS,
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
+  costAppliesToRange,
   type IncomeEntryType,
   type OperatingCostInput,
   type OperatingCostPeriod,
+  type OperatingCostTerm,
   type OperatingCostType,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -54,6 +56,7 @@ interface CostRow {
   amount: number;
   notes: string | null;
   is_active: boolean;
+  terms?: OperatingCostTerm[];
 }
 
 interface ProfitSummary {
@@ -135,19 +138,6 @@ const PRESET_EMOJI: Record<PeriodPreset, string> = {
   previous: '📆',
   custom: '✏️',
 };
-
-function operatingCostEmoji(name: string) {
-  const n = name.toLowerCase();
-  if (/renta|alquiler/.test(n)) return '🏠';
-  if (/n[oó]mina|sueldo|salario/.test(n)) return '👤';
-  return '📌';
-}
-
-function periodMovementEmoji(kind: 'visit' | 'income', entryType?: IncomeEntryType) {
-  if (kind === 'visit') return '🛻';
-  if (entryType === 'operating') return '💚';
-  return '💵';
-}
 
 function MetricCard({
   emoji,
@@ -622,6 +612,7 @@ export function ProfitabilityManager({
         body: JSON.stringify({
           ...costForm,
           amount: parseDecimal(costAmountText),
+          effectiveFrom: from,
         }),
       });
       const result = await response.json();
@@ -637,10 +628,11 @@ export function ProfitabilityManager({
   }
 
   async function toggleCost(row: CostRow) {
+    const applies = costAppliesToRange(row.terms, from, to);
     await fetch(`/api/costs/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isActive: !row.is_active }),
+      body: JSON.stringify({ applies: !applies, periodStart: from }),
     });
     await loadPeriod(from, to);
   }
@@ -696,7 +688,7 @@ export function ProfitabilityManager({
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
   const activeFixedTotal = costs
-    .filter((row) => row.is_active)
+    .filter((row) => costAppliesToRange(row.terms, from, to))
     .reduce((sum, row) => sum + Number(row.amount), 0);
   const otherIncomeTotal = Number(summary?.other_income ?? 0);
   const visitTotal = Number(summary?.visit_expenses ?? 0);
@@ -721,6 +713,8 @@ export function ProfitabilityManager({
     }));
     return [...visits, ...incomeRows].sort((a, b) => b.date.localeCompare(a.date));
   }, [visitExpenses, incomes]);
+  const visitMovements = periodMovements.filter((row) => row.kind === 'visit');
+  const incomeMovements = periodMovements.filter((row) => row.kind === 'income');
 
   return (
     <div className="space-y-6">
@@ -1139,54 +1133,76 @@ export function ProfitabilityManager({
             <p className="px-4 pt-3 text-sm text-slate-500">
               La visita se carga en Compras. Aquí anotas aportaciones u otros ingresos.
             </p>
-            {periodMovements.length === 0 ? (
+            {visitMovements.length > 0 ? (
+              <details className="group/vis border-t border-slate-100">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 marker:content-none [&::-webkit-details-marker]:hidden">
+                  <p className="text-sm font-medium text-slate-800">
+                    Gastos de visita
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      {visitMovements.length} · {formatMoney(visitTotal)}
+                    </span>
+                  </p>
+                  <NestedFoldChip group="vis" />
+                </summary>
+                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                  {visitMovements.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{row.concept}</p>
+                        <p className="text-xs text-slate-500">
+                          {row.date}
+                          {row.notes ? ` · ${row.notes}` : ''}
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-semibold tabular-nums text-slate-600">
+                        −{formatMoney(row.amount)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            {incomeMovements.length === 0 && visitMovements.length === 0 ? (
               <p className="px-4 py-4 text-sm text-slate-500">
                 Sin gastos de visita ni aportaciones en este periodo.
               </p>
+            ) : incomeMovements.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-slate-500">
+                Sin aportaciones ni otros ingresos en este periodo.
+              </p>
             ) : (
-              <ul className="divide-y divide-slate-100">
-                {periodMovements.map((row) => {
-                  const isVisit = row.kind === 'visit';
-                  const label = isVisit
-                    ? 'Visita'
-                    : INCOME_ENTRY_TYPE_LABELS[row.entryType];
-                  return (
-                    <li key={row.key} className="flex flex-wrap items-center gap-3 px-4 py-3.5">
-                      <div
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
-                        aria-hidden
-                      >
-                        {periodMovementEmoji(row.kind, isVisit ? undefined : row.entryType)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-base font-semibold text-slate-900">{row.concept}</p>
-                        <p className="text-sm text-slate-500">
-                          {label} · {row.date}
-                          {row.notes ? ` · ${row.notes}` : ''}
-                          {isVisit ? '' : ' · entra a Te quedó'}
-                        </p>
-                      </div>
-                      <p
-                        className={`text-lg font-bold tabular-nums ${
-                          isVisit ? 'text-slate-600' : 'text-slate-900'
-                        }`}
-                      >
-                        {isVisit ? '−' : ''}
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {incomeMovements.map((row) => (
+                  <li
+                    key={row.key}
+                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{row.concept}</p>
+                      <p className="text-xs text-slate-500">
+                        {INCOME_ENTRY_TYPE_LABELS[row.entryType]} · {row.date}
+                        {row.notes ? ` · ${row.notes}` : ''}
+                        {' · entra a Te quedó'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold tabular-nums text-slate-800">
                         {formatMoney(row.amount)}
                       </p>
-                      {!isVisit ? (
-                        <ActionChip
-                          elevated={false}
-                          tone="rose"
-                          emoji="🗑️"
-                          onClick={() => void removeIncome(row.id)}
-                        >
-                          Eliminar
-                        </ActionChip>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                      <ActionChip
+                        elevated={false}
+                        tone="rose"
+                        emoji="🗑️"
+                        onClick={() => void removeIncome(row.id)}
+                      >
+                        Eliminar
+                      </ActionChip>
+                    </div>
+                  </li>
+                ))}
               </ul>
             )}
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
@@ -1261,55 +1277,54 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Gastos fijos del local. En el mes en curso o el anterior se cuenta el monto completo; en un
-              rango a modo se prorratea.
+              Gastos fijos del local. Activar o pausar vale desde el periodo que estás viendo hacia
+              adelante; no cambia los meses anteriores. En el mes en curso o el anterior se cuenta el
+              monto completo; en un rango a modo se prorratea.
             </p>
             {costs.length === 0 ? (
               <p className="px-4 py-4 text-sm text-slate-500">Sin gastos fijos todavía.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {costs.map((row) => (
-                  <li
-                    key={row.id}
-                    className={`flex flex-wrap items-center gap-3 px-4 py-3.5 ${
-                      row.is_active ? '' : 'opacity-70'
-                    }`}
-                  >
-                    <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
-                      aria-hidden
+                {costs.map((row) => {
+                  const applies = costAppliesToRange(row.terms, from, to);
+                  return (
+                    <li
+                      key={row.id}
+                      className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 ${
+                        applies ? '' : 'opacity-70'
+                      }`}
                     >
-                      {operatingCostEmoji(row.name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-slate-900">{row.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {OPERATING_COST_TYPE_LABELS[row.cost_type]} · {OPERATING_COST_PERIOD_LABELS[row.period]}
-                        {!row.is_active ? ' · inactivo' : ''}
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">{row.name}</p>
+                        <p className="text-sm text-slate-500">
+                          {OPERATING_COST_TYPE_LABELS[row.cost_type]} ·{' '}
+                          {OPERATING_COST_PERIOD_LABELS[row.period]}
+                          {applies ? ' · aplica aquí' : ' · pausado aquí'}
+                        </p>
+                      </div>
+                      <p className="text-base font-bold tabular-nums text-slate-900">
+                        {formatMoney(Number(row.amount))}
                       </p>
-                    </div>
-                    <p className="text-lg font-bold tabular-nums text-slate-900">
-                      {formatMoney(Number(row.amount))}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <ActionChip
-                        elevated={false}
-                        emoji={row.is_active ? '⏸️' : '▶️'}
-                        onClick={() => void toggleCost(row)}
-                      >
-                        {row.is_active ? 'Desactivar' : 'Activar'}
-                      </ActionChip>
-                      <ActionChip
-                        elevated={false}
-                        tone="rose"
-                        emoji="🗑️"
-                        onClick={() => void removeCost(row.id)}
-                      >
-                        Eliminar
-                      </ActionChip>
-                    </div>
-                  </li>
-                ))}
+                      <div className="flex flex-wrap gap-2">
+                        <ActionChip
+                          elevated={false}
+                          emoji={applies ? '⏸️' : '▶️'}
+                          onClick={() => void toggleCost(row)}
+                        >
+                          {applies ? 'Pausar aquí' : 'Activar aquí'}
+                        </ActionChip>
+                        <ActionChip
+                          elevated={false}
+                          tone="rose"
+                          emoji="🗑️"
+                          onClick={() => void removeCost(row.id)}
+                        >
+                          Eliminar
+                        </ActionChip>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
 
