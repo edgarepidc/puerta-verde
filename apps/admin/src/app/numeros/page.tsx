@@ -121,7 +121,7 @@ export default async function NumerosPage() {
               inventory_value_cost: number;
               inventory_value_sale: number;
             }>}
-            initialCosts={(costs?.data ?? []) as Array<{
+            initialCosts={(costs?.data ?? []) as unknown as Array<{
               id: string;
               name: string;
               cost_type: OperatingCostType;

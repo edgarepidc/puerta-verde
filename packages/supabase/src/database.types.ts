@@ -365,15 +365,7 @@ export interface Database {
           amount: number;
         };
         Update: Partial<Database['public']['Tables']['branch_operating_costs']['Row']>;
-        Relationships: [
-          {
-            foreignKeyName: 'branch_operating_cost_terms_cost_id_fkey';
-            columns: ['id'];
-            isOneToOne: false;
-            referencedRelation: 'branch_operating_cost_terms';
-            referencedColumns: ['cost_id'];
-          },
-        ];
+        Relationships: [];
       };
       branch_operating_cost_terms: {
         Row: {
