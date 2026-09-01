@@ -34,6 +34,7 @@ export default async function AdminHomePage({
   const canExportSales = staffHasPermission(staff, 'sales.export', permissionMatrix);
   const canEditOrders = staffHasPermission(staff, 'orders.edit', permissionMatrix);
   const canDeleteOrders = staffHasPermission(staff, 'orders.delete', permissionMatrix);
+  const canEditPayment = staffHasPermission(staff, 'orders.edit_payment', permissionMatrix);
 
   const branch = {
     name: staff.branchName,
@@ -91,6 +92,7 @@ export default async function AdminHomePage({
         canExportSales={canExportSales}
         canEditOrders={canEditOrders}
         canDeleteOrders={canDeleteOrders}
+        canEditPayment={canEditPayment}
         products={(products ?? []) as Array<{
           id: string;
           price: number;

@@ -47,18 +47,68 @@ export {
 export const FULFILLMENT_TYPES = ['delivery', 'pickup'] as const;
 export type FulfillmentType = (typeof FULFILLMENT_TYPES)[number];
 
-export const PAYMENT_METHODS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
+export const PAYMENT_METHODS = ['cash', 'card_terminal', 'transfer', 'online', 'on_account'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const COLLECTED_PAYMENT_METHODS = ['cash', 'card_terminal', 'transfer'] as const;
+export type CollectedPaymentMethod = (typeof COLLECTED_PAYMENT_METHODS)[number];
+
+export const POS_PAYMENT_METHODS = ['cash', 'card_terminal', 'transfer', 'on_account'] as const;
+export type PosPaymentMethod = (typeof POS_PAYMENT_METHODS)[number];
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
   card_terminal: 'TPV',
   transfer: 'Transferencia',
   online: 'En línea',
+  on_account: 'Por pagar',
 };
 
 export const PAYMENT_STATUSES = ['pending', 'paid', 'refunded'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: 'Por pagar',
+  paid: 'Pagado',
+  refunded: 'Reembolsado',
+};
+
+export function isPaymentMethod(value: string | null | undefined): value is PaymentMethod {
+  return Boolean(value) && (PAYMENT_METHODS as readonly string[]).includes(value as string);
+}
+
+export function isCollectedPaymentMethod(
+  value: string | null | undefined,
+): value is CollectedPaymentMethod {
+  return Boolean(value) && (COLLECTED_PAYMENT_METHODS as readonly string[]).includes(value as string);
+}
+
+export function isPosPaymentMethod(value: string | null | undefined): value is PosPaymentMethod {
+  return Boolean(value) && (POS_PAYMENT_METHODS as readonly string[]).includes(value as string);
+}
+
+export function isUnpaidOrder(order: {
+  payment_status?: string | null;
+  payment_method?: string | null;
+}): boolean {
+  return order.payment_status !== 'paid' || order.payment_method === 'on_account';
+}
+
+export function paymentMethodLabel(method: string | null | undefined): string {
+  if (method && isPaymentMethod(method)) return PAYMENT_METHOD_LABELS[method];
+  return method ?? '';
+}
+
+export function orderPaymentLabel(order: {
+  payment_status?: string | null;
+  payment_method?: string | null;
+}): string {
+  if (isUnpaidOrder(order)) return PAYMENT_METHOD_LABELS.on_account;
+  if (order.payment_method && isPaymentMethod(order.payment_method)) {
+    return `Pagado (${PAYMENT_METHOD_LABELS[order.payment_method]})`;
+  }
+  return PAYMENT_STATUS_LABELS.paid;
+}
 
 export const PRODUCT_UNITS = ['kg', 'piece', 'bunch', 'bag', 'liter', 'box'] as const;
 export type ProductUnit = (typeof PRODUCT_UNITS)[number];

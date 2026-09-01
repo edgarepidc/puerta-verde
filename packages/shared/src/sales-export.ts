@@ -17,10 +17,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   card_terminal: 'TPV',
   transfer: 'Transferencia',
   online: 'En línea',
+  on_account: 'Por pagar',
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
+  pending: 'Por pagar',
   paid: 'Pagado',
   refunded: 'Reembolsado',
 };

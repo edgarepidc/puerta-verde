@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import {
+  isPosPaymentMethod,
   resolvePosCustomer,
   validateGuestCheckout,
   withUnavailableProductNames,
@@ -14,8 +15,6 @@ import { loadPermissionMatrix, requireStaffApi, staffHasPermission } from '@/lib
 import { applyCouponToOrder } from '@/lib/apply-coupon';
 import { parseSoldOnDate } from '@/lib/mexico-date';
 import { loadOrdersBoard } from '@/lib/orders-board';
-
-const POS_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer'];
 
 type PosItem = GuestCheckoutInput['items'][number] & { unitPrice?: number };
 
@@ -132,9 +131,10 @@ export async function POST(request: Request) {
     }
 
     const paymentMethod = body.paymentMethod ?? 'cash';
-    if (!POS_PAYMENT_METHODS.includes(paymentMethod)) {
+    if (!isPosPaymentMethod(paymentMethod)) {
       return NextResponse.json({ error: 'Método de pago no válido' }, { status: 400 });
     }
+    const onAccount = paymentMethod === 'on_account';
 
     const permissionMatrix = await loadPermissionMatrix(auth.organizationId);
     const canEditPrice = staffHasPermission(auth, 'pos.edit_price', permissionMatrix);
@@ -229,10 +229,10 @@ export async function POST(request: Request) {
     }
 
     const updates = {
-      payment_status: 'paid' as const,
+      payment_status: onAccount ? ('pending' as const) : ('paid' as const),
       payment_method: paymentMethod,
-      paid_at: soldOn.iso,
-      paid_by: auth.userId,
+      paid_at: onAccount ? null : soldOn.iso,
+      paid_by: onAccount ? null : auth.userId,
       source: 'pos' as const,
       created_at: soldOn.iso,
       ...(body.markDelivered !== false ? { status: 'delivered' as const } : {}),
@@ -248,10 +248,10 @@ export async function POST(request: Request) {
       await supabase
         .from('orders')
         .update({
-          payment_status: 'paid',
+          payment_status: updates.payment_status,
           payment_method: paymentMethod,
           paid_at: updates.paid_at,
-          paid_by: auth.userId,
+          paid_by: updates.paid_by,
           created_at: soldOn.iso,
           ...(body.markDelivered !== false ? { status: 'delivered' as const } : {}),
         })

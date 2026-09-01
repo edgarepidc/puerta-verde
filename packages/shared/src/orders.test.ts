@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { formatMoney, formatProductUnavailableError, isValidMexicanPhone, normalizePhone, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout, withUnavailableProductNames } from './index';
+import { formatMoney, formatProductUnavailableError, isUnpaidOrder, isValidMexicanPhone, normalizePhone, orderPaymentLabel, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout, withUnavailableProductNames } from './index';
 
 test('normalizePhone adds Mexico country code', () => {
   assert.equal(normalizePhone('5512345678'), '525512345678');
@@ -98,4 +98,19 @@ test('withUnavailableProductNames only enriches the generic message', () => {
     'Producto no disponible: Lechuga orejona',
   );
   assert.equal(withUnavailableProductNames('Stock insuficiente para Guayaba', ['Mandarina']), 'Stock insuficiente para Guayaba');
+});
+
+test('isUnpaidOrder treats on_account and pending as por pagar', () => {
+  assert.equal(isUnpaidOrder({ payment_status: 'pending', payment_method: null }), true);
+  assert.equal(isUnpaidOrder({ payment_status: 'pending', payment_method: 'on_account' }), true);
+  assert.equal(isUnpaidOrder({ payment_status: 'paid', payment_method: 'on_account' }), true);
+  assert.equal(isUnpaidOrder({ payment_status: 'paid', payment_method: 'cash' }), false);
+});
+
+test('orderPaymentLabel names paid methods and por pagar', () => {
+  assert.equal(orderPaymentLabel({ payment_status: 'pending', payment_method: null }), 'Por pagar');
+  assert.equal(
+    orderPaymentLabel({ payment_status: 'paid', payment_method: 'card_terminal' }),
+    'Pagado (TPV)',
+  );
 });

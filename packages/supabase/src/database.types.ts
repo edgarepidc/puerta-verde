@@ -99,7 +99,7 @@ export interface Database {
           coupon_id: string | null;
           coupon_code: string | null;
           discount_amount: number;
-          payment_method: 'cash' | 'card_terminal' | 'transfer' | 'online' | null;
+          payment_method: 'cash' | 'card_terminal' | 'transfer' | 'online' | 'on_account' | null;
           payment_status: 'pending' | 'paid' | 'refunded';
           paid_at: string | null;
           paid_by: string | null;

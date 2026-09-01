@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { PAYMENT_METHOD_LABELS, formatMoney, type PaymentMethod } from '@puertaverde/shared';
+import { PAYMENT_METHOD_LABELS, formatMoney } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput } from '@/components/DecimalInput';
@@ -32,7 +32,7 @@ interface CashSummary {
   } | null;
 }
 
-const METHOD_KEYS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer', 'online'];
+const METHOD_KEYS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
 
 function parseClosingDate(value: string): Date | null {
   const iso = /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null;

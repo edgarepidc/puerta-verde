@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { PAYMENT_METHODS, type PaymentMethod } from '@puertaverde/shared';
+import { isPaymentMethod, PAYMENT_METHODS, type PaymentMethod } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi } from '@/lib/auth';
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, total, payment_method')
+      .select('id, created_at, total, payment_method, payment_status')
       .eq('branch_id', tenant.branchId)
       .neq('status', 'cancelled')
       .gte('created_at', startBound)
@@ -73,10 +73,12 @@ export async function GET(request: Request) {
       const day = todayMexicoYmd(new Date(order.created_at));
       const amount = Number(order.total ?? 0);
       daily.set(day, (daily.get(day) ?? 0) + amount);
-      const method =
-        order.payment_method && (PAYMENT_METHODS as readonly string[]).includes(order.payment_method)
-          ? order.payment_method
-          : 'cash';
+      const method: PaymentMethod =
+        order.payment_status !== 'paid' || order.payment_method === 'on_account'
+          ? 'on_account'
+          : isPaymentMethod(order.payment_method)
+            ? order.payment_method
+            : 'cash';
       byPayment.set(method, (byPayment.get(method) ?? 0) + amount);
     }
 

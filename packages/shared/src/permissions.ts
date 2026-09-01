@@ -19,6 +19,7 @@ export const PERMISSION_KEYS = [
   'profit.view',
   'stock.thresholds',
   'orders.edit',
+  'orders.edit_payment',
   'orders.delete',
   'coupons.manage',
 ] as const;
@@ -93,6 +94,11 @@ export const PERMISSIONS: PermissionDefinition[] = [
     description: 'Ajustar kilos/piezas al pesar para que cuadre con lo vendido.',
   },
   {
+    key: 'orders.edit_payment',
+    label: 'Editar forma de pago',
+    description: 'Cambiar efectivo, TPV, transferencia o dejar el pedido por pagar.',
+  },
+  {
     key: 'orders.delete',
     label: 'Eliminar pedidos',
     description: 'Borrar un pedido y devolver el stock al inventario.',
@@ -118,6 +124,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PermissionKey, StaffRole[]> = {
   'profit.view': ['owner', 'branch_manager'],
   'stock.thresholds': ['owner', 'branch_manager'],
   'orders.edit': ['owner', 'branch_manager', 'staff'],
+  'orders.edit_payment': ['owner', 'branch_manager'],
   'orders.delete': ['owner', 'branch_manager'],
   'coupons.manage': ['owner', 'branch_manager'],
 };

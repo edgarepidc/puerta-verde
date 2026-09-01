@@ -49,6 +49,18 @@ test('buildSalesExportTables groups by Mexico day and keeps line items', () => {
         total: 156,
         created_at: '2026-08-18T18:00:00-06:00',
       },
+      {
+        id: 'c',
+        order_number: 1020,
+        customer_name: 'Luis',
+        customer_phone: '5550100109',
+        fulfillment_type: 'pickup',
+        payment_method: 'on_account',
+        payment_status: 'pending',
+        source: 'pos',
+        total: 40,
+        created_at: '2026-08-19T16:00:00-06:00',
+      },
     ],
     [
       {
@@ -66,11 +78,14 @@ test('buildSalesExportTables groups by Mexico day and keeps line items', () => {
   assert.equal(tables.byDay.length, 2);
   assert.equal(tables.byDay[0]?.Fecha, '2026-08-19');
   assert.equal(tables.byDay[0]?.Día, 'Hoy');
-  assert.equal(tables.byDay[0]?.Total, 89);
+  assert.equal(tables.byDay[0]?.Total, 129);
   assert.equal(tables.byDay[1]?.Día, 'Ayer');
-  assert.equal(tables.sales[0]?.Pedido, 1015);
-  assert.equal(tables.sales[0]?.Origen, 'Mostrador');
-  assert.equal(tables.sales[1]?.Entrega, 'Entrega a domicilio');
+  assert.equal(tables.sales[0]?.Pedido, 1020);
+  assert.equal(tables.sales[0]?.Pago, 'Por pagar');
+  assert.equal(tables.sales[0]?.['Estado de pago'], 'Por pagar');
+  assert.equal(tables.sales[1]?.Pedido, 1015);
+  assert.equal(tables.sales[1]?.Origen, 'Mostrador');
+  assert.equal(tables.sales[2]?.Entrega, 'Entrega a domicilio');
   assert.equal(tables.items.length, 1);
   assert.equal(tables.items[0]?.Producto, 'Jitomate');
   assert.equal(tables.items[0]?.Pedido, 1015);

@@ -33,6 +33,8 @@ test('resolvePermissionMatrix fills defaults and forces owner', () => {
   assert.equal(matrix['stock.thresholds'].includes('staff'), false);
   assert.ok(matrix['orders.edit'].includes('staff'));
   assert.ok(matrix['orders.edit'].includes('branch_manager'));
+  assert.ok(matrix['orders.edit_payment'].includes('branch_manager'));
+  assert.equal(matrix['orders.edit_payment'].includes('staff'), false);
   assert.ok(matrix['orders.delete'].includes('branch_manager'));
   assert.equal(matrix['orders.delete'].includes('staff'), false);
   assert.ok(matrix['coupons.manage'].includes('branch_manager'));

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-import { formatMoney } from '@puertaverde/shared';
+import { formatMoney, isUnpaidOrder } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 
@@ -260,7 +260,7 @@ export function CustomersManager({
                     </div>
                     <p className="text-xs text-slate-500">
                       {new Date(order.created_at).toLocaleString('es-MX')} · {order.status}
-                      {order.payment_status === 'paid' ? ' · pagado' : ''}
+                      {isUnpaidOrder(order) ? ' · por pagar' : order.payment_status === 'paid' ? ' · pagado' : ''}
                     </p>
                   </li>
                 ))}
