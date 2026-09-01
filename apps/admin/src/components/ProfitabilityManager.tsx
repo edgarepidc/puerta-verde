@@ -143,6 +143,12 @@ function operatingCostEmoji(name: string) {
   return '📌';
 }
 
+function periodMovementEmoji(kind: 'visit' | 'income', entryType?: IncomeEntryType) {
+  if (kind === 'visit') return '🛻';
+  if (entryType === 'operating') return '💚';
+  return '💵';
+}
+
 function MetricCard({
   emoji,
   tone,
@@ -453,6 +459,7 @@ export function ProfitabilityManager({
   const [openUtilidad, setOpenUtilidad] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
   const [openGastos, setOpenGastos] = useState(false);
+  const [openMovimientos, setOpenMovimientos] = useState(false);
   const [series, setSeries] = useState<TrendPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
@@ -665,6 +672,7 @@ export function ProfitabilityManager({
       setIncomeAmountText('');
       setIncomeNotes('');
       setOpenGastos(true);
+      setOpenMovimientos(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -690,6 +698,29 @@ export function ProfitabilityManager({
   const activeFixedTotal = costs
     .filter((row) => row.is_active)
     .reduce((sum, row) => sum + Number(row.amount), 0);
+  const otherIncomeTotal = Number(summary?.other_income ?? 0);
+  const visitTotal = Number(summary?.visit_expenses ?? 0);
+  const periodMovements = useMemo(() => {
+    const visits = visitExpenses.map((row) => ({
+      key: `visit-${row.id}`,
+      kind: 'visit' as const,
+      date: row.expense_date,
+      concept: row.concept,
+      notes: row.notes,
+      amount: Number(row.amount),
+    }));
+    const incomeRows = incomes.map((row) => ({
+      key: `income-${row.id}`,
+      kind: 'income' as const,
+      id: row.id,
+      date: row.entry_date,
+      concept: row.concept,
+      notes: row.notes,
+      amount: Number(row.amount),
+      entryType: row.entry_type,
+    }));
+    return [...visits, ...incomeRows].sort((a, b) => b.date.localeCompare(a.date));
+  }, [visitExpenses, incomes]);
 
   return (
     <div className="space-y-6">
@@ -1078,91 +1109,84 @@ export function ProfitabilityManager({
           </div>
         ) : null}
 
-        <details className="group/sub rounded-xl border border-slate-100">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <p className="text-sm font-medium text-slate-800">
-              Gastos de visita
-              <span className="ml-2 text-xs font-normal text-slate-500">
-                {visitExpenses.length} registro{visitExpenses.length === 1 ? '' : 's'} ·{' '}
-                {formatMoney(Number(summary?.visit_expenses ?? 0))}
-              </span>
-            </p>
-            <NestedFoldChip />
-          </summary>
-          {visitExpenses.length === 0 ? (
-            <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">
-              Sin gastos de visita en este periodo.
-            </p>
-          ) : (
-            <ul className="divide-y divide-slate-100 border-t border-slate-100">
-              {visitExpenses.map((expense) => (
-                <li
-                  key={expense.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900">{expense.concept}</p>
-                    <p className="text-xs text-slate-500">
-                      {expense.expense_date}
-                      {expense.notes ? ` · ${expense.notes}` : ''}
-                    </p>
-                  </div>
-                  <p className="font-semibold text-slate-800">{formatMoney(Number(expense.amount))}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </details>
-
-        <details className="group/sub rounded-xl border border-slate-100">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <p className="text-sm font-medium text-slate-800">
-              Aportaciones y otros
-              <span className="ml-2 text-xs font-normal text-slate-500">
-                {incomes.length} registro{incomes.length === 1 ? '' : 's'} ·{' '}
-                {formatMoney(contributionsTotal + Number(summary?.other_income ?? 0))}
-              </span>
-            </p>
+        <details
+          className="group/sub rounded-xl border border-slate-100"
+          open={openMovimientos}
+          onToggle={(event) => setOpenMovimientos(event.currentTarget.open)}
+        >
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-start gap-3">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
+                aria-hidden
+              >
+                📒
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-900">Visita y aportaciones</p>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {periodMovements.length} registro{periodMovements.length === 1 ? '' : 's'}
+                  {visitTotal > 0 ? ` · visita ${formatMoney(visitTotal)}` : ''}
+                  {contributionsTotal + otherIncomeTotal > 0
+                    ? ` · aportes ${formatMoney(contributionsTotal + otherIncomeTotal)}`
+                    : ''}
+                </p>
+              </div>
+            </div>
             <NestedFoldChip />
           </summary>
           <div className="border-t border-slate-100">
-            {incomes.length === 0 ? (
+            <p className="px-4 pt-3 text-sm text-slate-500">
+              La visita se carga en Compras. Aquí anotas aportaciones u otros ingresos.
+            </p>
+            {periodMovements.length === 0 ? (
               <p className="px-4 py-4 text-sm text-slate-500">
-                Sin aportaciones ni otros ingresos en este periodo.
+                Sin gastos de visita ni aportaciones en este periodo.
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {incomes.map((row) => (
-                  <li
-                    key={row.id}
-                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900">
-                        {row.concept}{' '}
-                        <span className="text-xs font-normal text-slate-500">
-                          · {INCOME_ENTRY_TYPE_LABELS[row.entry_type]}
-                        </span>
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {row.entry_date}
-                        {row.notes ? ` · ${row.notes}` : ''}
-                        {' · entra a Te quedó'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-slate-800">{formatMoney(Number(row.amount))}</p>
-                      <ActionChip
-                        elevated={false}
-                        tone="rose"
-                        emoji="🗑️"
-                        onClick={() => void removeIncome(row.id)}
+                {periodMovements.map((row) => {
+                  const isVisit = row.kind === 'visit';
+                  const label = isVisit
+                    ? 'Visita'
+                    : INCOME_ENTRY_TYPE_LABELS[row.entryType];
+                  return (
+                    <li key={row.key} className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+                      <div
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
+                        aria-hidden
                       >
-                        Eliminar
-                      </ActionChip>
-                    </div>
-                  </li>
-                ))}
+                        {periodMovementEmoji(row.kind, isVisit ? undefined : row.entryType)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-semibold text-slate-900">{row.concept}</p>
+                        <p className="text-sm text-slate-500">
+                          {label} · {row.date}
+                          {row.notes ? ` · ${row.notes}` : ''}
+                          {isVisit ? '' : ' · entra a Te quedó'}
+                        </p>
+                      </div>
+                      <p
+                        className={`text-lg font-bold tabular-nums ${
+                          isVisit ? 'text-slate-600' : 'text-slate-900'
+                        }`}
+                      >
+                        {isVisit ? '−' : ''}
+                        {formatMoney(row.amount)}
+                      </p>
+                      {!isVisit ? (
+                        <ActionChip
+                          elevated={false}
+                          tone="rose"
+                          emoji="🗑️"
+                          onClick={() => void removeIncome(row.id)}
+                        >
+                          Eliminar
+                        </ActionChip>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
