@@ -642,6 +642,7 @@ export function ProfitabilityManager({
       setIncomeConcept('');
       setIncomeAmountText('');
       setIncomeNotes('');
+      setOpenGastos(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -737,7 +738,9 @@ export function ProfitabilityManager({
             hint={netPositive ? 'Después de gastos' : 'Este periodo quedó abajo'}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div
+          className={`grid grid-cols-2 gap-2 sm:gap-3 ${contributionsTotal > 0 ? 'sm:grid-cols-3' : ''}`}
+        >
           <MetricCard
             emoji="📦"
             tone="slate"
@@ -756,6 +759,17 @@ export function ProfitabilityManager({
                 : 'Al precio de lista'
             }
           />
+          {contributionsTotal > 0 ? (
+            <div className="col-span-2 sm:col-span-1">
+              <MetricCard
+                emoji="💵"
+                tone="green"
+                label="Aportaste"
+                value={formatMoney(contributionsTotal)}
+                hint="Capital que metiste. No suma a Te quedó."
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
