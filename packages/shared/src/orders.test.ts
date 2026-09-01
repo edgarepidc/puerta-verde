@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { formatMoney, isValidMexicanPhone, normalizePhone, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout } from './index';
+import { formatMoney, formatProductUnavailableError, isValidMexicanPhone, normalizePhone, resolvePosCustomer, WALK_IN_NAME, WALK_IN_PHONE, validateGuestCheckout, withUnavailableProductNames } from './index';
 
 test('normalizePhone adds Mexico country code', () => {
   assert.equal(normalizePhone('5512345678'), '525512345678');
@@ -77,4 +77,25 @@ test('resolvePosCustomer uses a valid phone and defaults the name', () => {
 
 test('formatMoney uses MXN locale', () => {
   assert.match(formatMoney(45.5), /\$45\.50/);
+});
+
+test('formatProductUnavailableError includes the product name', () => {
+  assert.equal(formatProductUnavailableError([]), 'Producto no disponible');
+  assert.equal(formatProductUnavailableError(['Lechuga orejona']), 'Producto no disponible: Lechuga orejona');
+  assert.equal(
+    formatProductUnavailableError(['Guayaba', 'Guayaba', ' Mandarina ']),
+    'Producto no disponible: Guayaba, Mandarina',
+  );
+});
+
+test('withUnavailableProductNames only enriches the generic message', () => {
+  assert.equal(
+    withUnavailableProductNames('Producto no disponible', ['Lechuga orejona']),
+    'Producto no disponible: Lechuga orejona',
+  );
+  assert.equal(
+    withUnavailableProductNames('Producto no disponible: Lechuga orejona', ['Mandarina']),
+    'Producto no disponible: Lechuga orejona',
+  );
+  assert.equal(withUnavailableProductNames('Stock insuficiente para Guayaba', ['Mandarina']), 'Stock insuficiente para Guayaba');
 });

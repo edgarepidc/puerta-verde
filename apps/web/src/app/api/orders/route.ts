@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-import { createAdminClient } from '@puertaverde/supabase/admin';
+import { withUnavailableProductNames } from '@puertaverde/shared';
+import { createAdminClient, lookupUnavailableProductNames } from '@puertaverde/supabase';
 import {
   buildOrderConfirmationMessage,
   sendTextMessage,
@@ -76,7 +77,21 @@ export async function POST(request: Request) {
     });
 
     if (error || !data?.[0]) {
-      return NextResponse.json({ error: error?.message ?? 'No se pudo crear el pedido' }, { status: 400 });
+      const itemIds: string[] = [];
+      for (const item of items) {
+        const id = (item as { branch_product_id?: unknown }).branch_product_id;
+        if (typeof id === 'string' && id.length > 0) itemIds.push(id);
+      }
+      const names = await lookupUnavailableProductNames(supabase, branch.id, itemIds);
+      return NextResponse.json(
+        {
+          error: withUnavailableProductNames(
+            error?.message ?? 'No se pudo crear el pedido',
+            names,
+          ),
+        },
+        { status: 400 },
+      );
     }
 
     const order = data[0] as {
