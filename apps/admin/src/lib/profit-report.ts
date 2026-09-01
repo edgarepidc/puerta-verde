@@ -14,6 +14,7 @@ export interface ProfitReportData {
     variable_costs: number;
     visit_expenses: number;
     other_income?: number;
+    contributions?: number;
     operating_costs_total: number;
     estimated_net_profit: number;
     order_count: number;
@@ -95,6 +96,7 @@ export function profitSummaryLines(
     `Costos operativos: ${formatMoney(summary?.operating_costs_total ?? 0)}`,
     `Gastos de visita: ${formatMoney(summary?.visit_expenses ?? 0)}`,
     `Otros ingresos: ${formatMoney(summary?.other_income ?? 0)}`,
+    `Aportaciones: ${formatMoney(summary?.contributions ?? 0)}`,
     `Utilidad estimada: ${formatMoney(summary?.estimated_net_profit ?? 0)}`,
   ];
 }

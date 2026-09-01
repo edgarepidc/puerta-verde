@@ -746,6 +746,7 @@ export interface Database {
           variable_costs: number;
           visit_expenses: number;
           other_income: number;
+          contributions: number;
           operating_costs_total: number;
           estimated_net_profit: number;
           order_count: number;
