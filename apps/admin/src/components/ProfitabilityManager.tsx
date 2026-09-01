@@ -66,6 +66,7 @@ interface ProfitSummary {
   variable_costs: number;
   visit_expenses: number;
   other_income?: number;
+  contributions?: number;
   operating_costs_total: number;
   estimated_net_profit: number;
   order_count: number;
@@ -174,6 +175,7 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   const visit = Number(summary.visit_expenses);
   const other = Math.max(Number(summary.variable_costs) - visit, 0);
   const otherIncome = Number(summary.other_income ?? 0);
+  const contributions = Number(summary.contributions ?? 0);
   const net = Number(summary.estimated_net_profit);
   const netPositive = net >= 0;
   const gross = Number(summary.gross_profit ?? revenue - cogs);
@@ -233,8 +235,18 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
     steps.push({
       key: 'income',
       label: '+ Otros ingresos',
-      hint: 'Reembolsos o ventas sueltas. No es capital.',
+      hint: 'Reembolsos o ventas sueltas.',
       delta: otherIncome,
+      running,
+    });
+  }
+  if (contributions > 0) {
+    running += contributions;
+    steps.push({
+      key: 'capital',
+      label: '+ Aportaciones',
+      hint: 'Capital que metiste a la cuenta.',
+      delta: contributions,
       running,
     });
   }
@@ -735,7 +747,13 @@ export function ProfitabilityManager({
             tone={netPositive ? 'profit' : 'loss'}
             label="Te quedó"
             value={formatMoney(net)}
-            hint={netPositive ? 'Después de gastos' : 'Este periodo quedó abajo'}
+            hint={
+              contributionsTotal > 0
+                ? 'Incluye el capital que metiste'
+                : netPositive
+                  ? 'Después de gastos'
+                  : 'Este periodo quedó abajo'
+            }
           />
         </div>
         <div
@@ -766,7 +784,7 @@ export function ProfitabilityManager({
                 tone="green"
                 label="Aportaste"
                 value={formatMoney(contributionsTotal)}
-                hint="Capital que metiste. No suma a Te quedó."
+                hint="Capital que metiste. Ya está en Te quedó."
               />
             </div>
           ) : null}
@@ -976,7 +994,7 @@ export function ProfitabilityManager({
       >
         <FoldableSummary
           title="Gastos del mes"
-          hint="Mercancía vendida, renta y visita. Las compras de inventario y las aportaciones van aparte, para cuadrar."
+          hint="Mercancía vendida, renta y visita. Las compras de inventario van aparte, para cuadrar. Las aportaciones sí entran a Te quedó."
           emoji="🧾"
           iconClass="bg-amber-100"
         />
@@ -1116,7 +1134,7 @@ export function ProfitabilityManager({
                       <p className="text-xs text-slate-500">
                         {row.entry_date}
                         {row.notes ? ` · ${row.notes}` : ''}
-                        {row.entry_type === 'contribution' ? ' · no suma a utilidad' : ' · sí entra a utilidad'}
+                        {' · entra a Te quedó'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
