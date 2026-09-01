@@ -136,6 +136,13 @@ const PRESET_EMOJI: Record<PeriodPreset, string> = {
   custom: '✏️',
 };
 
+function operatingCostEmoji(name: string) {
+  const n = name.toLowerCase();
+  if (/renta|alquiler/.test(n)) return '🏠';
+  if (/n[oó]mina|sueldo|salario/.test(n)) return '👤';
+  return '📌';
+}
+
 function MetricCard({
   emoji,
   tone,
@@ -680,6 +687,9 @@ export function ProfitabilityManager({
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
+  const activeFixedTotal = costs
+    .filter((row) => row.is_active)
+    .reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -1206,51 +1216,81 @@ export function ProfitabilityManager({
           </div>
         </details>
 
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800">Renta, nómina y otros</h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Gastos fijos del local. En el mes en curso o el anterior se cuenta el monto completo; en un
-            rango a modo se prorratea.
-          </p>
-
-          <ul className="mt-3 divide-y divide-slate-100">
-            {costs.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {row.name}{' '}
-                    <span className="text-slate-500">
-                      · {OPERATING_COST_TYPE_LABELS[row.cost_type]} · {OPERATING_COST_PERIOD_LABELS[row.period]}
-                    </span>
-                  </p>
-                  <p className="text-slate-600">
-                    {formatMoney(Number(row.amount))}
-                    {!row.is_active && ' · inactivo'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <ActionChip
-                    elevated={false}
-                    emoji={row.is_active ? '⏸️' : '▶️'}
-                    onClick={() => void toggleCost(row)}
+        <details className="group/sub rounded-xl border border-slate-100">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-start gap-3">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
+                aria-hidden
+              >
+                🏠
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-900">Renta, nómina y otros</p>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {costs.length} costo{costs.length === 1 ? '' : 's'}
+                  {activeFixedTotal > 0 ? ` · ${formatMoney(activeFixedTotal)} activos` : ''}
+                </p>
+              </div>
+            </div>
+            <NestedFoldChip />
+          </summary>
+          <div className="border-t border-slate-100">
+            <p className="px-4 pt-3 text-sm text-slate-500">
+              Gastos fijos del local. En el mes en curso o el anterior se cuenta el monto completo; en un
+              rango a modo se prorratea.
+            </p>
+            {costs.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-slate-500">Sin gastos fijos todavía.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {costs.map((row) => (
+                  <li
+                    key={row.id}
+                    className={`flex flex-wrap items-center gap-3 px-4 py-3.5 ${
+                      row.is_active ? '' : 'opacity-70'
+                    }`}
                   >
-                    {row.is_active ? 'Desactivar' : 'Activar'}
-                  </ActionChip>
-                  <ActionChip
-                    elevated={false}
-                    tone="rose"
-                    emoji="🗑️"
-                    onClick={() => void removeCost(row.id)}
-                  >
-                    Eliminar
-                  </ActionChip>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <div
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
+                      aria-hidden
+                    >
+                      {operatingCostEmoji(row.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold text-slate-900">{row.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {OPERATING_COST_TYPE_LABELS[row.cost_type]} · {OPERATING_COST_PERIOD_LABELS[row.period]}
+                        {!row.is_active ? ' · inactivo' : ''}
+                      </p>
+                    </div>
+                    <p className="text-lg font-bold tabular-nums text-slate-900">
+                      {formatMoney(Number(row.amount))}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <ActionChip
+                        elevated={false}
+                        emoji={row.is_active ? '⏸️' : '▶️'}
+                        onClick={() => void toggleCost(row)}
+                      >
+                        {row.is_active ? 'Desactivar' : 'Activar'}
+                      </ActionChip>
+                      <ActionChip
+                        elevated={false}
+                        tone="rose"
+                        emoji="🗑️"
+                        onClick={() => void removeCost(row.id)}
+                      >
+                        Eliminar
+                      </ActionChip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          <div className="mt-6 min-w-0 rounded-xl bg-slate-50 p-4">
-            <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.55fr)_7.5rem_8.5rem_auto]">
+            <div className="border-t border-slate-100 bg-slate-50/80 p-4">
+              <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.55fr)_7.5rem_8.5rem_auto]">
               <input
                 placeholder="Nombre"
                 className="pv-input min-w-0 col-span-2 lg:col-span-1"
@@ -1294,6 +1334,7 @@ export function ProfitabilityManager({
             </div>
           </div>
         </div>
+        </details>
       </details>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
