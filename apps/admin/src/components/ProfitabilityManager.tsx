@@ -178,10 +178,12 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   const contributions = Number(summary.contributions ?? 0);
   const net = Number(summary.estimated_net_profit);
   const netPositive = net >= 0;
+  const operatingNet = net - contributions;
+  const operatingNetPositive = operatingNet >= 0;
   const gross = Number(summary.gross_profit ?? revenue - cogs);
   const grossPct =
     revenue > 0 ? Number(summary.gross_margin_percent ?? (gross / revenue) * 100) : null;
-  const netPct = revenue > 0 ? (net / revenue) * 100 : null;
+  const netPct = revenue > 0 ? (operatingNet / revenue) * 100 : null;
 
   const formatPct = (value: number | null) =>
     value == null ? '—' : `${value.toFixed(1).replace(/^-/, '−')}%`;
@@ -306,13 +308,14 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
           </p>
           <p
             className={`mt-0.5 text-xl font-bold tabular-nums ${
-              netPositive ? 'text-emerald-800' : 'text-rose-700'
+              operatingNetPositive ? 'text-emerald-800' : 'text-rose-700'
             }`}
           >
             {formatPct(netPct)}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            {formatMoney(net)} · después de gastos
+            {formatMoney(operatingNet)}
+            {contributions > 0 ? ' · del negocio, sin el capital' : ' · después de gastos'}
           </p>
         </div>
       </div>
