@@ -380,8 +380,9 @@ export function ProductsManager({
     }
   }
 
-  async function toggleAvailability(row: ProductRow) {
-    const nextVisible = !(row.is_available && row.product.is_active);
+  async function setAvailability(row: ProductRow, nextVisible: boolean) {
+    const currentlyVisible = row.is_available && row.product.is_active;
+    if (currentlyVisible === nextVisible) return;
     const response = await fetch(`/api/products/${row.product.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -617,7 +618,7 @@ export function ProductsManager({
                   <SortHeader label="Producto" column="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortHeader label="Precio" column="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortHeader label="Stock" column="stock" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <SortHeader label="Tienda" column="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortHeader label="Visible" column="store" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody>
@@ -667,18 +668,37 @@ export function ProductsManager({
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void toggleAvailability(row);
-                        }}
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          visible ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'
-                        }`}
+                      <div
+                        role="group"
+                        aria-label={`Visibilidad de ${row.product.name}`}
+                        className="flex flex-wrap gap-1"
+                        onClick={(event) => event.stopPropagation()}
                       >
-                        {visible ? 'Visible' : 'Oculto'}
-                      </button>
+                        <button
+                          type="button"
+                          aria-pressed={visible}
+                          onClick={() => void setAvailability(row, true)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            visible
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          Visible
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={!visible}
+                          onClick={() => void setAvailability(row, false)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${
+                            visible
+                              ? 'bg-slate-100 text-slate-400'
+                              : 'bg-slate-700 text-white'
+                          }`}
+                        >
+                          Ocultar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   );
@@ -834,16 +854,35 @@ export function ProductsManager({
                     </ActionChip>
                   ) : null}
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.isAvailable}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, isAvailable: e.target.checked, isActive: e.target.checked }))
-                  }
-                />
-                Visible en tienda
-              </label>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-slate-800">Visible en tienda</p>
+                <div role="group" aria-label="Visible en tienda" className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    aria-pressed={form.isAvailable}
+                    onClick={() => setForm((f) => ({ ...f, isAvailable: true, isActive: true }))}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                      form.isAvailable
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    Visible
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={!form.isAvailable}
+                    onClick={() => setForm((f) => ({ ...f, isAvailable: false, isActive: false }))}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                      form.isAvailable
+                        ? 'bg-slate-100 text-slate-400'
+                        : 'bg-slate-700 text-white'
+                    }`}
+                  >
+                    Ocultar
+                  </button>
+                </div>
+              </div>
               {form.unit === 'kg' ? (
               <label className="flex items-start gap-2 text-sm">
                 <input
