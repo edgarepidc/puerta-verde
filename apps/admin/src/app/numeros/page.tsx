@@ -73,11 +73,32 @@ export default async function NumerosPage() {
             .lte('expense_date', range.end)
             .order('expense_date', { ascending: false })
             .limit(200),
+          supabase
+            .from('income_entries')
+            .select('id, entry_type, concept, amount, entry_date, notes')
+            .eq('branch_id', tenant.branchId)
+            .gte('entry_date', range.start)
+            .lte('entry_date', range.end)
+            .order('entry_date', { ascending: false })
+            .limit(200),
+          supabase
+            .from('purchases')
+            .select('total_amount')
+            .eq('branch_id', tenant.branchId)
+            .gte('purchased_at', range.start)
+            .lte('purchased_at', range.end)
+            .limit(2000),
         ])
       : Promise.resolve(null),
   ]);
 
-  const [margins, costs, summaryRows, categoryRows, visitExpenses] = profitBundle ?? [];
+  const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
+    profitBundle ?? [];
+
+  const initialPurchasesTotal = (purchaseRows?.data ?? []).reduce(
+    (sum, row) => sum + Number(row.total_amount ?? 0),
+    0,
+  );
 
   return (
     <AdminShell title="Números" subtitle={tenant.branchName}>
@@ -116,6 +137,15 @@ export default async function NumerosPage() {
               expense_date: string;
               notes: string | null;
             }>}
+            initialIncomes={(incomeEntries?.data ?? []) as Array<{
+              id: string;
+              entry_type: 'contribution' | 'operating';
+              concept: string;
+              amount: number;
+              entry_date: string;
+              notes: string | null;
+            }>}
+            initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
             initialSummary={(summaryRows?.data?.[0] as {
               period_days: number;
               revenue: number;
@@ -125,6 +155,7 @@ export default async function NumerosPage() {
               fixed_costs: number;
               variable_costs: number;
               visit_expenses: number;
+              other_income: number;
               operating_costs_total: number;
               estimated_net_profit: number;
               order_count: number;
