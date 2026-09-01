@@ -1108,50 +1108,18 @@ export function OrdersBoard({
               </label>
             ) : null}
             {canEditPayment ? (
-              <div className="mt-3">
-                <p className="text-sm font-semibold text-slate-800">Forma de pago</p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  El botón gris no está seleccionado. Por pagar es cuenta abierta.
-                </p>
-                <PaymentMethodPills
-                  order={selected}
-                  disabled={updatingId === selected.id}
-                  onSelect={(method) => void setPayment(selected.id, method)}
-                />
-              </div>
+              <PaymentMethodSelect
+                order={selected}
+                disabled={updatingId === selected.id}
+                onSelect={(method) => void setPayment(selected.id, method)}
+              />
             ) : isUnpaidOrder(selected) ? (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                <p className="text-sm font-semibold text-amber-950">Registrar pago</p>
-                <p className="mt-0.5 text-xs text-amber-800">
-                  Elige cómo pagó el cliente. El pedido queda como pagado al instante.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={updatingId === selected.id}
-                    onClick={() => void setPayment(selected.id, 'cash')}
-                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    Efectivo
-                  </button>
-                  <button
-                    type="button"
-                    disabled={updatingId === selected.id}
-                    onClick={() => void setPayment(selected.id, 'card_terminal')}
-                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    TPV
-                  </button>
-                  <button
-                    type="button"
-                    disabled={updatingId === selected.id}
-                    onClick={() => void setPayment(selected.id, 'transfer')}
-                    className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    Transferencia
-                  </button>
-                </div>
-              </div>
+              <PaymentMethodSelect
+                order={selected}
+                collectOnly
+                disabled={updatingId === selected.id}
+                onSelect={(method) => void setPayment(selected.id, method)}
+              />
             ) : null}
             {detailNotes && detailNotes !== '[mostrador]' && (
               <p className="mt-2 text-sm text-slate-500">Notas: {detailNotes.replace(/^\[mostrador\]\s*/, '')}</p>
@@ -1604,47 +1572,50 @@ function selectedPosPayment(order: Pick<OrderRow, 'payment_status' | 'payment_me
   return 'cash';
 }
 
-function PaymentMethodPills({
+function PaymentMethodSelect({
   order,
   disabled,
+  collectOnly = false,
   onSelect,
 }: {
   order: Pick<OrderRow, 'payment_status' | 'payment_method'>;
   disabled?: boolean;
+  collectOnly?: boolean;
   onSelect: (method: PosPaymentMethod) => void;
 }) {
   const selected = selectedPosPayment(order);
-  const methods: PaymentMethod[] =
-    selected === 'online' ? ['cash', 'card_terminal', 'transfer', 'online', 'on_account'] : [...POS_PAYMENT_METHODS];
+  const methods: PaymentMethod[] = collectOnly
+    ? ['cash', 'card_terminal', 'transfer']
+    : selected === 'online'
+      ? ['cash', 'card_terminal', 'transfer', 'online', 'on_account']
+      : [...POS_PAYMENT_METHODS];
 
   return (
-    <div role="group" aria-label="Forma de pago" className="mt-2 flex flex-wrap gap-1">
-      {methods.map((method) => {
-        const pressed = method === selected;
-        const onlineLocked = method === 'online';
-        return (
-          <button
-            key={method}
-            type="button"
-            aria-pressed={pressed}
-            disabled={disabled || onlineLocked}
-            onClick={() => {
-              if (onlineLocked || !isPosPaymentMethod(method) || method === selected) return;
-              onSelect(method);
-            }}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-              pressed
-                ? method === 'on_account'
-                  ? 'bg-amber-100 text-amber-900'
-                  : 'bg-green-100 text-green-800'
-                : 'bg-slate-100 text-slate-400'
-            } disabled:opacity-60`}
-          >
+    <label className="mt-3 block text-sm">
+      <span className="font-medium text-slate-700">Forma de pago</span>
+      <select
+        className="pv-input mt-1"
+        aria-label="Forma de pago"
+        value={collectOnly && selected === 'on_account' ? '' : selected}
+        disabled={disabled}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (!isPosPaymentMethod(next) || next === selected) return;
+          onSelect(next);
+        }}
+      >
+        {collectOnly ? (
+          <option value="" disabled>
+            Elige cómo pagó
+          </option>
+        ) : null}
+        {methods.map((method) => (
+          <option key={method} value={method} disabled={method === 'online'}>
             {PAYMENT_METHOD_LABELS[method]}
-          </button>
-        );
-      })}
-    </div>
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1792,34 +1763,27 @@ function OrderCard({
             → {ORDER_STATUS_LABELS[nextStatus]}
           </button>
         ) : null}
-        {unpaid && (
-          <>
-            <button
-              type="button"
-              disabled={updatingId === order.id}
-              onClick={() => onMarkPaid(order.id, 'cash')}
-              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
-            >
-              Efectivo
-            </button>
-            <button
-              type="button"
-              disabled={updatingId === order.id}
-              onClick={() => onMarkPaid(order.id, 'card_terminal')}
-              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
-            >
-              TPV
-            </button>
-            <button
-              type="button"
-              disabled={updatingId === order.id}
-              onClick={() => onMarkPaid(order.id, 'transfer')}
-              className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-950 hover:bg-amber-200 disabled:opacity-50"
-            >
-              Transferencia
-            </button>
-          </>
-        )}
+        {unpaid ? (
+          <select
+            aria-label="Forma de pago"
+            disabled={updatingId === order.id}
+            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-950 disabled:opacity-50"
+            defaultValue=""
+            onChange={(event) => {
+              const next = event.target.value;
+              if (!isPosPaymentMethod(next) || next === 'on_account') return;
+              onMarkPaid(order.id, next);
+              event.currentTarget.value = '';
+            }}
+          >
+            <option value="" disabled>
+              Cobrar
+            </option>
+            <option value="cash">Efectivo</option>
+            <option value="card_terminal">TPV</option>
+            <option value="transfer">Transferencia</option>
+          </select>
+        ) : null}
       </div>
     </article>
   );
