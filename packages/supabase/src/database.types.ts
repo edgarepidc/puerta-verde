@@ -365,7 +365,38 @@ export interface Database {
           amount: number;
         };
         Update: Partial<Database['public']['Tables']['branch_operating_costs']['Row']>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'branch_operating_cost_terms_cost_id_fkey';
+            columns: ['id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_operating_cost_terms';
+            referencedColumns: ['cost_id'];
+          },
+        ];
+      };
+      branch_operating_cost_terms: {
+        Row: {
+          id: string;
+          cost_id: string;
+          start_date: string;
+          end_date: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['branch_operating_cost_terms']['Row']> & {
+          cost_id: string;
+          start_date: string;
+        };
+        Update: Partial<Database['public']['Tables']['branch_operating_cost_terms']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'branch_operating_cost_terms_cost_id_fkey';
+            columns: ['cost_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_operating_costs';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       suppliers: {
         Row: {

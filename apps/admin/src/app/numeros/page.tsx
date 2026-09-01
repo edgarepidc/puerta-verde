@@ -54,7 +54,7 @@ export default async function NumerosPage() {
     canViewProfit
       ? Promise.all([
           supabase.rpc('get_product_margins', { p_branch_id: tenant.branchId }),
-          supabase.from('branch_operating_costs').select('*').eq('branch_id', tenant.branchId).order('created_at'),
+          supabase.from('branch_operating_costs').select('*, terms:branch_operating_cost_terms(id, start_date, end_date)').eq('branch_id', tenant.branchId).order('created_at'),
           supabase.rpc('get_profit_summary', {
             p_branch_id: tenant.branchId,
             p_start: range.start,
@@ -129,6 +129,7 @@ export default async function NumerosPage() {
               amount: number;
               notes: string | null;
               is_active: boolean;
+              terms?: Array<{ id: string; start_date: string; end_date: string | null }>;
             }>}
             initialVisitExpenses={(visitExpenses?.data ?? []) as Array<{
               id: string;

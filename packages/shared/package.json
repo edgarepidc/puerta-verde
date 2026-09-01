@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/orders.test.ts src/order-status.test.ts src/sales-export.test.ts src/permissions.test.ts src/products.test.ts src/promotions-inventory.test.ts src/purchases.test.ts src/storefront.test.ts src/scale.test.ts src/cost-import.test.ts src/onboarding.test.ts src/market-prices.test.ts src/expenses.test.ts src/income-entries.test.ts src/inventory.test.ts src/coupons.test.ts"
+    "test": "tsx --test src/orders.test.ts src/order-status.test.ts src/sales-export.test.ts src/permissions.test.ts src/products.test.ts src/promotions-inventory.test.ts src/purchases.test.ts src/storefront.test.ts src/scale.test.ts src/cost-import.test.ts src/onboarding.test.ts src/market-prices.test.ts src/expenses.test.ts src/income-entries.test.ts src/inventory.test.ts src/coupons.test.ts src/profitability.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.3",

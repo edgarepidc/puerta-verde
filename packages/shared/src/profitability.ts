@@ -22,6 +22,24 @@ export interface OperatingCostInput {
   amount: number;
   notes?: string | null;
   isActive: boolean;
+  /** First day the cost should apply (the start of the Números period being viewed). */
+  effectiveFrom?: string;
+}
+
+export interface OperatingCostTerm {
+  id?: string;
+  start_date: string;
+  end_date: string | null;
+}
+
+export function costAppliesToRange(
+  terms: OperatingCostTerm[] | undefined,
+  from: string,
+  to: string,
+): boolean {
+  return (terms ?? []).some(
+    (term) => term.start_date <= to && (term.end_date == null || term.end_date >= from),
+  );
 }
 
 export function validateOperatingCostInput(input: OperatingCostInput): string | null {
