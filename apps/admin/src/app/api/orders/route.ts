@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 import {
   resolvePosCustomer,
   validateGuestCheckout,
+  withUnavailableProductNames,
   type GuestCheckoutInput,
   type PaymentMethod,
 } from '@puertaverde/shared';
-import { createAdminClient } from '@puertaverde/supabase/admin';
+import { createAdminClient, lookupUnavailableProductNames } from '@puertaverde/supabase';
 import { buildOrderConfirmationMessage, sendTextMessage } from '@puertaverde/whatsapp';
 
 import { loadPermissionMatrix, requireStaffApi, staffHasPermission } from '@/lib/auth';
@@ -181,7 +182,15 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      const names = await lookupUnavailableProductNames(
+        supabase,
+        auth.branchId,
+        body.items.map((item) => item.branchProductId),
+      );
+      return NextResponse.json(
+        { error: withUnavailableProductNames(error.message, names) },
+        { status: 400 },
+      );
     }
 
     const row = data?.[0] as

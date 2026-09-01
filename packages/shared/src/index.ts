@@ -308,3 +308,16 @@ export function validateGuestCheckout(input: GuestCheckoutInput): string | null 
   }
   return null;
 }
+
+export function formatProductUnavailableError(names: string[]): string {
+  const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+  if (unique.length === 0) return 'Producto no disponible';
+  if (unique.length === 1) return `Producto no disponible: ${unique[0]}`;
+  return `Producto no disponible: ${unique.join(', ')}`;
+}
+
+/** If Postgres still returned the generic message, attach the product names we looked up. */
+export function withUnavailableProductNames(message: string, names: string[]): string {
+  if (!/^Producto no disponible$/i.test(message.trim())) return message;
+  return formatProductUnavailableError(names);
+}
