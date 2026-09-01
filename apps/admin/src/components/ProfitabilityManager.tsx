@@ -4,10 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   formatMoney,
+  INCOME_ENTRY_TYPE_HINTS,
+  INCOME_ENTRY_TYPE_LABELS,
   OPERATING_COST_PERIOD_LABELS,
   OPERATING_COST_TYPE_LABELS,
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
+  type IncomeEntryType,
   type OperatingCostInput,
   type OperatingCostPeriod,
   type OperatingCostType,
@@ -62,6 +65,7 @@ interface ProfitSummary {
   fixed_costs: number;
   variable_costs: number;
   visit_expenses: number;
+  other_income?: number;
   operating_costs_total: number;
   estimated_net_profit: number;
   order_count: number;
@@ -72,6 +76,15 @@ interface VisitExpenseRow {
   concept: string;
   amount: number;
   expense_date: string;
+  notes: string | null;
+}
+
+interface IncomeRow {
+  id: string;
+  entry_type: IncomeEntryType;
+  concept: string;
+  amount: number;
+  entry_date: string;
   notes: string | null;
 }
 
@@ -160,6 +173,7 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   const fixed = Number(summary.fixed_costs);
   const visit = Number(summary.visit_expenses);
   const other = Math.max(Number(summary.variable_costs) - visit, 0);
+  const otherIncome = Number(summary.other_income ?? 0);
   const net = Number(summary.estimated_net_profit);
   const netPositive = net >= 0;
   const gross = Number(summary.gross_profit ?? revenue - cogs);
@@ -211,6 +225,16 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
       key: 'other',
       label: '− Otros gastos',
       delta: -other,
+      running,
+    });
+  }
+  if (otherIncome > 0) {
+    running += otherIncome;
+    steps.push({
+      key: 'income',
+      label: '+ Otros ingresos',
+      hint: 'Reembolsos o ventas sueltas. No es capital.',
+      delta: otherIncome,
       running,
     });
   }
@@ -284,6 +308,68 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   );
 }
 
+function CashSquare({
+  revenue,
+  contributions,
+  otherIncome,
+  purchases,
+  visit,
+  inventoryCost,
+}: {
+  revenue: number;
+  contributions: number;
+  otherIncome: number;
+  purchases: number;
+  visit: number;
+  inventoryCost: number;
+}) {
+  const inflow = revenue + contributions + otherIncome;
+  const outflow = purchases + visit;
+  return (
+    <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+      <h3 className="text-sm font-semibold text-slate-900">Para cuadrar</h3>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Efectivo del periodo, no la utilidad. Las compras de inventario no son un gasto.
+      </p>
+      <ul className="mt-3 space-y-2.5 text-sm">
+        <li className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">Entró</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Ventas {formatMoney(revenue)}
+              {contributions > 0 ? ` · aportaciones ${formatMoney(contributions)}` : ''}
+              {otherIncome > 0 ? ` · otros ${formatMoney(otherIncome)}` : ''}
+            </span>
+          </span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+            {formatMoney(inflow)}
+          </span>
+        </li>
+        <li className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">Salió</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Compras {formatMoney(purchases)} · visita {formatMoney(visit)}
+            </span>
+          </span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+            {formatMoney(outflow)}
+          </span>
+        </li>
+        <li className="flex items-baseline justify-between gap-3 border-t border-emerald-100 pt-2.5">
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">Sigue en mercancía</span>
+            <span className="mt-0.5 block text-xs text-slate-500">Inventario a costo</span>
+          </span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+            {formatMoney(inventoryCost)}
+          </span>
+        </li>
+      </ul>
+    </section>
+  );
+}
+
 function detectPreset(from: string, to: string): PeriodPreset {
   const current = currentMexicoMonthRange();
   if (from === current.start && to === current.end) return 'current';
@@ -303,6 +389,8 @@ export function ProfitabilityManager({
   initialMargins,
   initialCosts,
   initialVisitExpenses,
+  initialIncomes,
+  initialPurchasesTotal,
   initialSummary,
   initialCategories,
 }: {
@@ -312,12 +400,16 @@ export function ProfitabilityManager({
   initialMargins: MarginRow[];
   initialCosts: CostRow[];
   initialVisitExpenses: VisitExpenseRow[];
+  initialIncomes: IncomeRow[];
+  initialPurchasesTotal: number;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
 }) {
   const [margins, setMargins] = useState(initialMargins);
   const [costs, setCosts] = useState(initialCosts);
   const [visitExpenses, setVisitExpenses] = useState(initialVisitExpenses);
+  const [incomes, setIncomes] = useState(initialIncomes);
+  const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
   const [summary, setSummary] = useState(initialSummary);
   const [categories, setCategories] = useState(initialCategories);
   const [activePeriodLabel, setActivePeriodLabel] = useState(periodLabel);
@@ -326,6 +418,11 @@ export function ProfitabilityManager({
   const [preset, setPreset] = useState<PeriodPreset>(() => detectPreset(initialFrom, initialTo));
   const [costForm, setCostForm] = useState(emptyCost);
   const [costAmountText, setCostAmountText] = useState('');
+  const [incomeType, setIncomeType] = useState<IncomeEntryType>('contribution');
+  const [incomeConcept, setIncomeConcept] = useState('');
+  const [incomeAmountText, setIncomeAmountText] = useState('');
+  const [incomeDate, setIncomeDate] = useState(() => todayMexicoYmd());
+  const [incomeNotes, setIncomeNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -412,31 +509,37 @@ export function ProfitabilityManager({
     setError(null);
     try {
       const query = qs(nextFrom, nextTo);
-      const [marginsRes, costsRes, profitRes, categoriesRes, expensesRes, trendsRes] = await Promise.all([
-        fetch('/api/margins'),
-        fetch('/api/costs'),
-        fetch(`/api/profit?${query}`),
-        fetch(`/api/profit/categories?${query}`),
-        fetch(`/api/expenses?${query}`),
-        fetch(`/api/forecast/trends?${query}`),
-      ]);
+      const [marginsRes, costsRes, profitRes, categoriesRes, expensesRes, incomesRes, trendsRes] =
+        await Promise.all([
+          fetch('/api/margins'),
+          fetch('/api/costs'),
+          fetch(`/api/profit?${query}`),
+          fetch(`/api/profit/categories?${query}`),
+          fetch(`/api/expenses?${query}`),
+          fetch(`/api/incomes?${query}`),
+          fetch(`/api/forecast/trends?${query}`),
+        ]);
       const marginsPayload = await marginsRes.json();
       const costsPayload = await costsRes.json();
       const profitPayload = await profitRes.json();
       const categoriesPayload = await categoriesRes.json();
       const expensesPayload = await expensesRes.json();
+      const incomesPayload = await incomesRes.json();
       const trendsPayload = await trendsRes.json();
       if (!marginsRes.ok) throw new Error(marginsPayload.error ?? 'Error márgenes');
       if (!costsRes.ok) throw new Error(costsPayload.error ?? 'Error costos');
       if (!profitRes.ok) throw new Error(profitPayload.error ?? 'Error utilidad');
       if (!categoriesRes.ok) throw new Error(categoriesPayload.error ?? 'Error categorías');
       if (!expensesRes.ok) throw new Error(expensesPayload.error ?? 'Error gastos de visita');
+      if (!incomesRes.ok) throw new Error(incomesPayload.error ?? 'Error aportaciones');
       if (!trendsRes.ok) throw new Error(trendsPayload.error ?? 'Error ventas del periodo');
       setMargins(marginsPayload.margins);
       setCosts(costsPayload.costs);
       setSummary(profitPayload.summary);
+      setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
       setCategories(categoriesPayload.categories);
       setVisitExpenses(expensesPayload.expenses ?? []);
+      setIncomes(incomesPayload.incomes ?? []);
       setFrom(profitPayload.from ?? nextFrom);
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
@@ -519,11 +622,48 @@ export function ProfitabilityManager({
     await loadPeriod(from, to);
   }
 
+  async function addIncome() {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/incomes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryType: incomeType,
+          concept: incomeConcept,
+          amount: parseDecimal(incomeAmountText),
+          entryDate: incomeDate,
+          notes: incomeNotes,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
+      setIncomeConcept('');
+      setIncomeAmountText('');
+      setIncomeNotes('');
+      await loadPeriod(from, to);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeIncome(id: string) {
+    if (!confirm('¿Eliminar este movimiento?')) return;
+    await fetch(`/api/incomes/${id}`, { method: 'DELETE' });
+    await loadPeriod(from, to);
+  }
+
   const net = summary ? Number(summary.estimated_net_profit) : 0;
   const netPositive = net >= 0;
   const exportQuery = qs(from, to);
 
   const inventorySpread = totals.inventorySale - totals.inventoryCost;
+  const contributionsTotal = incomes
+    .filter((row) => row.entry_type === 'contribution')
+    .reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -822,9 +962,18 @@ export function ProfitabilityManager({
       >
         <FoldableSummary
           title="Gastos del mes"
-          hint="Mercancía vendida, renta y gastos de visita. Lo comprado y no vendido sigue en inventario."
+          hint="Mercancía vendida, renta y visita. Las compras de inventario y las aportaciones van aparte, para cuadrar."
           emoji="🧾"
           iconClass="bg-amber-100"
+        />
+
+        <CashSquare
+          revenue={Number(summary?.revenue ?? 0)}
+          contributions={contributionsTotal}
+          otherIncome={Number(summary?.other_income ?? 0)}
+          purchases={purchasesTotal}
+          visit={Number(summary?.visit_expenses ?? 0)}
+          inventoryCost={totals.inventoryCost}
         />
 
         {summary && costBreakdown.total > 0 ? (
@@ -918,6 +1067,108 @@ export function ProfitabilityManager({
               ))}
             </ul>
           )}
+        </details>
+
+        <details className="group/sub rounded-xl border border-slate-100">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <p className="text-sm font-medium text-slate-800">
+              Aportaciones y otros
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                {incomes.length} registro{incomes.length === 1 ? '' : 's'} ·{' '}
+                {formatMoney(contributionsTotal + Number(summary?.other_income ?? 0))}
+              </span>
+            </p>
+            <NestedFoldChip />
+          </summary>
+          <div className="border-t border-slate-100">
+            {incomes.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-slate-500">
+                Sin aportaciones ni otros ingresos en este periodo.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {incomes.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">
+                        {row.concept}{' '}
+                        <span className="text-xs font-normal text-slate-500">
+                          · {INCOME_ENTRY_TYPE_LABELS[row.entry_type]}
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {row.entry_date}
+                        {row.notes ? ` · ${row.notes}` : ''}
+                        {row.entry_type === 'contribution' ? ' · no suma a utilidad' : ' · sí entra a utilidad'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-slate-800">{formatMoney(Number(row.amount))}</p>
+                      <ActionChip
+                        elevated={false}
+                        tone="rose"
+                        emoji="🗑️"
+                        onClick={() => void removeIncome(row.id)}
+                      >
+                        Eliminar
+                      </ActionChip>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="border-t border-slate-100 bg-slate-50/80 p-4">
+              <p className="text-xs text-slate-500">{INCOME_ENTRY_TYPE_HINTS[incomeType]}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(['contribution', 'operating'] as IncomeEntryType[]).map((key) => (
+                  <ActionChip
+                    key={key}
+                    elevated={incomeType === key}
+                    tone={incomeType === key ? 'emerald' : 'slate'}
+                    onClick={() => setIncomeType(key)}
+                  >
+                    {INCOME_ENTRY_TYPE_LABELS[key]}
+                  </ActionChip>
+                ))}
+              </div>
+              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_auto]">
+                <input
+                  placeholder="Concepto"
+                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                  value={incomeConcept}
+                  onChange={(e) => setIncomeConcept(e.target.value)}
+                />
+                <DecimalInput
+                  placeholder="Monto"
+                  className="pv-input min-w-0"
+                  groupThousands
+                  value={incomeAmountText}
+                  onChange={setIncomeAmountText}
+                />
+                <input
+                  type="date"
+                  max={today}
+                  className="pv-input min-w-0"
+                  value={incomeDate}
+                  onChange={(e) => setIncomeDate(e.target.value)}
+                />
+                <div className="col-span-2 flex justify-end lg:col-span-1">
+                  <ActionChip emoji="💰" disabled={saving} onClick={() => void addIncome()}>
+                    Agregar
+                  </ActionChip>
+                </div>
+              </div>
+              <input
+                placeholder="Nota (opcional)"
+                className="pv-input mt-2 w-full text-sm"
+                value={incomeNotes}
+                onChange={(e) => setIncomeNotes(e.target.value)}
+              />
+            </div>
+          </div>
         </details>
 
         <div>

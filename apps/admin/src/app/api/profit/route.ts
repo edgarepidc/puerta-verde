@@ -26,18 +26,36 @@ export async function GET(request: Request) {
 
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
-    const { data, error } = await supabase.rpc('get_profit_summary', {
-      p_branch_id: tenant.branchId,
-      p_start: range.start,
-      p_end: range.end,
-    });
+    const [{ data, error }, { data: purchaseRows, error: purchaseError }] = await Promise.all([
+      supabase.rpc('get_profit_summary', {
+        p_branch_id: tenant.branchId,
+        p_start: range.start,
+        p_end: range.end,
+      }),
+      supabase
+        .from('purchases')
+        .select('total_amount')
+        .eq('branch_id', tenant.branchId)
+        .gte('purchased_at', range.start)
+        .lte('purchased_at', range.end)
+        .limit(2000),
+    ]);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+    if (purchaseError) {
+      return NextResponse.json({ error: purchaseError.message }, { status: 400 });
+    }
+
+    const purchasesTotal = (purchaseRows ?? []).reduce(
+      (sum, row) => sum + Number(row.total_amount ?? 0),
+      0,
+    );
 
     return NextResponse.json({
       summary: data?.[0] ?? null,
+      purchasesTotal: Number(purchasesTotal.toFixed(2)),
       periodLabel: range.label,
       from: range.start,
       to: range.end,

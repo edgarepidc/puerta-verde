@@ -253,6 +253,15 @@ export {
   type VisitExpensePreset,
 } from './expenses';
 export {
+  INCOME_ENTRY_TYPES,
+  INCOME_ENTRY_TYPE_HINTS,
+  INCOME_ENTRY_TYPE_LABELS,
+  isIncomeEntryType,
+  validateIncomeEntryInput,
+  type IncomeEntryInput,
+  type IncomeEntryType,
+} from './income-entries';
+export {
   COST_IMPORT_TEMPLATE_CSV,
   mapCostImportHeaders,
   normalizeProductName,

@@ -533,6 +533,29 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['expenses']['Row']>;
         Relationships: [];
       };
+      income_entries: {
+        Row: {
+          id: string;
+          branch_id: string;
+          organization_id: string;
+          entry_type: 'contribution' | 'operating';
+          concept: string;
+          amount: number;
+          entry_date: string;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['income_entries']['Row']> & {
+          branch_id: string;
+          organization_id: string;
+          entry_type: 'contribution' | 'operating';
+          concept: string;
+          amount: number;
+        };
+        Update: Partial<Database['public']['Tables']['income_entries']['Row']>;
+        Relationships: [];
+      };
       daily_cash_closings: {
         Row: {
           id: string;
@@ -722,6 +745,7 @@ export interface Database {
           fixed_costs: number;
           variable_costs: number;
           visit_expenses: number;
+          other_income: number;
           operating_costs_total: number;
           estimated_net_profit: number;
           order_count: number;

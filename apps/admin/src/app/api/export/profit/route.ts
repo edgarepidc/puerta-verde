@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     fixed_costs: number;
     variable_costs: number;
     visit_expenses: number;
+    other_income?: number;
     operating_costs_total: number;
     estimated_net_profit: number;
     order_count: number;
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
     ['Costos fijos', summary?.fixed_costs ?? 0],
     ['Costos variables', summary?.variable_costs ?? 0],
     ['Gastos de visita', summary?.visit_expenses ?? 0],
+    ['Otros ingresos', summary?.other_income ?? 0],
     ['Costos operativos', summary?.operating_costs_total ?? 0],
     ['Utilidad estimada', summary?.estimated_net_profit ?? 0],
   ]);
