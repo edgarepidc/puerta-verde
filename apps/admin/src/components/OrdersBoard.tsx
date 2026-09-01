@@ -6,20 +6,25 @@ import {
   FULFILLMENT_LABELS,
   ORDER_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
+  POS_PAYMENT_METHODS,
   PRODUCT_UNIT_LABELS,
   formatMexicoMonthLabel,
   formatMoney,
   groupByMexicoDay,
   groupSalesLogByMonth,
+  isPosPaymentMethod,
+  isUnpaidOrder,
   mexicoYmdFromIso,
   nextWorkflowStatus,
   normalizeOrderStatus,
+  orderPaymentLabel,
   orderStatusLabel,
   previousWorkflowStatus,
   todayMexicoYmd,
   type MexicoDayGroup,
   type OrderStatus,
   type PaymentMethod,
+  type PosPaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -131,6 +136,7 @@ export function OrdersBoard({
   canExportSales = false,
   canEditOrders = false,
   canDeleteOrders = false,
+  canEditPayment = false,
 }: {
   initialOrders: OrderRow[];
   products: CounterProduct[];
@@ -140,6 +146,7 @@ export function OrdersBoard({
   canExportSales?: boolean;
   canEditOrders?: boolean;
   canDeleteOrders?: boolean;
+  canEditPayment?: boolean;
 }) {
   const [orders, setOrders] = useState(initialOrders);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -717,7 +724,7 @@ export function OrdersBoard({
     }
   }
 
-  async function markPaid(orderId: string, paymentMethod: 'cash' | 'card_terminal' | 'transfer') {
+  async function setPayment(orderId: string, paymentMethod: PosPaymentMethod) {
     setUpdatingId(orderId);
     try {
       const response = await fetch('/api/orders/payment', {
@@ -730,7 +737,13 @@ export function OrdersBoard({
       setOrders((current) =>
         current.map((order) =>
           order.id === orderId
-            ? { ...order, payment_status: 'paid', payment_method: paymentMethod }
+            ? {
+                ...order,
+                payment_status:
+                  payload.payment_status ??
+                  (paymentMethod === 'on_account' ? 'pending' : 'paid'),
+                payment_method: payload.payment_method ?? paymentMethod,
+              }
             : order,
         ),
       );
@@ -851,7 +864,7 @@ export function OrdersBoard({
                   showBranchName={showBranchName}
                   onOpen={openDetail}
                   onUpdateStatus={updateStatus}
-                  onMarkPaid={markPaid}
+                  onMarkPaid={setPayment}
                 />
               ))}
             </div>
@@ -876,7 +889,7 @@ export function OrdersBoard({
                     showBranchName={showBranchName}
                     onOpen={openDetail}
                     onUpdateStatus={updateStatus}
-                    onMarkPaid={markPaid}
+                    onMarkPaid={setPayment}
                   />
                 ))}
               </div>
@@ -1074,9 +1087,7 @@ export function OrdersBoard({
             </div>
             <p className="mt-2 text-sm text-slate-600">
               {orderStatusLabel(selected.status)} · {fulfillmentLabel(selected)} ·{' '}
-              {selected.payment_status === 'paid'
-                ? `Pagado (${PAYMENT_METHOD_LABELS[(selected.payment_method as PaymentMethod) ?? 'cash'] ?? selected.payment_method})`
-                : 'Pendiente de pago'}
+              {orderPaymentLabel(selected)}
               {!detailEditing ? (
                 <>
                   {' '}
@@ -1096,7 +1107,19 @@ export function OrdersBoard({
                 />
               </label>
             ) : null}
-            {selected.payment_status !== 'paid' ? (
+            {canEditPayment ? (
+              <div className="mt-3">
+                <p className="text-sm font-semibold text-slate-800">Forma de pago</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  El botón gris no está seleccionado. Por pagar es cuenta abierta.
+                </p>
+                <PaymentMethodPills
+                  order={selected}
+                  disabled={updatingId === selected.id}
+                  onSelect={(method) => void setPayment(selected.id, method)}
+                />
+              </div>
+            ) : isUnpaidOrder(selected) ? (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
                 <p className="text-sm font-semibold text-amber-950">Registrar pago</p>
                 <p className="mt-0.5 text-xs text-amber-800">
@@ -1106,7 +1129,7 @@ export function OrdersBoard({
                   <button
                     type="button"
                     disabled={updatingId === selected.id}
-                    onClick={() => markPaid(selected.id, 'cash')}
+                    onClick={() => void setPayment(selected.id, 'cash')}
                     className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
                   >
                     Efectivo
@@ -1114,7 +1137,7 @@ export function OrdersBoard({
                   <button
                     type="button"
                     disabled={updatingId === selected.id}
-                    onClick={() => markPaid(selected.id, 'card_terminal')}
+                    onClick={() => void setPayment(selected.id, 'card_terminal')}
                     className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
                   >
                     TPV
@@ -1122,7 +1145,7 @@ export function OrdersBoard({
                   <button
                     type="button"
                     disabled={updatingId === selected.id}
-                    onClick={() => markPaid(selected.id, 'transfer')}
+                    onClick={() => void setPayment(selected.id, 'transfer')}
                     className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-200 hover:bg-amber-100 disabled:opacity-50"
                   >
                     Transferencia
@@ -1574,6 +1597,57 @@ function SalesDayBlock({
   );
 }
 
+function selectedPosPayment(order: Pick<OrderRow, 'payment_status' | 'payment_method'>): PaymentMethod {
+  if (isUnpaidOrder(order)) return 'on_account';
+  if (order.payment_method === 'online') return 'online';
+  if (isPosPaymentMethod(order.payment_method)) return order.payment_method;
+  return 'cash';
+}
+
+function PaymentMethodPills({
+  order,
+  disabled,
+  onSelect,
+}: {
+  order: Pick<OrderRow, 'payment_status' | 'payment_method'>;
+  disabled?: boolean;
+  onSelect: (method: PosPaymentMethod) => void;
+}) {
+  const selected = selectedPosPayment(order);
+  const methods: PaymentMethod[] =
+    selected === 'online' ? ['cash', 'card_terminal', 'transfer', 'online', 'on_account'] : [...POS_PAYMENT_METHODS];
+
+  return (
+    <div role="group" aria-label="Forma de pago" className="mt-2 flex flex-wrap gap-1">
+      {methods.map((method) => {
+        const pressed = method === selected;
+        const onlineLocked = method === 'online';
+        return (
+          <button
+            key={method}
+            type="button"
+            aria-pressed={pressed}
+            disabled={disabled || onlineLocked}
+            onClick={() => {
+              if (onlineLocked || !isPosPaymentMethod(method) || method === selected) return;
+              onSelect(method);
+            }}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+              pressed
+                ? method === 'on_account'
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-green-100 text-green-800'
+                : 'bg-slate-100 text-slate-400'
+            } disabled:opacity-60`}
+          >
+            {PAYMENT_METHOD_LABELS[method]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function OrderLogRow({
   order,
   selected,
@@ -1588,7 +1662,7 @@ function OrderLogRow({
   onOpen: (orderId: string) => void;
 }) {
   const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
-  const unpaid = order.payment_status !== 'paid';
+  const unpaid = isUnpaidOrder(order);
   const status = normalizeOrderStatus(order.status);
   const timeLabel = formatOrderBoardTime(order.created_at);
   const itemsPreview = summarizeOrderItems(order.items ?? []);
@@ -1620,7 +1694,7 @@ function OrderLogRow({
           <p className="min-w-0 truncate text-xs text-slate-500">
             {itemsPreview}
             {showBranchName && branch?.name ? ` · ${branch.name}` : ''}
-            {unpaid ? ' · Sin pagar' : ''}
+            {unpaid ? ' · Por pagar' : ''}
           </p>
           <span
             className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
@@ -1656,12 +1730,12 @@ function OrderCard({
   showBranchName: boolean;
   onOpen: (orderId: string) => void;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
-  onMarkPaid: (orderId: string, paymentMethod: 'cash' | 'card_terminal' | 'transfer') => void;
+  onMarkPaid: (orderId: string, paymentMethod: PosPaymentMethod) => void;
 }) {
   const branch = Array.isArray(order.branch) ? order.branch[0] : order.branch;
   const nextStatus = nextWorkflowStatus(order.status);
   const prevStatus = previousWorkflowStatus(order.status);
-  const unpaid = order.payment_status !== 'paid';
+  const unpaid = isUnpaidOrder(order);
   const timeLabel = formatOrderBoardTime(order.created_at);
   const itemsPreview = summarizeOrderItems(order.items ?? []);
 
@@ -1681,7 +1755,7 @@ function OrderCard({
               ) : null}
               {unpaid ? (
                 <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                  Sin pagar
+                  Por pagar
                 </span>
               ) : null}
             </div>

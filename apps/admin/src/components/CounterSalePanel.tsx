@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import {
   PAYMENT_METHOD_LABELS,
+  POS_PAYMENT_METHODS,
   PRODUCT_UNIT_LABELS,
   STOCK_STATUS_LABELS,
   formatMoney,
@@ -12,10 +13,11 @@ import {
   getDefaultQuantity,
   getQuantityStep,
   getStockStatus,
+  isPaymentMethod,
   isValidMexicanPhone,
   normalizePhone,
   resolvePosCustomer,
-  type PaymentMethod,
+  type PosPaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -82,8 +84,6 @@ interface CreatedOrder {
   branch_id?: string;
 }
 
-const POS_METHODS: PaymentMethod[] = ['cash', 'card_terminal', 'transfer'];
-
 export function buildTicketText(input: {
   orderNumber: number;
   customerName: string;
@@ -94,10 +94,9 @@ export function buildTicketText(input: {
   changeDue?: number | null;
   items: ReceiptItem[];
 }) {
-  const method =
-    PAYMENT_METHOD_LABELS[(input.paymentMethod as PaymentMethod) ?? 'cash'] ??
-    input.paymentMethod ??
-    'Efectivo';
+  const method = isPaymentMethod(input.paymentMethod)
+    ? PAYMENT_METHOD_LABELS[input.paymentMethod]
+    : input.paymentMethod ?? 'Efectivo';
   const lines = input.items.map((item) => {
     const unit = item.unit ? PRODUCT_UNIT_LABELS[item.unit as ProductUnit] ?? item.unit : '';
     const pieceNote =
@@ -165,7 +164,7 @@ export function CounterSalePanel({
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState('');
   const [exactAmount, setExactAmount] = useState(false);
   const [soldOn, setSoldOn] = useState(() => todayMexicoYmd());
@@ -1063,7 +1062,7 @@ export function CounterSalePanel({
               className="pv-input mt-1"
               value={paymentMethod}
               onChange={(e) => {
-                const next = e.target.value as PaymentMethod;
+                const next = e.target.value as PosPaymentMethod;
                 setPaymentMethod(next);
                 if (next !== 'cash') {
                   setAmountReceived('');
@@ -1071,12 +1070,17 @@ export function CounterSalePanel({
                 }
               }}
             >
-              {POS_METHODS.map((method) => (
+              {POS_PAYMENT_METHODS.map((method) => (
                 <option key={method} value={method}>
                   {PAYMENT_METHOD_LABELS[method]}
                 </option>
               ))}
             </select>
+            {paymentMethod === 'on_account' ? (
+              <span className="mt-1 block text-xs text-amber-700">
+                Queda como por pagar. No entra a caja hasta que se cobre.
+              </span>
+            ) : null}
           </label>
           {paymentMethod === 'cash' ? (
             <div className="space-y-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3">
@@ -1199,11 +1203,13 @@ export function CounterSalePanel({
             >
               {saving
                 ? 'Registrando…'
-                : exactAmount || changeDue === 0
-                  ? 'Cobrar y entregar'
-                  : changeDue != null
-                    ? `Cobrar · cambio ${formatMoney(changeDue)}`
-                    : 'Cobrar y entregar'}
+                : paymentMethod === 'on_account'
+                  ? 'Registrar por pagar'
+                  : exactAmount || changeDue === 0
+                    ? 'Cobrar y entregar'
+                    : changeDue != null
+                      ? `Cobrar · cambio ${formatMoney(changeDue)}`
+                      : 'Cobrar y entregar'}
             </ActionChip>
           </div>
         </aside>

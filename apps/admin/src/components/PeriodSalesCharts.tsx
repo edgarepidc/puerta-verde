@@ -37,6 +37,7 @@ const PAYMENT_COLOR: Record<PaymentMethod, string> = {
   card_terminal: '#0284c7',
   transfer: '#d97706',
   online: '#7c3aed',
+  on_account: '#b45309',
 };
 
 const WEEKDAY_MEDALS = ['🥇', '🥈', '🥉'];
