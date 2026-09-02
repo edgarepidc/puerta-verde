@@ -127,8 +127,6 @@ const emptyCost: OperatingCostInput = {
   chargeDay: 1,
 };
 
-const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
-
 function monthParts(ymd: string): { year: number; month: number } {
   const year = Number(ymd.slice(0, 4));
   const month = Number(ymd.slice(5, 7));
@@ -143,6 +141,10 @@ function daysInViewedMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
 function ChargeDayField({
   value,
   onChange,
@@ -155,58 +157,22 @@ function ChargeDayField({
   const { year, month } = monthParts(monthYmd);
   const dayCount = daysInViewedMonth(year, month);
   const selected = Math.min(normalizeChargeDay(value), dayCount);
-  const leadingBlanks = (() => {
-    const sundayIndex = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-    return sundayIndex === 0 ? 6 : sundayIndex - 1;
-  })();
-  const monthLabel = new Intl.DateTimeFormat('es-MX', {
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
+  const monthKey = pad2(month);
+  const ymd = `${year}-${monthKey}-${pad2(selected)}`;
 
   return (
-    <div className="w-full min-w-[12.75rem] max-w-[13.5rem]">
-      <p className="sr-only">Se suma el día</p>
-      <div className="rounded-[0.875rem] border border-slate-200 bg-white px-2 pb-2 pt-1.5">
-        <p className="mb-1 text-center text-[11px] font-semibold capitalize text-slate-600">
-          {monthLabel}
-        </p>
-        <div
-          className="grid grid-cols-7 text-center text-[10px] font-medium text-slate-400"
-          aria-hidden
-        >
-          {WEEKDAY_LETTERS.map((letter) => (
-            <span key={letter}>{letter}</span>
-          ))}
-        </div>
-        <div className="mt-0.5 grid grid-cols-7" role="listbox" aria-label="Día del mes">
-          {Array.from({ length: leadingBlanks }, (_, i) => (
-            <span key={`blank-${i}`} />
-          ))}
-          {Array.from({ length: dayCount }, (_, i) => {
-            const day = i + 1;
-            const isSelected = day === selected;
-            return (
-              <button
-                key={day}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                aria-label={`Día ${day}`}
-                className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition ${
-                  isSelected
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-slate-700 hover:bg-emerald-50'
-                }`}
-                onClick={() => onChange(day)}
-              >
-                {day}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <input
+      type="date"
+      className="pv-input min-w-0"
+      aria-label="Se suma el día"
+      min={`${year}-${monthKey}-01`}
+      max={`${year}-${monthKey}-${pad2(dayCount)}`}
+      value={ymd}
+      onChange={(event) => {
+        const day = Number(event.target.value.slice(8, 10));
+        if (Number.isInteger(day) && day >= 1 && day <= 31) onChange(day);
+      }}
+    />
   );
 }
 
@@ -250,17 +216,17 @@ function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="pv-glass-card flex gap-3 p-4">
+    <div className="pv-glass-card flex h-full gap-3 p-4">
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${BADGE_TONES[tone]}`}
         aria-hidden
       >
         {emoji}
       </div>
-      <div className="min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{value}</p>
-        {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+        {hint ? <p className="mt-auto pt-0.5 text-xs text-slate-500">{hint}</p> : null}
       </div>
     </div>
   );
@@ -294,7 +260,7 @@ function TeQuedoCard({
   canAdjust: boolean;
 }) {
   return (
-    <div className="pv-glass-card flex gap-3 p-4">
+    <div className="pv-glass-card flex h-full gap-3 p-4">
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${
           totalPositive ? BADGE_TONES.profit : BADGE_TONES.loss
@@ -303,7 +269,7 @@ function TeQuedoCard({
       >
         {totalPositive ? '💚' : '⚠️'}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tienes</p>
           {canAdjust && !adjusting ? (
@@ -317,7 +283,7 @@ function TeQuedoCard({
           ) : null}
         </div>
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(total)}</p>
-        <p className="mt-0.5 truncate text-xs text-slate-500">
+        <p className="mt-auto truncate pt-0.5 text-xs text-slate-500">
           En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
         </p>
         {canAdjust && adjusting ? (
@@ -1192,8 +1158,7 @@ export function ProfitabilityManager({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-3 sm:gap-3">
-        <div className="grid grid-cols-1 gap-2 sm:gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
           <MetricCard
             emoji="🧺"
             tone="green"
@@ -1203,6 +1168,28 @@ export function ProfitabilityManager({
               ticketAvg == null
                 ? `${ticketCount} tickets · ${activePeriodLabel}`
                 : `${ticketCount} ticket${ticketCount === 1 ? '' : 's'} · ${formatMoney(ticketAvg)} c/u · ${activePeriodLabel}`
+            }
+          />
+          <MetricCard
+            emoji="🥬"
+            tone="amber"
+            label="Costo de lo vendido"
+            value={formatMoney(cogs)}
+            hint={
+              grossMarginPct == null
+                ? 'La mercancía que sí se vendió, no el anaquel'
+                : `Mercancía que sí se vendió · margen ${grossMarginPct.toFixed(0).replace(/^-/, '−')}%`
+            }
+          />
+          <MetricCard
+            emoji="🧾"
+            tone="slate"
+            label="Salió de caja"
+            value={formatMoney(cashOut)}
+            hint={
+              rentCharged > 0
+                ? `Compras, renta y visita · renta ${formatMoney(rentCharged)} ya contó`
+                : 'Compras, renta y visita · caja y cuenta'
             }
           />
           <MetricCard
@@ -1216,38 +1203,12 @@ export function ProfitabilityManager({
                 : 'Hoy · si se vende todo, al precio de lista'
             }
           />
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:gap-3">
-          <MetricCard
-            emoji="🥬"
-            tone="amber"
-            label="Costo de lo vendido"
-            value={formatMoney(cogs)}
-            hint={
-              grossMarginPct == null
-                ? 'La mercancía que sí se vendió, no el anaquel'
-                : `Mercancía que sí se vendió · margen ${grossMarginPct.toFixed(0).replace(/^-/, '−')}%`
-            }
-          />
           <MetricCard
             emoji="📦"
             tone="slate"
             label="Inventario a costo"
             value={formatMoney(totals.inventoryCost)}
             hint="Hoy · lo que pagaste por lo que sigue en anaquel"
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:gap-3">
-          <MetricCard
-            emoji="🧾"
-            tone="slate"
-            label="Salió de caja"
-            value={formatMoney(cashOut)}
-            hint={
-              rentCharged > 0
-                ? `Compras, renta y visita · renta ${formatMoney(rentCharged)} ya contó`
-                : 'Compras, renta y visita · caja y cuenta'
-            }
           />
           <TeQuedoCard
             total={leftover}
@@ -1281,7 +1242,6 @@ export function ProfitabilityManager({
               hint="Capital que metiste. Ya está en Tienes."
             />
           ) : null}
-        </div>
       </div>
 
       <details
@@ -1911,24 +1871,22 @@ export function ProfitabilityManager({
                   return (
                     <li key={row.id} className="px-4 py-2.5">
                       {editing && editCost ? (
-                        <div className="flex flex-wrap items-start gap-2">
-                          <div className="flex w-[9.75rem] shrink-0 flex-col gap-2">
-                            <input
-                              className="pv-input min-w-0"
-                              value={editCost.name}
-                              onChange={(e) =>
-                                setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
-                              }
-                            />
-                            <DecimalInput
-                              className="pv-input min-w-0"
-                              groupThousands
-                              value={editCost.amount}
-                              onChange={(value) =>
-                                setEditCost((d) => (d ? { ...d, amount: value } : d))
-                              }
-                            />
-                          </div>
+                        <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
+                          <input
+                            className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                            value={editCost.name}
+                            onChange={(e) =>
+                              setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
+                            }
+                          />
+                          <DecimalInput
+                            className="pv-input min-w-0"
+                            groupThousands
+                            value={editCost.amount}
+                            onChange={(value) =>
+                              setEditCost((d) => (d ? { ...d, amount: value } : d))
+                            }
+                          />
                           <ChargeDayField
                             value={editCost.chargeDay}
                             onChange={(day) =>
@@ -1936,22 +1894,20 @@ export function ProfitabilityManager({
                             }
                             monthYmd={from}
                           />
-                          <div className="flex min-w-[7.5rem] flex-col gap-2">
-                            <MoneyPocketField
-                              label="Sale de"
-                              value={editCost.paidFrom}
-                              onChange={(value) =>
-                                setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
-                              }
-                            />
-                            <div className="flex flex-wrap gap-2">
-                              <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
-                                {saving ? 'Guardando…' : 'Guardar'}
-                              </ActionChip>
-                              <ActionChip elevated={false} onClick={() => setEditCost(null)}>
-                                Cancelar
-                              </ActionChip>
-                            </div>
+                          <MoneyPocketField
+                            label="Sale de"
+                            value={editCost.paidFrom}
+                            onChange={(value) =>
+                              setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
+                            }
+                          />
+                          <div className="col-span-2 flex flex-wrap gap-2">
+                            <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
+                              {saving ? 'Guardando…' : 'Guardar'}
+                            </ActionChip>
+                            <ActionChip elevated={false} onClick={() => setEditCost(null)}>
+                              Cancelar
+                            </ActionChip>
                           </div>
                         </div>
                       ) : (
@@ -2045,33 +2001,31 @@ export function ProfitabilityManager({
             ) : null}
 
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-              <div className="flex flex-wrap items-start gap-2">
-                <div className="flex w-[9.75rem] shrink-0 flex-col gap-2">
-                  <input
-                    placeholder="Nombre"
-                    className="pv-input min-w-0"
-                    value={costForm.name}
-                    onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
-                  />
-                  <DecimalInput
-                    placeholder="Monto"
-                    className="pv-input min-w-0"
-                    groupThousands
-                    value={costAmountText}
-                    onChange={setCostAmountText}
-                  />
-                </div>
+              <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
+                <input
+                  placeholder="Nombre"
+                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                  value={costForm.name}
+                  onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
+                />
+                <DecimalInput
+                  placeholder="Monto"
+                  className="pv-input min-w-0"
+                  groupThousands
+                  value={costAmountText}
+                  onChange={setCostAmountText}
+                />
                 <ChargeDayField
                   value={costForm.chargeDay ?? 1}
                   onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
                   monthYmd={from}
                 />
-                <div className="flex min-w-[7.5rem] flex-col gap-2">
-                  <MoneyPocketField
-                    label="Sale de"
-                    value={costForm.paidFrom ?? 'account'}
-                    onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
-                  />
+                <MoneyPocketField
+                  label="Sale de"
+                  value={costForm.paidFrom ?? 'account'}
+                  onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
+                />
+                <div className="col-span-2 flex justify-end lg:col-span-1">
                   <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
                     Agregar costo
                   </ActionChip>
