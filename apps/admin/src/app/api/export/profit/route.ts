@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     ['Costo de lo vendido', summary?.cogs ?? 0],
     ['Utilidad bruta', summary?.gross_profit ?? 0],
     ['Margen bruto %', summary?.gross_margin_percent ?? 0],
-    ['Costos fijos', summary?.fixed_costs ?? 0],
+    ['Renta y nómina', summary?.fixed_costs ?? 0],
     ['Costos variables', summary?.variable_costs ?? 0],
     ['Gastos de visita', summary?.visit_expenses ?? 0],
     ['Otros ingresos', summary?.other_income ?? 0],

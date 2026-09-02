@@ -136,6 +136,7 @@ export default async function NumerosPage() {
               notes: string | null;
               is_active: boolean;
               paid_from?: 'cash' | 'account' | null;
+              charge_day?: number;
               terms?: Array<{ id: string; start_date: string; end_date: string | null }>;
             }>}
             initialVisitExpenses={(visitExpenses?.data ?? []) as Array<{

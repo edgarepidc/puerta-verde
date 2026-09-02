@@ -32,7 +32,7 @@ export async function fetchMoneyPosition(
       .maybeSingle(),
     supabase
       .from('branch_operating_costs')
-      .select('cost_type, period, amount, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
+      .select('cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
       .eq('branch_id', branchId),
   ]);
 
@@ -48,6 +48,7 @@ export async function fetchMoneyPosition(
     costType: row.cost_type,
     period: row.period,
     amount: Number(row.amount),
+    chargeDay: row.charge_day ?? 1,
     paidFrom: parseMoneyPocket(row.paid_from, 'account'),
     terms: row.terms ?? [],
   }));
