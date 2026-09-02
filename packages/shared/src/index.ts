@@ -303,6 +303,7 @@ export {
   validateOperatingCostInput,
   costAppliesToRange,
   costPausedAtPeriodStart,
+  calendarMonthStart,
   applyOperatingCostsToPockets,
   operatingCostAmountForRange,
   OPERATING_COST_TYPES,
