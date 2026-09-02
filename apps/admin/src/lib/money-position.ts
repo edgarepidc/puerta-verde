@@ -4,6 +4,7 @@ import {
   calendarMonthStart,
   costPausedAtPeriodStart,
   parseMoneyPocket,
+  pocketTotal,
   resolveMoneyPosition,
   roundMoney,
   type MoneyPositionView,
@@ -150,8 +151,8 @@ export async function fetchMoneyPosition(
     },
   });
 
+  const addBack = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   if (closesThisPeriod) {
-    const addBack = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
     const needsOrderCount = costs.some(
       (cost) =>
         cost.period === 'per_order' &&
@@ -185,5 +186,9 @@ export async function fetchMoneyPosition(
     ...resolved,
     asOfDate: to,
     notes: snapshot && snapshot.asOfDate >= to ? (snapshotRow?.notes ?? null) : null,
+    openingTotal: snapshot ? pocketTotal(snapshot) : 0,
+    openingAsOf: snapshot?.asOfDate ?? null,
+    periodIn: roundMoney(flows.cashIn + flows.accountIn + addBack.cashIn),
+    periodOut: roundMoney(flows.cashOut + flows.accountOut + addBack.cashOut),
   };
 }

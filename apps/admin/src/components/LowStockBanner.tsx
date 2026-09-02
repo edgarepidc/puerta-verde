@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { PRODUCT_UNIT_LABELS, formatDecimal, isLowStock, type ProductUnit } from '@puertaverde/shared';
+import { isLowStock, type ProductUnit } from '@puertaverde/shared';
 
 interface LowStockProduct {
   id: string;
@@ -67,12 +67,7 @@ export function LowStockBanner({
             ⚠️ Stock bajo · {lowStock.length} producto{lowStock.length === 1 ? '' : 's'}
           </h2>
           <p className="mt-1 text-sm text-amber-800">
-            {lowStock
-              .map((product) => {
-                const unit = product.product.unit ? PRODUCT_UNIT_LABELS[product.product.unit] : '';
-                return `${product.product.name} (${formatDecimal(Number(product.stock))}${unit ? ` ${unit}` : ''})`;
-              })
-              .join(' · ')}
+            Ábrelos en Qué comprar para reponer.
           </p>
           <Link href={href} className="mt-2 inline-block text-sm font-medium text-amber-900 underline">
             {linkLabel}

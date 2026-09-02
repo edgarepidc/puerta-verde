@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   formatChargeDayLabel,
   formatDecimal,
+  formatMexicoDayLabel,
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
@@ -354,7 +355,15 @@ function TeQuedoCard({
   );
 }
 
-function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
+function ProfitBuildUp({
+  summary,
+  wasteCost,
+  zeroCostSold,
+}: {
+  summary: ProfitSummary | null;
+  wasteCost: number;
+  zeroCostSold: Array<{ name: string; revenue: number }>;
+}) {
   if (!summary) return null;
 
   const revenue = Number(summary.revenue);
@@ -364,7 +373,8 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   const other = Math.max(Number(summary.variable_costs) - visit, 0);
   const otherIncome = Number(summary.other_income ?? 0);
   const contributions = Number(summary.contributions ?? 0);
-  const net = Number(summary.estimated_net_profit);
+  const waste = Math.max(wasteCost, 0);
+  const net = Number(summary.estimated_net_profit) - waste;
   const netPositive = net >= 0;
   const operatingNet = net - contributions;
   const operatingNetPositive = operatingNet >= 0;
@@ -420,6 +430,16 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
       running,
     });
   }
+  if (waste > 0) {
+    running -= waste;
+    steps.push({
+      key: 'waste',
+      label: '− Merma',
+      hint: 'Mercancía que se tiró, no se vendió',
+      delta: -waste,
+      running,
+    });
+  }
   if (otherIncome > 0) {
     running += otherIncome;
     steps.push({
@@ -444,7 +464,9 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   return (
     <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 sm:p-5">
       <h3 className="text-base font-semibold text-slate-900">Cálculo de utilidad</h3>
-      <p className="mt-0.5 text-sm text-slate-500">De lo que entró a lo que quedó, paso a paso.</p>
+      <p className="mt-0.5 text-sm text-slate-500">
+        Ganancia del periodo, no lo que hay en caja. Eso está en Tienes.
+      </p>
       <ul className="mt-3 divide-y divide-slate-100">
         {steps.map((step, index) => (
           <li
@@ -507,71 +529,67 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
           </p>
         </div>
       </div>
+      {zeroCostSold.length > 0 ? (
+        <p className="mt-3 text-xs text-slate-500">
+          Vendiste sin costo cargado:{' '}
+          {zeroCostSold
+            .slice(0, 4)
+            .map((row) => `${row.name} ${formatMoney(row.revenue)}`)
+            .join(' · ')}
+          {zeroCostSold.length > 4 ? ` · +${zeroCostSold.length - 4}` : ''}. Eso infla el margen.
+        </p>
+      ) : null}
     </section>
   );
 }
 
-function CashSquare({
-  revenue,
-  contributions,
-  otherIncome,
-  purchases,
-  visit,
-  operating,
-  inventoryCost,
+function CashBridge({
+  openingTotal,
+  openingAsOf,
+  periodIn,
+  periodOut,
+  closing,
 }: {
-  revenue: number;
-  contributions: number;
-  otherIncome: number;
-  purchases: number;
-  visit: number;
-  operating: number;
-  inventoryCost: number;
+  openingTotal: number;
+  openingAsOf: string | null;
+  periodIn: number;
+  periodOut: number;
+  closing: number;
 }) {
-  const inflow = revenue + contributions + otherIncome;
-  const outflow = purchases + visit + operating;
   return (
     <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Para cuadrar</h3>
+      <h3 className="text-sm font-semibold text-slate-900">Caja y cuenta</h3>
       <p className="mt-0.5 text-xs text-slate-500">
-        Efectivo del periodo, no la utilidad. El inventario a costo ya está pagado; no es un segundo gasto.
+        Del último conteo a Tienes. No es la utilidad.
       </p>
       <ul className="mt-3 space-y-2.5 text-sm">
         <li className="flex items-baseline justify-between gap-3">
           <span className="min-w-0">
-            <span className="font-medium text-slate-800">Entró</span>
+            <span className="font-medium text-slate-800">Conteo</span>
             <span className="mt-0.5 block text-xs text-slate-500">
-              Ventas {formatMoney(revenue)}
-              {contributions > 0 ? ` · aportaciones ${formatMoney(contributions)}` : ''}
-              {otherIncome > 0 ? ` · otros ${formatMoney(otherIncome)}` : ''}
+              {openingAsOf ? formatMexicoDayLabel(openingAsOf) : 'Aún no hay un conteo guardado'}
             </span>
           </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(inflow)}
+            {formatMoney(openingTotal)}
           </span>
         </li>
         <li className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">Salió</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Compras {formatMoney(purchases)}
-              {operating > 0 ? ` · renta y fijos ${formatMoney(operating)}` : ''}
-              {` · visita ${formatMoney(visit)}`}
-            </span>
-          </span>
+          <span className="font-medium text-slate-800">+ Entró</span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(outflow)}
+            {formatMoney(periodIn)}
+          </span>
+        </li>
+        <li className="flex items-baseline justify-between gap-3">
+          <span className="font-medium text-slate-800">− Salió</span>
+          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+            {formatMoney(periodOut)}
           </span>
         </li>
         <li className="flex items-baseline justify-between gap-3 border-t border-emerald-100 pt-2.5">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">Sigue en mercancía</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Inventario a costo · ya pagado al comprar
-            </span>
-          </span>
+          <span className="font-medium text-slate-800">= Tienes</span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(inventoryCost)}
+            {formatMoney(closing)}
           </span>
         </li>
       </ul>
@@ -600,6 +618,8 @@ export function ProfitabilityManager({
   initialVisitExpenses,
   initialIncomes,
   initialPurchasesTotal,
+  initialWasteCost,
+  initialZeroCostSold,
   initialMoneyPosition,
   initialSummary,
   initialCategories,
@@ -613,6 +633,8 @@ export function ProfitabilityManager({
   initialVisitExpenses: VisitExpenseRow[];
   initialIncomes: IncomeRow[];
   initialPurchasesTotal: number;
+  initialWasteCost: number;
+  initialZeroCostSold: Array<{ name: string; revenue: number }>;
   initialMoneyPosition: MoneyPositionView | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
@@ -623,6 +645,8 @@ export function ProfitabilityManager({
   const [visitExpenses, setVisitExpenses] = useState(initialVisitExpenses);
   const [incomes, setIncomes] = useState(initialIncomes);
   const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
+  const [wasteCost, setWasteCost] = useState(initialWasteCost);
+  const [zeroCostSold, setZeroCostSold] = useState(initialZeroCostSold);
   const [summary, setSummary] = useState(initialSummary);
   const [categories, setCategories] = useState(initialCategories);
   const [activePeriodLabel, setActivePeriodLabel] = useState(periodLabel);
@@ -642,10 +666,12 @@ export function ProfitabilityManager({
   const [showAllMargins, setShowAllMargins] = useState(false);
   const [openVentas, setOpenVentas] = useState(false);
   const [openUtilidad, setOpenUtilidad] = useState(false);
+  const [openCategoria, setOpenCategoria] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
   const [openGastos, setOpenGastos] = useState(false);
   const [openMovimientos, setOpenMovimientos] = useState(false);
   const [series, setSeries] = useState<TrendPoint[]>([]);
+  const [chartsStatus, setChartsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
@@ -684,11 +710,7 @@ export function ProfitabilityManager({
   const totals = useMemo(() => {
     const inventoryCost = margins.reduce((s, r) => s + Number(r.inventory_value_cost), 0);
     const inventorySale = margins.reduce((s, r) => s + Number(r.inventory_value_sale), 0);
-    const avgMargin =
-      margins.length > 0
-        ? margins.reduce((s, r) => s + Number(r.margin_percent), 0) / margins.length
-        : 0;
-    return { inventoryCost, inventorySale, avgMargin };
+    return { inventoryCost, inventorySale };
   }, [margins]);
 
   const categoryMaxProfit = useMemo(
@@ -700,11 +722,15 @@ export function ProfitabilityManager({
     () => [...margins].sort((a, b) => Number(b.margin_percent) - Number(a.margin_percent)),
     [margins],
   );
-
-  const visibleMargins = showAllMargins ? sortedMargins : sortedMargins.slice(0, 12);
-  const marginBarMax = useMemo(
-    () => Math.max(...sortedMargins.map((m) => Math.abs(Number(m.margin_percent))), 1),
+  const inStockMargins = useMemo(
+    () => sortedMargins.filter((row) => Number(row.stock) > 0),
     [sortedMargins],
+  );
+
+  const visibleMargins = showAllMargins ? inStockMargins : inStockMargins.slice(0, 12);
+  const marginBarMax = useMemo(
+    () => Math.max(...inStockMargins.map((m) => Math.abs(Number(m.margin_percent))), 1),
+    [inStockMargins],
   );
 
   const costBreakdown = useMemo(() => {
@@ -749,6 +775,7 @@ export function ProfitabilityManager({
 
   async function loadPeriod(nextFrom: string, nextTo: string) {
     setLoadingPeriod(true);
+    setChartsStatus('loading');
     setError(null);
     try {
       const query = qs(nextFrom, nextTo);
@@ -783,6 +810,8 @@ export function ProfitabilityManager({
       setCosts(costsPayload.costs);
       setSummary(profitPayload.summary);
       setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
+      setWasteCost(Number(profitPayload.wasteCost ?? 0));
+      setZeroCostSold(profitPayload.zeroCostSold ?? []);
       setCategories(categoriesPayload.categories);
       setVisitExpenses(expensesPayload.expenses ?? []);
       setIncomes(incomesPayload.incomes ?? []);
@@ -792,23 +821,27 @@ export function ProfitabilityManager({
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
       setPreset(detectPreset(profitPayload.from ?? nextFrom, profitPayload.to ?? nextTo));
+      setChartsStatus('ready');
       await applyTrends(trendsPayload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
+      setChartsStatus('error');
     } finally {
       setLoadingPeriod(false);
     }
   }
 
   useEffect(() => {
+    setChartsStatus('loading');
     fetch(`/api/forecast/trends?${qs(from, to)}`)
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error ?? 'Error ventas del periodo');
         await applyTrends(payload);
+        setChartsStatus('ready');
       })
       .catch(() => {
-        /* charts load in the background; period cards still useful */
+        setChartsStatus('error');
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1040,6 +1073,9 @@ export function ProfitabilityManager({
 
   const revenue = Number(summary?.revenue ?? 0);
   const cogs = Number(summary?.cogs ?? 0);
+  const ticketCount = Number(summary?.order_count ?? 0);
+  const ticketAvg = ticketCount > 0 ? revenue / ticketCount : null;
+  const rentCharged = Number(summary?.fixed_costs ?? 0);
   const cashOut =
     purchasesTotal + Number(summary?.operating_costs_total ?? 0);
   const grossMarginPct =
@@ -1117,6 +1153,16 @@ export function ProfitabilityManager({
         <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
           {loadingPeriod ? 'Cargando…' : 'Actualizar'}
         </ActionChip>
+        <a href={`/api/export/profit?${exportQuery}`}>
+          <ActionChip as="span" emoji="📗">
+            Excel
+          </ActionChip>
+        </a>
+        <a href={`/api/export/profit/pdf?${exportQuery}`}>
+          <ActionChip as="span" emoji="📄">
+            PDF
+          </ActionChip>
+        </a>
       </div>
       {preset === 'custom' ? (
         <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
@@ -1153,7 +1199,11 @@ export function ProfitabilityManager({
             tone="green"
             label="Vendiste"
             value={formatMoney(revenue)}
-            hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'} · ${activePeriodLabel}`}
+            hint={
+              ticketAvg == null
+                ? `${ticketCount} tickets · ${activePeriodLabel}`
+                : `${ticketCount} ticket${ticketCount === 1 ? '' : 's'} · ${formatMoney(ticketAvg)} c/u · ${activePeriodLabel}`
+            }
           />
           <MetricCard
             emoji="🏷️"
@@ -1162,8 +1212,8 @@ export function ProfitabilityManager({
             value={formatMoney(totals.inventorySale)}
             hint={
               inventorySpread >= 0
-                ? `Si se vende todo · ${formatMoney(inventorySpread)} de margen`
-                : 'Si se vende todo, al precio de lista'
+                ? `Hoy · si se vende todo · ${formatMoney(inventorySpread)} de margen`
+                : 'Hoy · si se vende todo, al precio de lista'
             }
           />
         </div>
@@ -1184,7 +1234,7 @@ export function ProfitabilityManager({
             tone="slate"
             label="Inventario a costo"
             value={formatMoney(totals.inventoryCost)}
-            hint="Lo que pagaste por lo que sigue en anaquel"
+            hint="Hoy · lo que pagaste por lo que sigue en anaquel"
           />
         </div>
         <div className="grid grid-cols-1 gap-2 sm:gap-3">
@@ -1193,7 +1243,11 @@ export function ProfitabilityManager({
             tone="slate"
             label="Salió de caja"
             value={formatMoney(cashOut)}
-            hint="Compras, renta y visita · caja y cuenta"
+            hint={
+              rentCharged > 0
+                ? `Compras, renta y visita · renta ${formatMoney(rentCharged)} ya contó`
+                : 'Compras, renta y visita · caja y cuenta'
+            }
           />
           <TeQuedoCard
             total={leftover}
@@ -1240,11 +1294,6 @@ export function ProfitabilityManager({
           hint={`${activePeriodLabel} · ${formatMoney(Number(summary?.revenue ?? 0))}`}
           emoji="📈"
           iconClass="bg-sky-100"
-          actions={
-            <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-              {loadingPeriod ? 'Cargando…' : 'Actualizar'}
-            </ActionChip>
-          }
         />
 
         <PeriodSalesCharts
@@ -1254,9 +1303,8 @@ export function ProfitabilityManager({
           topProducts={topProducts}
           topWeekdays={topWeekdays}
           paymentBreakdown={paymentBreakdown}
+          status={chartsStatus}
         />
-
-        <ProfitBuildUp summary={summary} />
       </details>
 
       <details
@@ -1265,27 +1313,28 @@ export function ProfitabilityManager({
         onToggle={(event) => setOpenUtilidad(event.currentTarget.open)}
       >
         <FoldableSummary
-          title="Utilidad"
-          hint={`Por categoría · ${activePeriodLabel}`}
+          title="Cálculo de utilidad"
+          hint="Del periodo · no es Tienes"
+          emoji="🧮"
+          iconClass="bg-violet-100"
+        />
+        <ProfitBuildUp
+          summary={summary}
+          wasteCost={wasteCost}
+          zeroCostSold={zeroCostSold}
+        />
+      </details>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openCategoria}
+        onToggle={(event) => setOpenCategoria(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Por categoría"
+          hint={`Margen bruto · ${activePeriodLabel}`}
           emoji="📊"
           iconClass="bg-violet-100"
-          actions={
-            <>
-              <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-                {loadingPeriod ? 'Cargando…' : 'Actualizar'}
-              </ActionChip>
-              <a href={`/api/export/profit?${exportQuery}`}>
-                <ActionChip as="span" emoji="📗">
-                  Excel
-                </ActionChip>
-              </a>
-              <a href={`/api/export/profit/pdf?${exportQuery}`}>
-                <ActionChip as="span" emoji="📄">
-                  PDF
-                </ActionChip>
-              </a>
-            </>
-          }
         />
 
         {categories.length === 0 ? (
@@ -1368,13 +1417,13 @@ export function ProfitabilityManager({
         onToggle={(event) => setOpenMargenes(event.currentTarget.open)}
       >
         <FoldableSummary
-          title="Márgenes por producto"
-          hint={`Margen promedio ${totals.avgMargin.toFixed(1)}%`}
+          title="Precio vs costo"
+          hint="Anaquel de hoy · no es el mix vendido"
           emoji="🥬"
           iconClass="bg-emerald-100"
         />
 
-        {sortedMargins.length === 0 ? (
+        {inStockMargins.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500">Sin productos con margen.</p>
         ) : (
           <div>
@@ -1413,13 +1462,13 @@ export function ProfitabilityManager({
                 );
               })}
             </div>
-            {sortedMargins.length > 12 ? (
+            {inStockMargins.length > 12 ? (
               <ActionChip
                 className="mt-4"
                 emoji="📋"
                 onClick={() => setShowAllMargins((v) => !v)}
               >
-                {showAllMargins ? 'Ver menos' : `Ver todos (${sortedMargins.length})`}
+                {showAllMargins ? 'Ver menos' : `Ver todos (${inStockMargins.length})`}
               </ActionChip>
             ) : null}
           </div>
@@ -1438,17 +1487,12 @@ export function ProfitabilityManager({
           iconClass="bg-amber-100"
         />
 
-        <CashSquare
-          revenue={Number(summary?.revenue ?? 0)}
-          contributions={contributionsTotal}
-          otherIncome={Number(summary?.other_income ?? 0)}
-          purchases={purchasesTotal}
-          visit={Number(summary?.visit_expenses ?? 0)}
-          operating={
-            Number(summary?.fixed_costs ?? 0) +
-            Math.max(Number(summary?.variable_costs ?? 0) - Number(summary?.visit_expenses ?? 0), 0)
-          }
-          inventoryCost={totals.inventoryCost}
+        <CashBridge
+          openingTotal={Number(moneyPosition?.openingTotal ?? 0)}
+          openingAsOf={moneyPosition?.openingAsOf ?? null}
+          periodIn={Number(moneyPosition?.periodIn ?? 0)}
+          periodOut={Number(moneyPosition?.periodOut ?? 0)}
+          closing={leftover}
         />
 
         {summary && costBreakdown.total > 0 ? (
@@ -1536,7 +1580,8 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              La visita se carga en Compras. Aquí anotas aportaciones u otros ingresos.
+              Gasolina, diablero y caseta de la visita. Las compras de mercancía van en Compras.
+              Aquí también anotas aportaciones u otros ingresos.
             </p>
             {visitMovements.length > 0 ? (
               <details className="group/vis border-t border-slate-100">

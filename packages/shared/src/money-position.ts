@@ -54,6 +54,11 @@ export interface MoneyPositionView {
   snapshotAsOf: string | null;
   asOfDate: string;
   notes: string | null;
+  /** Last counted total (or 0 if never counted). */
+  openingTotal: number;
+  openingAsOf: string | null;
+  periodIn: number;
+  periodOut: number;
 }
 
 export interface MoneyPositionInput {

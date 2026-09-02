@@ -8,6 +8,7 @@ import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
 import { fetchMoneyPosition } from '@/lib/money-position';
+import { fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
 import type { OperatingCostPeriod, OperatingCostType, ProductUnit } from '@puertaverde/shared';
 
@@ -32,6 +33,7 @@ export default async function NumerosPage() {
     { data: stockCategories },
     profitBundle,
     moneyPosition,
+    profitExtras,
   ] = await Promise.all([
     supabase.rpc('get_restock_forecast', {
       p_branch_id: staff.branchId,
@@ -96,6 +98,12 @@ export default async function NumerosPage() {
     canViewProfit
       ? fetchMoneyPosition(tenant.branchId, range.start, range.end).catch(() => null)
       : Promise.resolve(null),
+    canViewProfit
+      ? fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end).catch(() => ({
+          wasteCost: 0,
+          zeroCostSold: [],
+        }))
+      : Promise.resolve({ wasteCost: 0, zeroCostSold: [] as Array<{ name: string; revenue: number }> }),
   ]);
 
   const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
@@ -156,6 +164,8 @@ export default async function NumerosPage() {
               notes: string | null;
             }>}
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
+            initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
+            initialZeroCostSold={profitExtras.zeroCostSold ?? []}
             initialMoneyPosition={moneyPosition}
             canAdjustMoney={canAdjustMoney}
             initialSummary={(summaryRows?.data?.[0] as {

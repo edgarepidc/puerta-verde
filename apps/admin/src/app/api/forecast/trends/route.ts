@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, total, payment_method, payment_status')
+      .select('id, created_at, subtotal, discount_amount, payment_method, payment_status')
       .eq('branch_id', tenant.branchId)
       .neq('status', 'cancelled')
       .gte('created_at', startBound)
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
 
     for (const order of orders ?? []) {
       const day = todayMexicoYmd(new Date(order.created_at));
-      const amount = Number(order.total ?? 0);
+      const amount = Math.max(Number(order.subtotal ?? 0) - Number(order.discount_amount ?? 0), 0);
       daily.set(day, (daily.get(day) ?? 0) + amount);
       const method: PaymentMethod =
         order.payment_status !== 'paid' || order.payment_method === 'on_account'
