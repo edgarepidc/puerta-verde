@@ -171,29 +171,9 @@ function MetricCard({
   );
 }
 
-const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
-function formatShortMexicoDate(ymd: string): string {
-  const parts = ymd.split('-').map(Number);
-  const month = parts[1] ?? 1;
-  const day = parts[2] ?? 1;
-  return `${day} ${MONTH_SHORT[month - 1] ?? ''}`;
-}
-
-function pocketHint(position: MoneyPositionView): string {
-  if (position.source === 'snapshot' && position.snapshotAsOf) {
-    return `Conteo al ${formatShortMexicoDate(position.snapshotAsOf)}`;
-  }
-  if (position.source === 'projected' && position.snapshotAsOf) {
-    return `Desde el conteo del ${formatShortMexicoDate(position.snapshotAsOf)}`;
-  }
-  return 'Este periodo · aún no hay un conteo';
-}
-
 function TeQuedoCard({
   net,
   netPositive,
-  contributionsTotal,
   position,
   adjusting,
   cashText,
@@ -207,7 +187,6 @@ function TeQuedoCard({
 }: {
   net: number;
   netPositive: boolean;
-  contributionsTotal: number;
   position: MoneyPositionView | null;
   adjusting: boolean;
   cashText: string;
@@ -230,75 +209,52 @@ function TeQuedoCard({
         {netPositive ? '💚' : '⚠️'}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Te quedó</p>
-        <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(net)}</p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          {contributionsTotal > 0
-            ? 'Incluye el capital que metiste'
-            : netPositive
-              ? 'Después de gastos'
-              : 'Este periodo quedó abajo'}
-        </p>
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Dónde está el dinero
-          </p>
-          <ul className="mt-1.5 space-y-1 text-sm">
-            <li className="flex items-baseline justify-between gap-3">
-              <span className="text-slate-600">En caja</span>
-              <span className="font-semibold tabular-nums text-slate-900">
-                {formatMoney(position?.cash ?? 0)}
-              </span>
-            </li>
-            <li className="flex items-baseline justify-between gap-3">
-              <span className="text-slate-600">En cuenta</span>
-              <span className="font-semibold tabular-nums text-slate-900">
-                {formatMoney(position?.account ?? 0)}
-              </span>
-            </li>
-          </ul>
-          <p className="mt-1 text-xs text-slate-500">
-            {position
-              ? `${pocketHint(position)}. No cambia las ventas ni la utilidad.`
-              : 'Efectivo vs TPV y transferencias. No cambia las ventas ni la utilidad.'}
-          </p>
-          {canAdjust && adjusting ? (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <label className="text-xs font-medium text-slate-600">
-                Caja
-                <DecimalInput
-                  className="pv-input mt-1"
-                  groupThousands
-                  value={cashText}
-                  onChange={onCashText}
-                />
-              </label>
-              <label className="text-xs font-medium text-slate-600">
-                Cuenta
-                <DecimalInput
-                  className="pv-input mt-1"
-                  groupThousands
-                  value={accountText}
-                  onChange={onAccountText}
-                />
-              </label>
-              <div className="col-span-2 flex flex-wrap gap-2">
-                <ActionChip emoji="💾" disabled={saving} onClick={onSave}>
-                  {saving ? 'Guardando…' : 'Guardar conteo'}
-                </ActionChip>
-                <ActionChip elevated={false} onClick={onToggleAdjust}>
-                  Cancelar
-                </ActionChip>
-              </div>
-            </div>
-          ) : canAdjust ? (
-            <div className="mt-2">
-              <ActionChip elevated={false} emoji="✏️" onClick={onToggleAdjust}>
-                Ajustar
-              </ActionChip>
-            </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Te quedó</p>
+          {canAdjust && !adjusting ? (
+            <button
+              type="button"
+              className="shrink-0 text-[11px] font-semibold text-slate-500 hover:text-slate-800"
+              onClick={onToggleAdjust}
+            >
+              Ajustar
+            </button>
           ) : null}
         </div>
+        <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(net)}</p>
+        <p className="mt-0.5 truncate text-xs text-slate-500">
+          En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
+        </p>
+        {canAdjust && adjusting ? (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <label className="text-xs font-medium text-slate-600">
+              Caja
+              <DecimalInput
+                className="pv-input mt-1"
+                groupThousands
+                value={cashText}
+                onChange={onCashText}
+              />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              Cuenta
+              <DecimalInput
+                className="pv-input mt-1"
+                groupThousands
+                value={accountText}
+                onChange={onAccountText}
+              />
+            </label>
+            <div className="col-span-2 flex flex-wrap gap-2">
+              <ActionChip emoji="💾" disabled={saving} onClick={onSave}>
+                {saving ? 'Guardando…' : 'Guardar conteo'}
+              </ActionChip>
+              <ActionChip elevated={false} onClick={onToggleAdjust}>
+                Cancelar
+              </ActionChip>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -1087,7 +1043,6 @@ export function ProfitabilityManager({
           <TeQuedoCard
             net={net}
             netPositive={netPositive}
-            contributionsTotal={contributionsTotal}
             position={moneyPosition}
             adjusting={adjustingPockets}
             cashText={cashAdjustText}
