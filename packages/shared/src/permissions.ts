@@ -17,6 +17,7 @@ export const PERMISSION_KEYS = [
   'promotions.manage',
   'cash.closing',
   'profit.view',
+  'profit.adjust_cash',
   'stock.thresholds',
   'orders.edit',
   'orders.edit_payment',
@@ -84,6 +85,12 @@ export const PERMISSIONS: PermissionDefinition[] = [
     description: 'Consultar márgenes, costos operativos y reportes de utilidad.',
   },
   {
+    key: 'profit.adjust_cash',
+    label: 'Ajustar caja y cuenta',
+    description:
+      'Contar efectivo vs TPV y transferencias en Números. No cambia las ventas ni la utilidad.',
+  },
+  {
     key: 'stock.thresholds',
     label: 'Editar límites de stock bajo',
     description: 'Definir el umbral de stock bajo por categoría de producto.',
@@ -122,6 +129,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PermissionKey, StaffRole[]> = {
   'promotions.manage': ['owner', 'branch_manager'],
   'cash.closing': ['owner', 'branch_manager', 'staff'],
   'profit.view': ['owner', 'branch_manager'],
+  'profit.adjust_cash': ['owner', 'branch_manager'],
   'stock.thresholds': ['owner', 'branch_manager'],
   'orders.edit': ['owner', 'branch_manager', 'staff'],
   'orders.edit_payment': ['owner', 'branch_manager'],

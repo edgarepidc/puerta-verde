@@ -20,6 +20,7 @@ export default async function NumerosPage() {
   const tenant = await getDefaultTenant();
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);
   const canViewProfit = staffHasPermission(staff, 'profit.view', permissionMatrix);
+  const canAdjustMoney = staffHasPermission(staff, 'profit.adjust_cash', permissionMatrix);
   const canEditStockThresholds = staffHasPermission(staff, 'stock.thresholds', permissionMatrix);
   const supabase = createAdminClient();
   const range = currentMexicoMonthRange();
@@ -153,6 +154,7 @@ export default async function NumerosPage() {
             }>}
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
             initialMoneyPosition={moneyPosition}
+            canAdjustMoney={canAdjustMoney}
             initialSummary={(summaryRows?.data?.[0] as {
               period_days: number;
               revenue: number;
