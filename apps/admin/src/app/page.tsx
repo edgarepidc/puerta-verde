@@ -26,7 +26,7 @@ export default async function AdminHomePage({
     params.section === 'reposicion' ||
     params.tab === 'reposicion'
   ) {
-    redirect('/numeros');
+    redirect('/productos#que-comprar');
   }
 
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);

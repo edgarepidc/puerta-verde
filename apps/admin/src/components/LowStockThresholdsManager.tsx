@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
@@ -42,6 +42,10 @@ export function LowStockThresholdsManager({
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [openMinimos, setOpenMinimos] = useState(false);
+
+  useEffect(() => {
+    if (window.location.hash === '#minimo-categoria') setOpenMinimos(true);
+  }, []);
 
   const dirty = useMemo(
     () =>
@@ -89,6 +93,7 @@ export function LowStockThresholdsManager({
 
   return (
     <details
+      id="minimo-categoria"
       className="group pv-glass-card space-y-4 p-4 sm:p-6"
       open={openMinimos}
       onToggle={(event) => setOpenMinimos(event.currentTarget.open)}
@@ -116,7 +121,7 @@ export function LowStockThresholdsManager({
       />
 
       {rows.length === 0 ? (
-        <p className="text-sm text-slate-500">Aún no hay categorías. Créalas en Productos.</p>
+        <p className="text-sm text-slate-500">Aún no hay categorías. Créalas en el listado de arriba.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {rows.map((row) => (

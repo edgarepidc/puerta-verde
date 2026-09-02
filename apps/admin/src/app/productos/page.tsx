@@ -16,9 +16,15 @@ export default async function ProductsPage() {
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);
   const canManage = staffHasPermission(staff, 'products.manage', permissionMatrix);
   const canAdjustInventory = staffHasPermission(staff, 'inventory.adjust', permissionMatrix);
+  const canEditStockThresholds = staffHasPermission(staff, 'stock.thresholds', permissionMatrix);
   const supabase = createAdminClient();
 
-  const [{ data: productsWithWeigh, error: productsError }, { data: categories }, { data: movements }] =
+  const [
+    { data: productsWithWeigh, error: productsError },
+    { data: categories },
+    { data: movements },
+    { data: forecast },
+  ] =
     await Promise.all([
     supabase
       .from('branch_products')
@@ -48,9 +54,10 @@ export default async function ProductsPage() {
       .order('created_at', { ascending: true }),
     supabase
       .from('product_categories')
-      .select('id, name, sort_order')
+      .select('id, name, sort_order, low_stock_threshold')
       .eq('organization_id', tenant.organizationId)
-      .order('sort_order'),
+      .order('sort_order')
+      .order('name'),
     supabase
       .from('inventory_movements')
       .select(`
@@ -67,6 +74,10 @@ export default async function ProductsPage() {
       .in('movement_type', ['waste', 'adjustment'])
       .order('created_at', { ascending: false })
       .limit(80),
+    supabase.rpc('get_restock_forecast', {
+      p_branch_id: tenant.branchId,
+      p_horizon_days: 7,
+    }),
   ]);
 
   let products: unknown = productsWithWeigh;
@@ -128,7 +139,29 @@ export default async function ProductsPage() {
             category: { id: string; name: string } | null;
           };
         }>}
-        initialCategories={categories ?? []}
+        initialCategories={(categories ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          sort_order: row.sort_order,
+        }))}
+        initialThresholdCategories={(categories ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          sort_order: row.sort_order,
+          low_stock_threshold: Number(row.low_stock_threshold ?? 3),
+        }))}
+        initialForecast={(forecast ?? []) as Array<{
+          branch_product_id: string;
+          product_name: string;
+          unit: ProductUnit;
+          current_stock: number;
+          min_stock: number;
+          avg_daily_sales: number;
+          forecast_demand: number;
+          suggested_reorder: number;
+          days_until_stockout: number | null;
+        }>}
+        canEditStockThresholds={canEditStockThresholds}
         initialMovements={(movements ?? []) as Array<{
           id: string;
           movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';

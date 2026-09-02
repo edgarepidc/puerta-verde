@@ -31,7 +31,7 @@ export default async function ConfiguracionPage({
 }) {
   const params = await searchParams;
   if (params.tab === 'cupones') redirect('/promociones?section=cupones');
-  if (params.tab === 'stock') redirect('/numeros');
+  if (params.tab === 'stock') redirect('/productos#minimo-categoria');
 
   const staff = await getStaffSession();
   if (!staff) redirect('/login');
