@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('expenses')
-      .select('id, concept, amount, expense_date, notes, created_at')
+      .select('id, concept, amount, expense_date, notes, paid_from, created_at')
       .eq('branch_id', tenant.branchId)
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -72,9 +72,10 @@ export async function POST(request: Request) {
         amount: body.amount,
         expense_date: body.expenseDate,
         notes: body.notes?.trim() ? body.notes.trim() : null,
+        paid_from: body.paidFrom === 'account' ? 'account' : 'cash',
         created_by: auth.userId,
       })
-      .select('id, concept, amount, expense_date, notes, created_at')
+      .select('id, concept, amount, expense_date, notes, paid_from, created_at')
       .single();
 
     if (error || !data) {

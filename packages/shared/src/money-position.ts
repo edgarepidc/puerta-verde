@@ -1,5 +1,27 @@
 import { roundMoney } from './market-prices';
 
+export const MONEY_POCKETS = ['cash', 'account'] as const;
+export type MoneyPocket = (typeof MONEY_POCKETS)[number];
+
+export const MONEY_POCKET_LABELS: Record<MoneyPocket, string> = {
+  cash: 'Efectivo',
+  account: 'Cuenta',
+};
+
+export function isMoneyPocket(value: unknown): value is MoneyPocket {
+  return typeof value === 'string' && (MONEY_POCKETS as readonly string[]).includes(value);
+}
+
+export function parseMoneyPocket(value: unknown, fallback: MoneyPocket = 'cash'): MoneyPocket {
+  return isMoneyPocket(value) ? value : fallback;
+}
+
+export function addPocketOutflow(flows: MoneyPositionFlows, pocket: MoneyPocket, amount: number) {
+  if (!(amount > 0)) return;
+  if (pocket === 'account') flows.accountOut += amount;
+  else flows.cashOut += amount;
+}
+
 export interface MoneyPositionSnapshot {
   asOfDate: string;
   cash: number;

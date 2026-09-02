@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveMoneyPosition, validateMoneyPositionInput } from './money-position';
+import { addPocketOutflow, resolveMoneyPosition, validateMoneyPositionInput } from './money-position';
 
 test('validateMoneyPositionInput accepts August closing amounts', () => {
   assert.equal(
@@ -60,4 +60,13 @@ test('resolveMoneyPosition without a snapshot is just the period flow', () => {
   assert.equal(result.source, 'period');
   assert.equal(result.cash, 60);
   assert.equal(result.account, 70);
+});
+
+test('addPocketOutflow sends cash and account to different pockets', () => {
+  const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  addPocketOutflow(flows, 'cash', 40);
+  addPocketOutflow(flows, 'account', 15);
+  addPocketOutflow(flows, 'cash', 0);
+  assert.equal(flows.cashOut, 40);
+  assert.equal(flows.accountOut, 15);
 });

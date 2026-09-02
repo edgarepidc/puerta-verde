@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  MONEY_POCKET_LABELS,
   PRODUCT_QUALITY_LABELS,
   PRODUCT_UNITS,
   PRODUCT_UNIT_LABELS,
@@ -12,7 +13,9 @@ import {
   calcMarginPercent,
   formatDecimal,
   formatMoney,
+  parseMoneyPocket,
   suggestSalePrice,
+  type MoneyPocket,
   type ProductQuality,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -21,6 +24,7 @@ import { ActionChip, ChevronDownIcon, FoldableSummary } from '@/components/Actio
 import { CategorySearchSelect } from '@/components/CategorySearchSelect';
 import { LowStockBanner } from '@/components/LowStockBanner';
 import { MarketComparePanel } from '@/components/MarketComparePanel';
+import { MoneyPocketField } from '@/components/MoneyPocketField';
 import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import { uploadProductMedia } from '@/lib/upload-image';
@@ -57,6 +61,7 @@ interface PurchaseRow {
   purchased_at: string;
   notes: string | null;
   total_amount: number;
+  paid_from?: MoneyPocket | null;
   created_at: string;
   supplier: { id: string; name: string } | null;
   items: Array<{
@@ -110,6 +115,7 @@ interface EditPurchaseDraft {
   supplierId: string;
   purchasedAt: string;
   notes: string;
+  paidFrom: MoneyPocket;
   items: EditItemDraft[];
 }
 
@@ -119,6 +125,7 @@ interface ExpenseRow {
   amount: number;
   expense_date: string;
   notes: string | null;
+  paid_from?: MoneyPocket | null;
   created_at: string;
 }
 
@@ -127,6 +134,7 @@ interface ExpenseDraft {
   customConcept: string;
   amount: string;
   notes: string;
+  paidFrom: MoneyPocket;
 }
 
 interface EditExpenseDraft {
@@ -135,6 +143,7 @@ interface EditExpenseDraft {
   amount: string;
   notes: string;
   expenseDate: string;
+  paidFrom: MoneyPocket;
 }
 
 function emptyExpenseDraft(): ExpenseDraft {
@@ -143,6 +152,7 @@ function emptyExpenseDraft(): ExpenseDraft {
     customConcept: '',
     amount: '',
     notes: '',
+    paidFrom: 'cash',
   };
 }
 
@@ -324,6 +334,7 @@ export function PurchasesManager({
   const [supplierId, setSupplierId] = useState(initialSuppliers.find((s) => s.is_active)?.id ?? '');
   const [purchasedAt, setPurchasedAt] = useState(todayLocalDate());
   const [notes, setNotes] = useState('');
+  const [paidFrom, setPaidFrom] = useState<MoneyPocket>('cash');
   const [lines, setLines] = useState<LineDraft[]>([emptyLine('1')]);
   const [categories, setCategories] = useState<CategoryOption[]>(initialCategories);
   const [productModalKey, setProductModalKey] = useState<string | null>(null);
@@ -551,6 +562,7 @@ export function PurchasesManager({
           amount: parseDecimal(draft.amount),
           expenseDate: date,
           notes: draft.notes || null,
+          paidFrom: draft.paidFrom,
         }),
       });
       const result = await response.json();
@@ -581,6 +593,7 @@ export function PurchasesManager({
           amount: parseDecimal(editExpenseDraft.amount),
           expenseDate: editExpenseDraft.expenseDate,
           notes: editExpenseDraft.notes || null,
+          paidFrom: editExpenseDraft.paidFrom,
         }),
       });
       const result = await response.json();
@@ -625,7 +638,7 @@ export function PurchasesManager({
     return (
       <div
         className={`grid gap-3 ${
-          compact ? 'md:grid-cols-[1.4fr_0.8fr_auto]' : 'md:grid-cols-[1.2fr_0.8fr_1fr_auto]'
+          compact ? 'md:grid-cols-[1.2fr_0.7fr_0.9fr_auto]' : 'md:grid-cols-[1fr_0.7fr_1fr_0.9fr_auto]'
         }`}
       >
         <label className="block text-sm">
@@ -669,6 +682,10 @@ export function PurchasesManager({
             />
           </label>
         )}
+        <MoneyPocketField
+          value={draft.paidFrom}
+          onChange={(value) => setDraft({ ...draft, paidFrom: value })}
+        />
         <div className="flex items-end">
           <ActionChip emoji="🧾" disabled={saving} onClick={onSubmit}>
             {saving ? 'Guardando…' : submitLabel}
@@ -908,6 +925,7 @@ export function PurchasesManager({
           supplierId: resolvedSupplierId,
           purchasedAt,
           notes: notes || null,
+          paidFrom,
           items: withProducts.map((line) => {
             const weigh = weighByKey.get(line.key) ?? false;
             const pieces = parseDecimal(line.pieceCount);
@@ -924,6 +942,7 @@ export function PurchasesManager({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo registrar');
       setNotes('');
+      setPaidFrom('cash');
       setLines([emptyLine()]);
       await refreshPurchases();
       setExpandedDate(purchasedAt);
@@ -957,6 +976,7 @@ export function PurchasesManager({
       supplierId: purchase.supplier?.id ?? '',
       purchasedAt: purchase.purchased_at,
       notes: purchase.notes ?? '',
+      paidFrom: parseMoneyPocket(purchase.paid_from),
       items: (purchase.items ?? []).map((item) => ({
         id: item.id,
         branchProductId: item.branch_product?.id ?? '',
@@ -1047,6 +1067,7 @@ export function PurchasesManager({
           supplierId: editDraft.supplierId || undefined,
           purchasedAt: editDraft.purchasedAt,
           notes: editDraft.notes || null,
+          paidFrom: editDraft.paidFrom,
           items: editDraft.items.map((item) => ({
             id: item.id,
             branchProductId: item.branchProductId || undefined,
@@ -1140,7 +1161,7 @@ export function PurchasesManager({
           iconClass="bg-emerald-100"
         />
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="block text-sm">
               <span className="font-medium text-slate-700">Proveedor *</span>
               <select
@@ -1178,6 +1199,7 @@ export function PurchasesManager({
                 onChange={(e) => setPurchasedAt(e.target.value)}
               />
             </label>
+            <MoneyPocketField value={paidFrom} onChange={setPaidFrom} />
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Notas</span>
               <input
@@ -1389,9 +1411,10 @@ export function PurchasesManager({
                     >
                       <div>
                         <p className="font-medium text-slate-900">{expense.concept}</p>
-                        {expense.notes ? (
-                          <p className="text-slate-500">{expense.notes}</p>
-                        ) : null}
+                        <p className="text-slate-500">
+                          {MONEY_POCKET_LABELS[parseMoneyPocket(expense.paid_from)]}
+                          {expense.notes ? ` · ${expense.notes}` : ''}
+                        </p>
                       </div>
                       <p className="font-semibold text-slate-900">
                         {formatMoney(Number(expense.amount))}
@@ -1909,9 +1932,10 @@ export function PurchasesManager({
                                     <p className="font-medium text-slate-900">
                                       {purchase.supplier?.name ?? 'Proveedor'}
                                     </p>
-                                    {purchase.notes ? (
-                                      <p className="text-sm text-slate-500">{purchase.notes}</p>
-                                    ) : null}
+                                    <p className="text-sm text-slate-500">
+                                      {MONEY_POCKET_LABELS[parseMoneyPocket(purchase.paid_from)]}
+                                      {purchase.notes ? ` · ${purchase.notes}` : ''}
+                                    </p>
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="font-semibold text-slate-900">
@@ -1961,7 +1985,7 @@ export function PurchasesManager({
                               </>
                             ) : (
                               <div className="space-y-3">
-                                <div className="grid gap-3 md:grid-cols-3">
+                                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                                   <label className="block text-sm">
                                     <span className="font-medium text-slate-700">Proveedor</span>
                                     <select
@@ -1993,6 +2017,12 @@ export function PurchasesManager({
                                       }
                                     />
                                   </label>
+                                  <MoneyPocketField
+                                    value={editDraft.paidFrom}
+                                    onChange={(value) =>
+                                      setEditDraft((d) => (d ? { ...d, paidFrom: value } : d))
+                                    }
+                                  />
                                   <label className="block text-sm">
                                     <span className="font-medium text-slate-700">Notas</span>
                                     <input
@@ -2116,9 +2146,10 @@ export function PurchasesManager({
                                       <p className="text-sm font-medium text-slate-900">
                                         {expense.concept}
                                       </p>
-                                      {expense.notes ? (
-                                        <p className="text-xs text-slate-500">{expense.notes}</p>
-                                      ) : null}
+                                      <p className="text-xs text-slate-500">
+                                        {MONEY_POCKET_LABELS[parseMoneyPocket(expense.paid_from)]}
+                                        {expense.notes ? ` · ${expense.notes}` : ''}
+                                      </p>
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <p className="text-sm font-semibold text-slate-900">
@@ -2134,6 +2165,7 @@ export function PurchasesManager({
                                             amount: String(expense.amount),
                                             notes: expense.notes ?? '',
                                             expenseDate: expense.expense_date,
+                                            paidFrom: parseMoneyPocket(expense.paid_from),
                                           })
                                         }
                                       >
@@ -2149,7 +2181,7 @@ export function PurchasesManager({
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_1fr]">
+                                  <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_1fr_0.9fr]">
                                     <label className="block text-sm">
                                       <span className="font-medium text-slate-700">Concepto</span>
                                       <input
@@ -2186,7 +2218,15 @@ export function PurchasesManager({
                                         }
                                       />
                                     </label>
-                                    <div className="flex flex-wrap gap-2 md:col-span-3">
+                                    <MoneyPocketField
+                                      value={editExpenseDraft.paidFrom}
+                                      onChange={(value) =>
+                                        setEditExpenseDraft((d) =>
+                                          d ? { ...d, paidFrom: value } : d,
+                                        )
+                                      }
+                                    />
+                                    <div className="flex flex-wrap gap-2 md:col-span-4">
                                       <ActionChip
                                         emoji="🧾"
                                         disabled={saving}

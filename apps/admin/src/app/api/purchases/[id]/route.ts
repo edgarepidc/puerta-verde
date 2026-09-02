@@ -19,6 +19,7 @@ interface PurchasePatchBody {
   supplierId?: string;
   purchasedAt?: string | null;
   notes?: string | null;
+  paidFrom?: 'cash' | 'account';
   items?: PurchaseItemPatch[];
 }
 
@@ -278,6 +279,9 @@ export async function PATCH(
           : {}),
         ...(body.notes !== undefined
           ? { notes: body.notes?.trim() ? body.notes.trim() : null }
+          : {}),
+        ...(body.paidFrom === 'cash' || body.paidFrom === 'account'
+          ? { paid_from: body.paidFrom }
           : {}),
         total_amount: total,
       })

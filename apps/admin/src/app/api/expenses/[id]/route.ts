@@ -10,6 +10,7 @@ interface ExpensePatchBody {
   amount?: number;
   expenseDate?: string;
   notes?: string | null;
+  paidFrom?: 'cash' | 'account';
 }
 
 export async function PATCH(
@@ -50,10 +51,13 @@ export async function PATCH(
         ...(body.notes !== undefined
           ? { notes: body.notes?.trim() ? body.notes.trim() : null }
           : {}),
+        ...(body.paidFrom === 'cash' || body.paidFrom === 'account'
+          ? { paid_from: body.paidFrom }
+          : {}),
       })
       .eq('id', id)
       .eq('branch_id', tenant.branchId)
-      .select('id, concept, amount, expense_date, notes, created_at')
+      .select('id, concept, amount, expense_date, notes, paid_from, created_at')
       .maybeSingle();
 
     if (error) {

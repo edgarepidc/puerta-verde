@@ -41,6 +41,7 @@ export async function PATCH(
       amount: number;
       notes: string | null;
       is_active: boolean;
+      paid_from: 'cash' | 'account';
     }> = {};
     if (body.name?.trim()) updates.name = body.name.trim();
     if (body.costType && OPERATING_COST_TYPES.includes(body.costType)) {
@@ -56,6 +57,9 @@ export async function PATCH(
       updates.amount = body.amount;
     }
     if (body.notes !== undefined) updates.notes = body.notes?.trim() || null;
+    if (body.paidFrom === 'cash' || body.paidFrom === 'account') {
+      updates.paid_from = body.paidFrom;
+    }
 
     const supabase = createAdminClient();
     const periodStart = body.periodStart?.trim();

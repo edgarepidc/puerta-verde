@@ -31,3 +31,15 @@ test('validateExpenseInput rejects invalid dates', () => {
     'La fecha del gasto es inválida.',
   );
 });
+
+test('validateExpenseInput accepts cash or account', () => {
+  assert.equal(
+    validateExpenseInput({
+      concept: 'Gasolina',
+      amount: 450,
+      expenseDate: '2026-08-07',
+      paidFrom: 'account',
+    }),
+    null,
+  );
+});

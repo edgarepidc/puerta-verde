@@ -7,12 +7,15 @@ import {
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
+  MONEY_POCKET_LABELS,
   OPERATING_COST_PERIOD_LABELS,
   OPERATING_COST_TYPE_LABELS,
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
   costAppliesToRange,
+  parseMoneyPocket,
   type IncomeEntryType,
+  type MoneyPocket,
   type MoneyPositionView,
   type OperatingCostInput,
   type OperatingCostPeriod,
@@ -22,6 +25,7 @@ import {
 } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
+import { MoneyPocketField } from '@/components/MoneyPocketField';
 import {
   PeriodSalesCharts,
   type PaymentRow,
@@ -58,6 +62,7 @@ interface CostRow {
   amount: number;
   notes: string | null;
   is_active: boolean;
+  paid_from?: MoneyPocket | null;
   terms?: OperatingCostTerm[];
 }
 
@@ -83,6 +88,7 @@ interface VisitExpenseRow {
   amount: number;
   expense_date: string;
   notes: string | null;
+  paid_from?: MoneyPocket | null;
 }
 
 interface IncomeRow {
@@ -113,6 +119,7 @@ const emptyCost: OperatingCostInput = {
   amount: 0,
   notes: '',
   isActive: true,
+  paidFrom: 'account',
 };
 
 type BadgeTone = 'green' | 'amber' | 'leaf' | 'blue' | 'slate' | 'orange' | 'indigo' | 'profit' | 'loss';
@@ -559,6 +566,7 @@ export function ProfitabilityManager({
     amount: string;
     expenseDate: string;
     notes: string;
+    paidFrom: MoneyPocket;
   } | null>(null);
   const [editIncome, setEditIncome] = useState<{
     id: string;
@@ -574,6 +582,7 @@ export function ProfitabilityManager({
     amount: string;
     costType: OperatingCostType;
     period: OperatingCostPeriod;
+    paidFrom: MoneyPocket;
   } | null>(null);
 
   const today = todayMexicoYmd();
@@ -845,6 +854,7 @@ export function ProfitabilityManager({
           amount: parseDecimal(editVisit.amount),
           expenseDate: editVisit.expenseDate,
           notes: editVisit.notes || null,
+          paidFrom: editVisit.paidFrom,
         }),
       });
       const result = await response.json();
@@ -878,6 +888,7 @@ export function ProfitabilityManager({
           amount: parseDecimal(editCost.amount),
           costType: editCost.costType,
           period: editCost.period,
+          paidFrom: editCost.paidFrom,
         }),
       });
       const result = await response.json();
@@ -938,6 +949,7 @@ export function ProfitabilityManager({
       concept: row.concept,
       notes: row.notes,
       amount: Number(row.amount),
+      paidFrom: parseMoneyPocket(row.paid_from),
     }));
     const incomeRows = incomes.map((row) => ({
       key: `income-${row.id}`,
@@ -1429,6 +1441,14 @@ export function ProfitabilityManager({
                                 setEditVisit((d) => (d ? { ...d, notes: e.target.value } : d))
                               }
                             />
+                            <div className="col-span-2">
+                              <MoneyPocketField
+                                value={editVisit.paidFrom}
+                                onChange={(value) =>
+                                  setEditVisit((d) => (d ? { ...d, paidFrom: value } : d))
+                                }
+                              />
+                            </div>
                             <div className="col-span-2 flex flex-wrap gap-2">
                               <ActionChip emoji="💾" disabled={saving} onClick={() => void saveVisitEdit()}>
                                 {saving ? 'Guardando…' : 'Guardar'}
@@ -1444,6 +1464,7 @@ export function ProfitabilityManager({
                               <p className="font-medium text-slate-900">{row.concept}</p>
                               <p className="text-xs text-slate-500">
                                 {row.date}
+                                {` · ${MONEY_POCKET_LABELS[row.paidFrom]}`}
                                 {row.notes ? ` · ${row.notes}` : ''}
                               </p>
                             </div>
@@ -1461,6 +1482,7 @@ export function ProfitabilityManager({
                                     amount: formatDecimal(row.amount),
                                     expenseDate: row.date,
                                     notes: row.notes ?? '',
+                                    paidFrom: row.paidFrom,
                                   })
                                 }
                               >
@@ -1689,7 +1711,7 @@ export function ProfitabilityManager({
                       className={`px-4 py-2.5 ${applies ? '' : 'opacity-70'}`}
                     >
                       {editing && editCost ? (
-                        <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.55fr)_7.5rem_8.5rem_auto]">
+                        <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_7rem_8rem_7.5rem_auto]">
                           <input
                             className="pv-input min-w-0 col-span-2 lg:col-span-1"
                             value={editCost.name}
@@ -1735,6 +1757,13 @@ export function ProfitabilityManager({
                               </option>
                             ))}
                           </select>
+                          <MoneyPocketField
+                            label="Sale de"
+                            value={editCost.paidFrom}
+                            onChange={(value) =>
+                              setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
+                            }
+                          />
                           <div className="col-span-2 flex flex-wrap justify-end gap-2 lg:col-span-1">
                             <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
                               {saving ? 'Guardando…' : 'Guardar'}
@@ -1750,7 +1779,8 @@ export function ProfitabilityManager({
                             <p className="font-medium text-slate-900">{row.name}</p>
                             <p className="text-sm text-slate-500">
                               {OPERATING_COST_TYPE_LABELS[row.cost_type]} ·{' '}
-                              {OPERATING_COST_PERIOD_LABELS[row.period]}
+                              {OPERATING_COST_PERIOD_LABELS[row.period]} ·{' '}
+                              {MONEY_POCKET_LABELS[parseMoneyPocket(row.paid_from, 'account')]}
                               {applies ? ' · aplica aquí' : ' · pausado aquí'}
                             </p>
                           </div>
@@ -1768,6 +1798,7 @@ export function ProfitabilityManager({
                                   amount: formatDecimal(Number(row.amount)),
                                   costType: row.cost_type,
                                   period: row.period,
+                                  paidFrom: parseMoneyPocket(row.paid_from, 'account'),
                                 })
                               }
                             >
@@ -1798,7 +1829,7 @@ export function ProfitabilityManager({
             )}
 
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-              <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.55fr)_7.5rem_8.5rem_auto]">
+              <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_7rem_8rem_7.5rem_auto]">
               <input
                 placeholder="Nombre"
                 className="pv-input min-w-0 col-span-2 lg:col-span-1"
@@ -1834,6 +1865,11 @@ export function ProfitabilityManager({
                   </option>
                 ))}
               </select>
+              <MoneyPocketField
+                label="Sale de"
+                value={costForm.paidFrom ?? 'account'}
+                onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
+              />
               <div className="col-span-2 flex justify-end lg:col-span-1">
                 <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
                   Agregar costo

@@ -27,6 +27,7 @@ export async function GET() {
           purchased_at,
           notes,
           total_amount,
+          paid_from,
           created_at,
           supplier:suppliers ( id, name ),
           items:purchase_items (
@@ -60,7 +61,7 @@ export async function GET() {
         .order('name', { ascending: true }),
       supabase
         .from('expenses')
-        .select('id, concept, amount, expense_date, notes, created_at')
+        .select('id, concept, amount, expense_date, notes, paid_from, created_at')
         .eq('branch_id', tenant.branchId)
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false })
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
       p_supplier_id: body.supplierId,
       p_purchased_at: body.purchasedAt ?? null,
       p_notes: body.notes ?? null,
+      p_paid_from: body.paidFrom === 'account' ? 'account' : 'cash',
       p_items: body.items.map((item) => ({
         branch_product_id: item.branchProductId,
         quantity: item.quantity,

@@ -1,16 +1,15 @@
-import { resolveMoneyPosition, roundMoney, type MoneyPositionView } from '@puertaverde/shared';
+import {
+  addPocketOutflow,
+  parseMoneyPocket,
+  resolveMoneyPosition,
+  roundMoney,
+  type MoneyPositionView,
+} from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { addMexicoDays, mexicoYmdBoundsIso } from '@/lib/mexico-date';
 
 export type { MoneyPositionView };
-
-function sumAmount(rows: Array<{ amount?: number | null; total_amount?: number | null }> | null): number {
-  return (rows ?? []).reduce(
-    (sum, row) => sum + Number(row.amount ?? row.total_amount ?? 0),
-    0,
-  );
-}
 
 export async function fetchMoneyPosition(
   branchId: string,
@@ -38,10 +37,7 @@ export async function fetchMoneyPosition(
   const closesThisPeriod = Boolean(snapshot && snapshot.asOfDate >= to);
   const movementStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
 
-  let cashIn = 0;
-  let accountIn = 0;
-  let cashOut = 0;
-  let accountOut = 0;
+  const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
 
   if (!closesThisPeriod && movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
@@ -58,14 +54,14 @@ export async function fetchMoneyPosition(
         .limit(5000),
       supabase
         .from('purchases')
-        .select('total_amount')
+        .select('total_amount, paid_from')
         .eq('branch_id', branchId)
         .gte('purchased_at', movementStart)
         .lte('purchased_at', to)
         .limit(2000),
       supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, paid_from')
         .eq('branch_id', branchId)
         .gte('expense_date', movementStart)
         .lte('expense_date', to)
@@ -82,23 +78,27 @@ export async function fetchMoneyPosition(
     for (const order of ordersRes.data ?? []) {
       const amount = Number(order.total ?? 0);
       if (order.payment_method === 'cash' || !order.payment_method) {
-        cashIn += amount;
+        flows.cashIn += amount;
       } else if (
         order.payment_method === 'card_terminal' ||
         order.payment_method === 'transfer' ||
         order.payment_method === 'online'
       ) {
-        accountIn += amount;
+        flows.accountIn += amount;
       }
     }
 
-    cashOut += sumAmount(purchasesRes.data);
-    cashOut += sumAmount(expensesRes.data);
+    for (const row of purchasesRes.data ?? []) {
+      addPocketOutflow(flows, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
+    }
+    for (const row of expensesRes.data ?? []) {
+      addPocketOutflow(flows, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
+    }
 
     for (const row of incomesRes.data ?? []) {
       const amount = Number(row.amount ?? 0);
-      if (row.entry_type === 'contribution') accountIn += amount;
-      else cashIn += amount;
+      if (row.entry_type === 'contribution') flows.accountIn += amount;
+      else flows.cashIn += amount;
     }
   }
 
@@ -106,10 +106,10 @@ export async function fetchMoneyPosition(
     snapshot,
     periodEnd: to,
     flows: {
-      cashIn: roundMoney(cashIn),
-      accountIn: roundMoney(accountIn),
-      cashOut: roundMoney(cashOut),
-      accountOut: roundMoney(accountOut),
+      cashIn: roundMoney(flows.cashIn),
+      accountIn: roundMoney(flows.accountIn),
+      cashOut: roundMoney(flows.cashOut),
+      accountOut: roundMoney(flows.accountOut),
     },
   });
 

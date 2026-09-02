@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { costAppliesToRange } from './profitability';
+import { costAppliesToRange, operatingCostAmountForRange } from './profitability';
 
 test('costAppliesToRange is true for an open term that started before the period', () => {
   assert.equal(
@@ -39,4 +39,24 @@ test('costAppliesToRange handles a gap then a new term', () => {
   ];
   assert.equal(costAppliesToRange(terms, '2026-08-01', '2026-08-31'), false);
   assert.equal(costAppliesToRange(terms, '2026-09-01', '2026-09-01'), true);
+});
+
+test('operatingCostAmountForRange uses the full month when the range starts on day 1', () => {
+  assert.equal(
+    operatingCostAmountForRange(
+      { costType: 'fixed', period: 'monthly', amount: 9500 },
+      '2026-09-01',
+      '2026-09-02',
+    ),
+    9500,
+  );
+});
+
+test('operatingCostAmountForRange prorates a monthly cost mid-month', () => {
+  const amount = operatingCostAmountForRange(
+    { costType: 'fixed', period: 'monthly', amount: 9000 },
+    '2026-09-10',
+    '2026-09-12',
+  );
+  assert.equal(amount, 900);
 });

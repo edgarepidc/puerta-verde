@@ -70,7 +70,7 @@ export default async function NumerosPage() {
           }),
           supabase
             .from('expenses')
-            .select('id, concept, amount, expense_date, notes')
+            .select('id, concept, amount, expense_date, notes, paid_from')
             .eq('branch_id', tenant.branchId)
             .gte('expense_date', range.start)
             .lte('expense_date', range.end)
@@ -135,6 +135,7 @@ export default async function NumerosPage() {
               amount: number;
               notes: string | null;
               is_active: boolean;
+              paid_from?: 'cash' | 'account' | null;
               terms?: Array<{ id: string; start_date: string; end_date: string | null }>;
             }>}
             initialVisitExpenses={(visitExpenses?.data ?? []) as Array<{
@@ -143,6 +144,7 @@ export default async function NumerosPage() {
               amount: number;
               expense_date: string;
               notes: string | null;
+              paid_from?: 'cash' | 'account' | null;
             }>}
             initialIncomes={(incomeEntries?.data ?? []) as Array<{
               id: string;

@@ -1,3 +1,5 @@
+import { isMoneyPocket, type MoneyPocket } from './money-position';
+
 export const PRODUCT_QUALITIES = ['premium', 'normal', 'saldo'] as const;
 export type ProductQuality = (typeof PRODUCT_QUALITIES)[number];
 
@@ -25,6 +27,7 @@ export interface PurchaseInput {
   supplierId: string;
   purchasedAt?: string | null;
   notes?: string | null;
+  paidFrom?: MoneyPocket;
   items: PurchaseItemInput[];
 }
 
@@ -43,6 +46,9 @@ export function validateSupplierInput(input: SupplierInput): string | null {
 
 export function validatePurchaseInput(input: PurchaseInput): string | null {
   if (!input.supplierId) return 'Selecciona un proveedor.';
+  if (input.paidFrom != null && !isMoneyPocket(input.paidFrom)) {
+    return 'Elige si pagaste en efectivo o de la cuenta.';
+  }
   if (!Array.isArray(input.items) || input.items.length === 0) {
     return 'Agrega al menos un producto a la compra.';
   }

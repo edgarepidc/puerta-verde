@@ -356,6 +356,7 @@ export interface Database {
           amount: number;
           notes: string | null;
           is_active: boolean;
+          paid_from: 'cash' | 'account';
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['branch_operating_costs']['Row']> & {
@@ -415,6 +416,7 @@ export interface Database {
           purchased_at: string;
           notes: string | null;
           total_amount: number;
+          paid_from: 'cash' | 'account';
           created_by: string | null;
           created_at: string;
         };
@@ -544,6 +546,7 @@ export interface Database {
           amount: number;
           expense_date: string;
           notes: string | null;
+          paid_from: 'cash' | 'account';
           created_by: string | null;
           created_at: string;
         };
@@ -741,6 +744,7 @@ export interface Database {
           p_purchased_at: string | null;
           p_notes: string | null;
           p_items: Json;
+          p_paid_from?: 'cash' | 'account';
         };
         Returns: Array<{ purchase_id: string; total_amount: number }>;
       };

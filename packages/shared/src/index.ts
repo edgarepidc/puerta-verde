@@ -302,6 +302,7 @@ export {
   calcMarginPercent,
   validateOperatingCostInput,
   costAppliesToRange,
+  operatingCostAmountForRange,
   OPERATING_COST_TYPES,
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPE_LABELS,
@@ -328,8 +329,14 @@ export {
   type IncomeEntryType,
 } from './income-entries';
 export {
+  MONEY_POCKETS,
+  MONEY_POCKET_LABELS,
+  addPocketOutflow,
+  isMoneyPocket,
+  parseMoneyPocket,
   resolveMoneyPosition,
   validateMoneyPositionInput,
+  type MoneyPocket,
   type MoneyPositionFlows,
   type MoneyPositionInput,
   type MoneyPositionSnapshot,
