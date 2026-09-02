@@ -43,8 +43,15 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const gate = await requireProfit();
-  if (gate.auth instanceof NextResponse) return gate.auth;
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'profit.adjust_cash',
+    'No tienes permiso para ajustar caja y cuenta',
+  );
+  if (denied) return denied;
 
   try {
     const tenant = await getDefaultTenant();
@@ -79,7 +86,7 @@ export async function PUT(request: Request) {
         cash_amount: input.cashAmount,
         account_amount: input.accountAmount,
         notes: input.notes?.trim() ? input.notes.trim() : null,
-        created_by: gate.auth.userId,
+        created_by: auth.userId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'branch_id,as_of_date' },

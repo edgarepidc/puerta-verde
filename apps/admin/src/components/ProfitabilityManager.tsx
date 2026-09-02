@@ -203,6 +203,7 @@ function TeQuedoCard({
   onAccountText,
   onToggleAdjust,
   onSave,
+  canAdjust,
 }: {
   net: number;
   netPositive: boolean;
@@ -216,6 +217,7 @@ function TeQuedoCard({
   onAccountText: (value: string) => void;
   onToggleAdjust: () => void;
   onSave: () => void;
+  canAdjust: boolean;
 }) {
   return (
     <div className="pv-glass-card flex gap-3 p-4">
@@ -257,10 +259,10 @@ function TeQuedoCard({
           </ul>
           <p className="mt-1 text-xs text-slate-500">
             {position
-              ? `${pocketHint(position)}. No cambia la utilidad.`
-              : 'Efectivo vs TPV y transferencias. No cambia la utilidad.'}
+              ? `${pocketHint(position)}. No cambia las ventas ni la utilidad.`
+              : 'Efectivo vs TPV y transferencias. No cambia las ventas ni la utilidad.'}
           </p>
-          {adjusting ? (
+          {canAdjust && adjusting ? (
             <div className="mt-3 grid grid-cols-2 gap-2">
               <label className="text-xs font-medium text-slate-600">
                 Caja
@@ -289,13 +291,13 @@ function TeQuedoCard({
                 </ActionChip>
               </div>
             </div>
-          ) : (
+          ) : canAdjust ? (
             <div className="mt-2">
               <ActionChip elevated={false} emoji="✏️" onClick={onToggleAdjust}>
                 Ajustar
               </ActionChip>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -545,6 +547,7 @@ export function ProfitabilityManager({
   initialMoneyPosition,
   initialSummary,
   initialCategories,
+  canAdjustMoney,
 }: {
   periodLabel: string;
   initialFrom: string;
@@ -557,6 +560,7 @@ export function ProfitabilityManager({
   initialMoneyPosition: MoneyPositionView | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
+  canAdjustMoney: boolean;
 }) {
   const [margins, setMargins] = useState(initialMargins);
   const [costs, setCosts] = useState(initialCosts);
@@ -932,6 +936,7 @@ export function ProfitabilityManager({
   }
 
   async function saveMoneyAdjust() {
+    if (!canAdjustMoney) return;
     setSaving(true);
     setError(null);
     try {
@@ -1039,8 +1044,8 @@ export function ProfitabilityManager({
         </div>
       ) : null}
 
-      <div className="space-y-2 sm:space-y-3">
-        <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-3 sm:gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:gap-3">
           <MetricCard
             emoji="🧺"
             tone="green"
@@ -1049,6 +1054,15 @@ export function ProfitabilityManager({
             hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'} · ${activePeriodLabel}`}
           />
           <MetricCard
+            emoji="📦"
+            tone="slate"
+            label="Inventario a costo"
+            value={formatMoney(totals.inventoryCost)}
+            hint="Lo que pagaste por lo que hay"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:gap-3">
+          <MetricCard
             emoji="🧾"
             tone="amber"
             label="Te costó"
@@ -1056,39 +1070,6 @@ export function ProfitabilityManager({
               Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
             )}
             hint="Mercancía + fijos + visita"
-          />
-          <TeQuedoCard
-            net={net}
-            netPositive={netPositive}
-            contributionsTotal={contributionsTotal}
-            position={moneyPosition}
-            adjusting={adjustingPockets}
-            cashText={cashAdjustText}
-            accountText={accountAdjustText}
-            saving={saving}
-            onCashText={setCashAdjustText}
-            onAccountText={setAccountAdjustText}
-            onToggleAdjust={() => {
-              if (adjustingPockets) {
-                setAdjustingPockets(false);
-                return;
-              }
-              setCashAdjustText(formatDecimal(moneyPosition?.cash ?? 0));
-              setAccountAdjustText(formatDecimal(moneyPosition?.account ?? 0));
-              setAdjustingPockets(true);
-            }}
-            onSave={() => void saveMoneyAdjust()}
-          />
-        </div>
-        <div
-          className={`grid grid-cols-2 gap-2 sm:gap-3 ${contributionsTotal > 0 ? 'sm:grid-cols-3' : ''}`}
-        >
-          <MetricCard
-            emoji="📦"
-            tone="slate"
-            label="Inventario a costo"
-            value={formatMoney(totals.inventoryCost)}
-            hint="Lo que pagaste por lo que hay"
           />
           <MetricCard
             emoji="🏷️"
@@ -1101,16 +1082,40 @@ export function ProfitabilityManager({
                 : 'Al precio de lista'
             }
           />
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:gap-3">
+          <TeQuedoCard
+            net={net}
+            netPositive={netPositive}
+            contributionsTotal={contributionsTotal}
+            position={moneyPosition}
+            adjusting={adjustingPockets}
+            cashText={cashAdjustText}
+            accountText={accountAdjustText}
+            saving={saving}
+            canAdjust={canAdjustMoney}
+            onCashText={setCashAdjustText}
+            onAccountText={setAccountAdjustText}
+            onToggleAdjust={() => {
+              if (!canAdjustMoney) return;
+              if (adjustingPockets) {
+                setAdjustingPockets(false);
+                return;
+              }
+              setCashAdjustText(formatDecimal(moneyPosition?.cash ?? 0));
+              setAccountAdjustText(formatDecimal(moneyPosition?.account ?? 0));
+              setAdjustingPockets(true);
+            }}
+            onSave={() => void saveMoneyAdjust()}
+          />
           {contributionsTotal > 0 ? (
-            <div className="col-span-2 sm:col-span-1">
-              <MetricCard
-                emoji="💵"
-                tone="green"
-                label="Aportaste"
-                value={formatMoney(contributionsTotal)}
-                hint="Capital que metiste. Ya está en Te quedó."
-              />
-            </div>
+            <MetricCard
+              emoji="💵"
+              tone="green"
+              label="Aportaste"
+              value={formatMoney(contributionsTotal)}
+              hint="Capital que metiste. Ya está en Te quedó."
+            />
           ) : null}
         </div>
       </div>
