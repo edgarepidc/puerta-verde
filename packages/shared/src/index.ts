@@ -249,6 +249,8 @@ export {
   isChileProduct,
   getDefaultLowStockThreshold,
   isLowStock,
+  STOCK_QTY_DECIMALS,
+  quantityForStockCount,
   type InventoryMovementInput,
   type InventoryMovementType,
   type ManualInventoryMovementType,

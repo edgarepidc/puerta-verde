@@ -11,6 +11,7 @@ import {
   formatMoney,
   getDefaultLowStockThreshold,
   isLowStock,
+  quantityForStockCount,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -495,7 +496,7 @@ export function ProductsManager({
       setStockError('Indica un conteo válido (0 o más).');
       return;
     }
-    const delta = Number((counted - system).toFixed(2));
+    const delta = Number((counted - system).toFixed(3));
     if (delta === 0) {
       setStockError('El conteo es igual al stock del sistema.');
       return;
@@ -513,7 +514,7 @@ export function ProductsManager({
         body: JSON.stringify({
           branchProductId: stockRow.id,
           movementType: kind,
-          quantity: kind === 'waste' ? Math.abs(delta) : delta,
+          quantity: quantityForStockCount({ system, counted, kind }),
           notes:
             stockNotes.trim() ||
             (kind === 'waste'
