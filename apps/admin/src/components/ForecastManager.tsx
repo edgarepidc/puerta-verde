@@ -309,12 +309,13 @@ export function ForecastManager({
     <div className="space-y-6">
       <LowStockBanner
         products={bannerProducts}
-        href="/compras"
+        href="#que-comprar"
         persist
-        linkLabel="Ir a comprar"
+        linkLabel="Ver qué comprar"
       />
 
       <details
+        id="que-comprar"
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
         open={openComprar}
         onToggle={(event) => setOpenComprar(event.currentTarget.open)}

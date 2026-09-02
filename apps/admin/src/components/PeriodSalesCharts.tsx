@@ -52,7 +52,7 @@ const PRODUCT_RANK_MODES: Array<{
 }> = [
   { id: 'quantity', label: 'Unidades', hint: 'Prioriza comprar lo que rota' },
   { id: 'revenue', label: 'Venta', hint: 'Lo que más cobras en caja' },
-  { id: 'profit', label: 'Ingreso', hint: 'Lo que más deja después del costo' },
+  { id: 'profit', label: 'Utilidad', hint: 'Lo que más deja después del costo' },
 ];
 
 function productRankValue(product: TopProduct, mode: ProductRankMode) {
@@ -326,6 +326,7 @@ export function PeriodSalesCharts({
   topProducts,
   topWeekdays,
   paymentBreakdown,
+  status = 'ready',
 }: {
   periodLabel: string;
   total: number;
@@ -333,6 +334,7 @@ export function PeriodSalesCharts({
   topProducts: TopProduct[];
   topWeekdays: WeekdayRow[];
   paymentBreakdown: PaymentRow[];
+  status?: 'loading' | 'ready' | 'error';
 }) {
   const [rankMode, setRankMode] = useState<ProductRankMode>('quantity');
   const rankedProducts = useMemo(() => {
@@ -352,8 +354,14 @@ export function PeriodSalesCharts({
         <p className="mt-3 text-sm font-medium text-slate-700">Ventas por día</p>
         <p className="text-sm text-slate-500">Monto vendido en caja</p>
         <div className="mt-3">
-          {series.length > 0 ? (
+          {status === 'loading' ? (
+            <p className="py-10 text-sm text-slate-500">Cargando ventas…</p>
+          ) : status === 'error' ? (
+            <p className="py-10 text-sm text-slate-500">No se pudieron cargar las gráficas.</p>
+          ) : series.length > 0 ? (
             <LineChart series={series} />
+          ) : total > 0 ? (
+            <p className="py-10 text-sm text-slate-500">Las ventas están en la tarjeta de arriba.</p>
           ) : (
             <p className="py-10 text-sm text-slate-500">Aún no hay ventas en el periodo.</p>
           )}
@@ -379,8 +387,14 @@ export function PeriodSalesCharts({
             ))}
           </div>
         </div>
-        {rankedProducts.length > 0 ? (
+        {status === 'loading' ? (
+          <p className="py-10 text-sm text-slate-500">Cargando productos…</p>
+        ) : status === 'error' ? (
+          <p className="py-10 text-sm text-slate-500">No se pudieron cargar los productos.</p>
+        ) : rankedProducts.length > 0 ? (
           <ProductBarChart products={rankedProducts} mode={rankMode} />
+        ) : total > 0 ? (
+          <p className="py-10 text-sm text-slate-500">Las ventas están en la tarjeta de arriba.</p>
         ) : (
           <p className="py-10 text-sm text-slate-500">Sin datos de productos todavía.</p>
         )}

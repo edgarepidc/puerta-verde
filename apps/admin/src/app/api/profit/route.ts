@@ -4,6 +4,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { resolveProfitDateRange } from '@/lib/mexico-date';
+import { fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
 
 export async function GET(request: Request) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
 
     const tenant = await getDefaultTenant();
     const supabase = createAdminClient();
-    const [{ data, error }, { data: purchaseRows, error: purchaseError }] = await Promise.all([
+    const [{ data, error }, { data: purchaseRows, error: purchaseError }, extras] = await Promise.all([
       supabase.rpc('get_profit_summary', {
         p_branch_id: tenant.branchId,
         p_start: range.start,
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
         .gte('purchased_at', range.start)
         .lte('purchased_at', range.end)
         .limit(2000),
+      fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end),
     ]);
 
     if (error) {
@@ -56,6 +58,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       summary: data?.[0] ?? null,
       purchasesTotal: Number(purchasesTotal.toFixed(2)),
+      wasteCost: extras.wasteCost,
+      zeroCostSold: extras.zeroCostSold,
       periodLabel: range.label,
       from: range.start,
       to: range.end,
