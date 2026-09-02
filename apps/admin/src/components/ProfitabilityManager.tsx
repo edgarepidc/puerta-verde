@@ -515,6 +515,7 @@ function CashBridge({
   ticketIn,
   ticketInCash,
   ticketInAccount,
+  pausedIn,
   periodIn,
   periodOut,
   closing,
@@ -524,11 +525,12 @@ function CashBridge({
   ticketIn: number;
   ticketInCash: number;
   ticketInAccount: number;
+  pausedIn: number;
   periodIn: number;
   periodOut: number;
   closing: number;
 }) {
-  const otherIn = Math.max(periodIn - ticketIn, 0);
+  const otherIn = Math.max(periodIn - ticketIn - pausedIn, 0);
   return (
     <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
       <h3 className="text-sm font-semibold text-slate-900">Caja y cuenta</h3>
@@ -558,6 +560,19 @@ function CashBridge({
             {formatMoney(ticketIn)}
           </span>
         </li>
+        {pausedIn > 0.009 ? (
+          <li className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0">
+              <span className="font-medium text-slate-800">+ Seguía en la cuenta</span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Renta de agosto que no se pagó
+              </span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+              {formatMoney(pausedIn)}
+            </span>
+          </li>
+        ) : null}
         {otherIn > 0.009 ? (
           <li className="flex items-baseline justify-between gap-3">
             <span className="font-medium text-slate-800">+ Aportaciones y otros</span>
@@ -570,7 +585,7 @@ function CashBridge({
           <span className="min-w-0">
             <span className="font-medium text-slate-800">− Salió</span>
             <span className="mt-0.5 block text-xs text-slate-500">
-              Compras, renta, visita y gastos
+              Incluye la renta que sí pagaste el 1 · compras y visita
             </span>
           </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
@@ -1501,6 +1516,7 @@ export function ProfitabilityManager({
           ticketIn={Number(moneyPosition?.ticketIn ?? 0)}
           ticketInCash={Number(moneyPosition?.ticketInCash ?? 0)}
           ticketInAccount={Number(moneyPosition?.ticketInAccount ?? 0)}
+          pausedIn={Number(moneyPosition?.pausedIn ?? 0)}
           periodIn={Number(moneyPosition?.periodIn ?? 0)}
           periodOut={Number(moneyPosition?.periodOut ?? 0)}
           closing={leftover}
