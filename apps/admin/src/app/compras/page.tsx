@@ -20,7 +20,7 @@ export default async function ComprasPage({
 
   const params = await searchParams;
   if (params.section === 'reposicion' || params.tab === 'reposicion') {
-    redirect('/numeros');
+    redirect('/productos#que-comprar');
   }
 
   const tenant = await getDefaultTenant();

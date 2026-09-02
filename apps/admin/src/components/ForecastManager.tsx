@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   PRODUCT_UNIT_LABELS,
@@ -155,6 +155,10 @@ export function ForecastManager({
   const [printError, setPrintError] = useState<string | null>(null);
   const [openComprar, setOpenComprar] = useState(false);
   const { status: printerStatus } = useThermalPrinter();
+
+  useEffect(() => {
+    if (window.location.hash === '#que-comprar') setOpenComprar(true);
+  }, []);
 
   const bannerProducts = useMemo(() => {
     if (stockProducts.length > 0) return stockProducts;

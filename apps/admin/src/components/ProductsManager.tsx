@@ -24,6 +24,8 @@ import {
   decimalFromNumber,
   parseDecimal,
 } from '@/components/DecimalInput';
+import { ForecastManager } from '@/components/ForecastManager';
+import { LowStockThresholdsManager } from '@/components/LowStockThresholdsManager';
 import { MarketComparePanel } from '@/components/MarketComparePanel';
 import { StockMovementHistory, type StockMovementRow } from '@/components/StockMovementHistory';
 import { uploadProductMedia } from '@/lib/upload-image';
@@ -160,6 +162,9 @@ export function ProductsManager({
   canManage = true,
   canAdjustInventory = false,
   initialMovements = [],
+  initialForecast = [],
+  initialThresholdCategories = [],
+  canEditStockThresholds = false,
 }: {
   initialProducts: ProductRow[];
   initialCategories: Category[];
@@ -167,6 +172,24 @@ export function ProductsManager({
   canManage?: boolean;
   canAdjustInventory?: boolean;
   initialMovements?: StockMovementRow[];
+  initialForecast?: Array<{
+    branch_product_id: string;
+    product_name: string;
+    unit: ProductUnit;
+    current_stock: number;
+    min_stock: number;
+    avg_daily_sales: number;
+    forecast_demand: number;
+    suggested_reorder: number;
+    days_until_stockout: number | null;
+  }>;
+  initialThresholdCategories?: Array<{
+    id: string;
+    name: string;
+    sort_order: number;
+    low_stock_threshold: number;
+  }>;
+  canEditStockThresholds?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(initialCategories);
@@ -1084,6 +1107,24 @@ export function ProductsManager({
           </section>
         </div>
       )}
+
+      <ForecastManager
+        initialForecast={initialForecast}
+        stockProducts={products.map((row) => ({
+          id: row.id,
+          stock: Number(row.stock),
+          min_stock: row.min_stock,
+          product: {
+            name: row.product.name,
+            unit: row.product.unit,
+            category: row.product.category,
+          },
+        }))}
+      />
+      <LowStockThresholdsManager
+        canEdit={canEditStockThresholds}
+        initialCategories={initialThresholdCategories}
+      />
 
       <StockMovementHistory
         movements={movements}

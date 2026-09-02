@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** Qué comprar vive en Números. */
+/** Qué comprar vive en Productos. */
 export default function PronosticosRedirectPage() {
-  redirect('/numeros');
+  redirect('/productos#que-comprar');
 }

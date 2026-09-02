@@ -20,7 +20,7 @@ const AUTO_HIDE_MS = 10_000;
 
 export function LowStockBanner({
   products,
-  href = '/numeros',
+  href = '/productos#que-comprar',
   persist = false,
   linkLabel = 'Ver qué comprar',
 }: {

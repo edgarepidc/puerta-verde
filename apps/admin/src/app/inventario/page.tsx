@@ -10,7 +10,7 @@ export default async function InventarioRedirectPage({
   const section = typeof params.section === 'string' ? params.section : undefined;
   const tab = typeof params.tab === 'string' ? params.tab : undefined;
   if (section === 'reposicion' || tab === 'reposicion') {
-    redirect('/numeros');
+    redirect('/productos#que-comprar');
   }
 
   const qs = new URLSearchParams();

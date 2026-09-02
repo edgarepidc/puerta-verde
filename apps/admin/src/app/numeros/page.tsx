@@ -2,8 +2,6 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import { redirect } from 'next/navigation';
 
 import { AdminShell } from '@/components/AdminShell';
-import { ForecastManager } from '@/components/ForecastManager';
-import { LowStockThresholdsManager } from '@/components/LowStockThresholdsManager';
 import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
@@ -22,40 +20,11 @@ export default async function NumerosPage() {
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);
   const canViewProfit = staffHasPermission(staff, 'profit.view', permissionMatrix);
   const canAdjustMoney = staffHasPermission(staff, 'profit.adjust_cash', permissionMatrix);
-  const canEditStockThresholds = staffHasPermission(staff, 'stock.thresholds', permissionMatrix);
   const supabase = createAdminClient();
   const range = currentMexicoMonthRange();
   const periodLabel = formatMexicoPeriodLabel(range.start, range.end);
 
-  const [
-    { data: forecast },
-    { data: stockProducts },
-    { data: stockCategories },
-    profitBundle,
-    moneyPosition,
-    profitExtras,
-  ] = await Promise.all([
-    supabase.rpc('get_restock_forecast', {
-      p_branch_id: staff.branchId,
-      p_horizon_days: 7,
-    }),
-    supabase
-      .from('branch_products')
-      .select(`
-        id,
-        stock,
-        min_stock,
-        is_available,
-        product:products ( id, name, unit, sku )
-      `)
-      .eq('branch_id', staff.branchId)
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('product_categories')
-      .select('id, name, sort_order, low_stock_threshold')
-      .eq('organization_id', staff.organizationId)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true }),
+  const [profitBundle, moneyPosition, profitExtras] = await Promise.all([
     canViewProfit
       ? Promise.all([
           supabase.rpc('get_product_margins', { p_branch_id: tenant.branchId }),
@@ -194,39 +163,6 @@ export default async function NumerosPage() {
             }>}
           />
         ) : null}
-
-        <ForecastManager
-          stockProducts={(stockProducts ?? []) as Array<{
-            id: string;
-            stock: number;
-            min_stock?: number | null;
-            product: {
-              name: string;
-              unit?: ProductUnit;
-              category?: { name?: string | null } | null;
-            };
-          }>}
-          initialForecast={(forecast ?? []) as Array<{
-            branch_product_id: string;
-            product_name: string;
-            unit: ProductUnit;
-            current_stock: number;
-            min_stock: number;
-            avg_daily_sales: number;
-            forecast_demand: number;
-            suggested_reorder: number;
-            days_until_stockout: number | null;
-          }>}
-        />
-        <LowStockThresholdsManager
-          canEdit={canEditStockThresholds}
-          initialCategories={(stockCategories ?? []).map((row) => ({
-            id: row.id,
-            name: row.name,
-            sort_order: row.sort_order,
-            low_stock_threshold: Number(row.low_stock_threshold ?? 3),
-          }))}
-        />
       </div>
     </AdminShell>
   );
