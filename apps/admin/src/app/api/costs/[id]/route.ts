@@ -4,6 +4,7 @@ import {
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
   costAppliesToRange,
+  normalizeChargeDay,
   type OperatingCostInput,
   type OperatingCostTerm,
 } from '@puertaverde/shared';
@@ -42,6 +43,7 @@ export async function PATCH(
       notes: string | null;
       is_active: boolean;
       paid_from: 'cash' | 'account';
+      charge_day: number;
     }> = {};
     if (body.name?.trim()) updates.name = body.name.trim();
     if (body.costType && OPERATING_COST_TYPES.includes(body.costType)) {
@@ -59,6 +61,13 @@ export async function PATCH(
     if (body.notes !== undefined) updates.notes = body.notes?.trim() || null;
     if (body.paidFrom === 'cash' || body.paidFrom === 'account') {
       updates.paid_from = body.paidFrom;
+    }
+    if (body.chargeDay != null) {
+      const chargeDay = normalizeChargeDay(body.chargeDay, 0);
+      if (chargeDay === 0) {
+        return NextResponse.json({ error: 'El día tiene que ser del 1 al 31.' }, { status: 400 });
+      }
+      updates.charge_day = chargeDay;
     }
 
     const supabase = createAdminClient();

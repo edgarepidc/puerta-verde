@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  formatChargeDayLabel,
   formatDecimal,
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
   MONEY_POCKET_LABELS,
-  OPERATING_COST_PERIOD_LABELS,
-  OPERATING_COST_TYPE_LABELS,
-  OPERATING_COST_PERIODS,
-  OPERATING_COST_TYPES,
+  MAX_CHARGE_DAY,
   costAppliesToRange,
+  costPausedAtPeriodStart,
+  normalizeChargeDay,
+  operatingCostAmountForRange,
   parseMoneyPocket,
   pocketTotal,
   type IncomeEntryType,
@@ -36,6 +37,7 @@ import {
 } from '@/components/PeriodSalesCharts';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import {
+  addMexicoDays,
   currentMexicoMonthRange,
   previousMexicoMonthRange,
   todayMexicoYmd,
@@ -64,6 +66,7 @@ interface CostRow {
   notes: string | null;
   is_active: boolean;
   paid_from?: MoneyPocket | null;
+  charge_day?: number | null;
   terms?: OperatingCostTerm[];
 }
 
@@ -121,7 +124,34 @@ const emptyCost: OperatingCostInput = {
   notes: '',
   isActive: true,
   paidFrom: 'account',
+  chargeDay: 1,
 };
+
+function ChargeDayField({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (day: number) => void;
+}) {
+  return (
+    <label className="min-w-0">
+      <span className="sr-only">Se suma el día</span>
+      <select
+        className="pv-input min-w-0"
+        value={normalizeChargeDay(value)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="Se suma el día"
+      >
+        {Array.from({ length: MAX_CHARGE_DAY }, (_, i) => i + 1).map((day) => (
+          <option key={day} value={day}>
+            Día {day}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 type BadgeTone = 'green' | 'amber' | 'leaf' | 'blue' | 'slate' | 'orange' | 'indigo' | 'profit' | 'loss';
 
@@ -312,7 +342,7 @@ function ProfitBuildUp({ summary }: { summary: ProfitSummary | null }) {
   running -= fixed;
   steps.push({
     key: 'fixed',
-    label: '− Gastos fijos',
+    label: '− Renta y nómina',
     hint: 'Renta, nómina y otros del local',
     delta: -fixed,
     running,
@@ -590,6 +620,7 @@ export function ProfitabilityManager({
     costType: OperatingCostType;
     period: OperatingCostPeriod;
     paidFrom: MoneyPocket;
+    chargeDay: number;
   } | null>(null);
 
   const today = todayMexicoYmd();
@@ -629,7 +660,7 @@ export function ProfitabilityManager({
     const total = purchases + fixed + configuredVariable + visit;
     const segments = [
       { key: 'purchases', label: 'Compras', emoji: '🛒', amount: purchases, color: 'bg-amber-400' },
-      { key: 'fixed', label: 'Gastos fijos', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
+      { key: 'fixed', label: 'Renta y nómina', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
       {
         key: 'variable',
         label: 'Otros gastos',
@@ -771,6 +802,12 @@ export function ProfitabilityManager({
 
   async function toggleCost(row: CostRow) {
     const applies = costAppliesToRange(row.terms, from, to);
+    if (applies) {
+      const ok = window.confirm(
+        'Se deja de mostrar de este mes en adelante. En los meses anteriores se queda. ¿Quitar de la lista?',
+      );
+      if (!ok) return;
+    }
     await fetch(`/api/costs/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -780,7 +817,10 @@ export function ProfitabilityManager({
   }
 
   async function removeCost(id: string) {
-    if (!confirm('¿Eliminar este costo?')) return;
+    const ok = window.confirm(
+      'Esto lo borra de todos los meses, también de los anteriores. Si solo ya no lo vas a usar, mejor quítalo de la lista. ¿Borrar del todo?',
+    );
+    if (!ok) return;
     await fetch(`/api/costs/${id}`, { method: 'DELETE' });
     await loadPeriod(from, to);
   }
@@ -896,6 +936,7 @@ export function ProfitabilityManager({
           costType: editCost.costType,
           period: editCost.period,
           paidFrom: editCost.paidFrom,
+          chargeDay: editCost.chargeDay,
         }),
       });
       const result = await response.json();
@@ -945,9 +986,28 @@ export function ProfitabilityManager({
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
-  const activeFixedTotal = costs
-    .filter((row) => costAppliesToRange(row.terms, from, to))
-    .reduce((sum, row) => sum + Number(row.amount), 0);
+  const listedCosts = costs.filter((row) => costAppliesToRange(row.terms, from, to));
+  const removedHereCosts = costs.filter(
+    (row) =>
+      !costAppliesToRange(row.terms, from, to) &&
+      costPausedAtPeriodStart(row.terms, from, addMexicoDays(from, -1)),
+  );
+  const chargedThisPeriod = listedCosts.reduce(
+    (sum, row) =>
+      sum +
+      operatingCostAmountForRange(
+        {
+          costType: row.cost_type,
+          period: row.period,
+          amount: Number(row.amount),
+          chargeDay: normalizeChargeDay(row.charge_day),
+          terms: row.terms,
+        },
+        from,
+        to,
+      ),
+    0,
+  );
   const otherIncomeTotal = Number(summary?.other_income ?? 0);
   const visitTotal = Number(summary?.visit_expenses ?? 0);
   const periodMovements = useMemo(() => {
@@ -1339,7 +1399,7 @@ export function ProfitabilityManager({
               {(['purchases', 'fixed', 'visit'] as const).map((key) => {
                 const seg = costBreakdown.segments.find((s) => s.key === key) ?? {
                   key,
-                  label: key === 'purchases' ? 'Compras' : key === 'fixed' ? 'Gastos fijos' : 'Gastos de visita',
+                  label: key === 'purchases' ? 'Compras' : key === 'fixed' ? 'Renta y nómina' : 'Gastos de visita',
                   emoji: key === 'purchases' ? '🛒' : key === 'fixed' ? '🏠' : '🛻',
                   amount: 0,
                   color: key === 'purchases' ? 'bg-amber-400' : key === 'fixed' ? 'bg-slate-400' : 'bg-sky-400',
@@ -1697,8 +1757,8 @@ export function ProfitabilityManager({
               <div className="min-w-0">
                 <p className="text-base font-semibold text-slate-900">Renta, nómina y otros</p>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  {costs.length} costo{costs.length === 1 ? '' : 's'}
-                  {activeFixedTotal > 0 ? ` · ${formatMoney(activeFixedTotal)} activos` : ''}
+                  {listedCosts.length} en la lista
+                  {chargedThisPeriod > 0 ? ` · ${formatMoney(chargedThisPeriod)} este periodo` : ''}
                 </p>
               </div>
             </div>
@@ -1706,24 +1766,32 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Gastos fijos del local. Activar o pausar vale desde el periodo que estás viendo hacia
-              adelante; no cambia los meses anteriores. En el mes en curso o el anterior se cuenta el
-              monto completo; en un rango a modo se prorratea.
+              Cada gasto se suma el día que eliges, completo. Así Te quedó baja cuando sale el
+              dinero. Quitar de la lista lo oculta de este mes en adelante; en los meses anteriores
+              se queda. Si el mes no llega a ese día, se suma el último.
             </p>
-            {costs.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-slate-500">Sin gastos fijos todavía.</p>
+            {listedCosts.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-slate-500">Sin gastos de este tipo en este periodo.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {costs.map((row) => {
-                  const applies = costAppliesToRange(row.terms, from, to);
+                {listedCosts.map((row) => {
                   const editing = editCost?.id === row.id;
+                  const chargeDay = normalizeChargeDay(row.charge_day);
+                  const charged = operatingCostAmountForRange(
+                    {
+                      costType: row.cost_type,
+                      period: row.period,
+                      amount: Number(row.amount),
+                      chargeDay,
+                      terms: row.terms,
+                    },
+                    from,
+                    to,
+                  );
                   return (
-                    <li
-                      key={row.id}
-                      className={`px-4 py-2.5 ${applies ? '' : 'opacity-70'}`}
-                    >
+                    <li key={row.id} className="px-4 py-2.5">
                       {editing && editCost ? (
-                        <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_7rem_8rem_7.5rem_auto]">
+                        <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_8rem_7.5rem_auto]">
                           <input
                             className="pv-input min-w-0 col-span-2 lg:col-span-1"
                             value={editCost.name}
@@ -1739,36 +1807,12 @@ export function ProfitabilityManager({
                               setEditCost((d) => (d ? { ...d, amount: value } : d))
                             }
                           />
-                          <select
-                            className="pv-input min-w-0"
-                            value={editCost.costType}
-                            onChange={(e) =>
-                              setEditCost((d) =>
-                                d ? { ...d, costType: e.target.value as OperatingCostType } : d,
-                              )
+                          <ChargeDayField
+                            value={editCost.chargeDay}
+                            onChange={(day) =>
+                              setEditCost((d) => (d ? { ...d, chargeDay: day } : d))
                             }
-                          >
-                            {OPERATING_COST_TYPES.map((t) => (
-                              <option key={t} value={t}>
-                                {OPERATING_COST_TYPE_LABELS[t]}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            className="pv-input min-w-0"
-                            value={editCost.period}
-                            onChange={(e) =>
-                              setEditCost((d) =>
-                                d ? { ...d, period: e.target.value as OperatingCostPeriod } : d,
-                              )
-                            }
-                          >
-                            {OPERATING_COST_PERIODS.map((p) => (
-                              <option key={p} value={p}>
-                                {OPERATING_COST_PERIOD_LABELS[p]}
-                              </option>
-                            ))}
-                          </select>
+                          />
                           <MoneyPocketField
                             label="Sale de"
                             value={editCost.paidFrom}
@@ -1790,10 +1834,9 @@ export function ProfitabilityManager({
                           <div className="min-w-0">
                             <p className="font-medium text-slate-900">{row.name}</p>
                             <p className="text-sm text-slate-500">
-                              {OPERATING_COST_TYPE_LABELS[row.cost_type]} ·{' '}
-                              {OPERATING_COST_PERIOD_LABELS[row.period]} ·{' '}
+                              {formatChargeDayLabel(chargeDay)} ·{' '}
                               {MONEY_POCKET_LABELS[parseMoneyPocket(row.paid_from, 'account')]}
-                              {applies ? ' · aplica aquí' : ' · pausado aquí'}
+                              {charged > 0 ? ' · ya contó aquí' : ' · todavía no se suma'}
                             </p>
                           </div>
                           <p className="text-base font-bold tabular-nums text-slate-900">
@@ -1811,6 +1854,7 @@ export function ProfitabilityManager({
                                   costType: row.cost_type,
                                   period: row.period,
                                   paidFrom: parseMoneyPocket(row.paid_from, 'account'),
+                                  chargeDay,
                                 })
                               }
                             >
@@ -1818,10 +1862,10 @@ export function ProfitabilityManager({
                             </ActionChip>
                             <ActionChip
                               elevated={false}
-                              emoji={applies ? '⏸️' : '▶️'}
+                              emoji="📤"
                               onClick={() => void toggleCost(row)}
                             >
-                              {applies ? 'Pausar aquí' : 'Activar aquí'}
+                              Quitar de la lista
                             </ActionChip>
                             <ActionChip
                               elevated={false}
@@ -1840,8 +1884,43 @@ export function ProfitabilityManager({
               </ul>
             )}
 
+            {removedHereCosts.length > 0 ? (
+              <details className="border-t border-slate-100">
+                <summary className="cursor-pointer px-4 py-3 text-sm text-slate-500">
+                  {removedHereCosts.length === 1
+                    ? '1 gasto quitado de este mes'
+                    : `${removedHereCosts.length} gastos quitados de este mes`}
+                </summary>
+                <ul className="divide-y divide-slate-100 border-t border-slate-50">
+                  {removedHereCosts.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-700">{row.name}</p>
+                        <p className="text-sm text-slate-500">
+                          No se suma de aquí en adelante. En meses anteriores se queda.
+                        </p>
+                      </div>
+                      <p className="text-base font-bold tabular-nums text-slate-700">
+                        {formatMoney(Number(row.amount))}
+                      </p>
+                      <ActionChip
+                        elevated={false}
+                        emoji="📥"
+                        onClick={() => void toggleCost(row)}
+                      >
+                        Volver a la lista
+                      </ActionChip>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-              <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_7rem_8rem_7.5rem_auto]">
+              <div className="grid min-w-0 grid-cols-2 items-center gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.5fr)_8rem_7.5rem_auto]">
               <input
                 placeholder="Nombre"
                 className="pv-input min-w-0 col-span-2 lg:col-span-1"
@@ -1855,28 +1934,10 @@ export function ProfitabilityManager({
                 value={costAmountText}
                 onChange={setCostAmountText}
               />
-              <select
-                className="pv-input min-w-0"
-                value={costForm.costType}
-                onChange={(e) => setCostForm((f) => ({ ...f, costType: e.target.value as OperatingCostType }))}
-              >
-                {OPERATING_COST_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {OPERATING_COST_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="pv-input min-w-0"
-                value={costForm.period}
-                onChange={(e) => setCostForm((f) => ({ ...f, period: e.target.value as OperatingCostPeriod }))}
-              >
-                {OPERATING_COST_PERIODS.map((p) => (
-                  <option key={p} value={p}>
-                    {OPERATING_COST_PERIOD_LABELS[p]}
-                  </option>
-                ))}
-              </select>
+              <ChargeDayField
+                value={costForm.chargeDay ?? 1}
+                onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
+              />
               <MoneyPocketField
                 label="Sale de"
                 value={costForm.paidFrom ?? 'account'}

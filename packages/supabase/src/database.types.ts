@@ -357,6 +357,7 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           paid_from: 'cash' | 'account';
+          charge_day: number;
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['branch_operating_costs']['Row']> & {

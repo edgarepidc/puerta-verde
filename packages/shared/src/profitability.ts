@@ -24,6 +24,9 @@ export const OPERATING_COST_PERIOD_LABELS: Record<OperatingCostPeriod, string> =
   per_order: 'Por pedido',
 };
 
+export const MIN_CHARGE_DAY = 1;
+export const MAX_CHARGE_DAY = 31;
+
 export interface OperatingCostInput {
   name: string;
   costType: OperatingCostType;
@@ -32,6 +35,8 @@ export interface OperatingCostInput {
   notes?: string | null;
   isActive: boolean;
   paidFrom?: MoneyPocket;
+  /** Calendar day (1–31) when the full amount leaves caja/cuenta. */
+  chargeDay?: number;
   /** First day the cost should apply (the start of the Números period being viewed). */
   effectiveFrom?: string;
 }
@@ -52,7 +57,7 @@ export function costAppliesToRange(
   );
 }
 
-/** True when Pausar closed a term the day before this period (end_date = from − 1). */
+/** True when Quitar closed a term the day before this period (end_date = from − 1). */
 export function costPausedAtPeriodStart(
   terms: OperatingCostTerm[] | undefined,
   periodStart: string,
@@ -68,10 +73,26 @@ export function calendarMonthStart(ymd: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd.slice(0, 7)}-01` : ymd;
 }
 
+export function normalizeChargeDay(value: unknown, fallback = 1): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < MIN_CHARGE_DAY || n > MAX_CHARGE_DAY) return fallback;
+  return n;
+}
+
+export function chargeDateForMonth(year: number, month: number, chargeDay: number): string {
+  const day = Math.min(normalizeChargeDay(chargeDay), daysInCalendarMonth(year, month));
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+export function formatChargeDayLabel(chargeDay: number): string {
+  return `Se suma el día ${normalizeChargeDay(chargeDay)}`;
+}
+
 export interface OperatingCostPocketInput {
   costType: OperatingCostType;
   period: OperatingCostPeriod;
   amount: number;
+  chargeDay?: number;
   paidFrom?: MoneyPocket | null;
   terms?: OperatingCostTerm[];
 }
@@ -96,7 +117,9 @@ export function applyOperatingCostsToPockets(
         ? applies
         : !applies && costPausedAtPeriodStart(cost.terms, options.from, options.dayBeforeFrom);
     if (!include) continue;
-    const amount = operatingCostAmountForRange(cost, options.from, options.to, orderCount);
+    const amount = operatingCostAmountForRange(cost, options.from, options.to, orderCount, {
+      ignoreTerms: options.mode === 'paused-addback',
+    });
     const pocket = parseMoneyPocket(cost.paidFrom, 'account');
     if (options.mode === 'outflow') addPocketOutflow(flows, pocket, amount);
     else addPocketInflow(flows, pocket, amount);
@@ -111,7 +134,14 @@ export function validateOperatingCostInput(input: OperatingCostInput): string | 
   if (input.paidFrom != null && !isMoneyPocket(input.paidFrom)) {
     return 'Elige si sale de efectivo o de la cuenta.';
   }
+  if (input.chargeDay != null && normalizeChargeDay(input.chargeDay, 0) === 0) {
+    return 'El día tiene que ser del 1 al 31.';
+  }
   return null;
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
 }
 
 function ymdParts(ymd: string): { year: number; month: number; day: number } {
@@ -131,28 +161,57 @@ function inclusiveDayCount(from: string, to: string): number {
   return Math.max(Math.round(ms / 86_400_000) + 1, 1);
 }
 
-/** Same allocation as get_profit_summary for a date range. */
+function monthsOverlappingRange(from: string, to: string): Array<{ year: number; month: number }> {
+  const start = ymdParts(from);
+  const end = ymdParts(to);
+  const months: Array<{ year: number; month: number }> = [];
+  let year = start.year;
+  let month = start.month;
+  while (year < end.year || (year === end.year && month <= end.month)) {
+    months.push({ year, month });
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return months;
+}
+
+/** Full amount on each charge day that falls in the range (and still has terms). */
 export function operatingCostAmountForRange(
-  cost: { costType: OperatingCostType; period: OperatingCostPeriod; amount: number },
+  cost: {
+    costType: OperatingCostType;
+    period: OperatingCostPeriod;
+    amount: number;
+    chargeDay?: number;
+    terms?: OperatingCostTerm[];
+  },
   from: string,
   to: string,
   orderCount = 0,
+  options?: { ignoreTerms?: boolean },
 ): number {
-  const start = ymdParts(from);
-  const end = ymdParts(to);
-  const periodDays = inclusiveDayCount(from, to);
-  const sameMonth = start.year === end.year && start.month === end.month;
-  const fullMonthFixed = sameMonth && start.day === 1;
-  const monthDiv = sameMonth ? daysInCalendarMonth(start.year, start.month) : 30;
   const amount = Number(cost.amount);
-
-  if (cost.period === 'monthly') {
-    if (cost.costType === 'fixed' && fullMonthFixed) return amount;
-    return amount * (periodDays / monthDiv);
-  }
-  if (cost.period === 'daily') return amount * periodDays;
+  if (cost.period === 'daily') return amount * inclusiveDayCount(from, to);
   if (cost.period === 'per_order') return amount * orderCount;
-  return 0;
+  if (cost.period !== 'monthly') return 0;
+
+  const chargeDay = normalizeChargeDay(cost.chargeDay);
+  let total = 0;
+  for (const { year, month } of monthsOverlappingRange(from, to)) {
+    const charge = chargeDateForMonth(year, month, chargeDay);
+    if (charge < from || charge > to) continue;
+    if (
+      !options?.ignoreTerms &&
+      cost.terms != null &&
+      !costAppliesToRange(cost.terms, charge, charge)
+    ) {
+      continue;
+    }
+    total += amount;
+  }
+  return total;
 }
 
 export function calcMarginAmount(salePrice: number, unitCost: number): number {

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { validateOperatingCostInput, type OperatingCostInput } from '@puertaverde/shared';
+import {
+  normalizeChargeDay,
+  validateOperatingCostInput,
+  type OperatingCostInput,
+} from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
         notes: body.notes?.trim() || null,
         is_active: true,
         paid_from: body.paidFrom === 'cash' ? 'cash' : 'account',
+        charge_day: normalizeChargeDay(body.chargeDay),
       })
       .select('id')
       .single();
