@@ -111,6 +111,46 @@ function formatStockQty(value: number): string {
   return formatDecimal(value);
 }
 
+function VisibilityToggle({
+  visible,
+  onToggle,
+  disabled = false,
+  compact = false,
+  label,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  compact?: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={visible}
+      aria-label={
+        label
+          ? visible
+            ? `${label} visible en tienda. Clic para ocultar`
+            : `${label} oculto en tienda. Clic para mostrar`
+          : visible
+            ? 'Visible en tienda. Clic para ocultar'
+            : 'Oculto en tienda. Clic para mostrar'
+      }
+      disabled={disabled}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+      className={`rounded-full font-medium disabled:cursor-not-allowed disabled:opacity-60 ${
+        compact ? 'px-3 py-1 text-xs' : 'px-3 py-1.5 text-xs'
+      } ${visible ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}`}
+    >
+      {visible ? 'Visible' : 'Oculto'}
+    </button>
+  );
+}
+
 export function ProductsManager({
   initialProducts,
   initialCategories,
@@ -384,6 +424,17 @@ export function ProductsManager({
   async function setAvailability(row: ProductRow, nextVisible: boolean) {
     const currentlyVisible = row.is_available && row.product.is_active;
     if (currentlyVisible === nextVisible) return;
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === row.id
+          ? {
+              ...item,
+              is_available: nextVisible,
+              product: { ...item.product, is_active: nextVisible },
+            }
+          : item,
+      ),
+    );
     const response = await fetch(`/api/products/${row.product.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -409,6 +460,17 @@ export function ProductsManager({
       }),
     });
     if (!response.ok) {
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === row.id
+            ? {
+                ...item,
+                is_available: currentlyVisible,
+                product: { ...item.product, is_active: currentlyVisible },
+              }
+            : item,
+        ),
+      );
       const result = await response.json();
       alert(result.error ?? 'No se pudo actualizar');
       return;
@@ -669,37 +731,13 @@ export function ProductsManager({
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <div
-                        role="group"
-                        aria-label={`Visibilidad de ${row.product.name}`}
-                        className="flex flex-wrap gap-1"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          aria-pressed={visible}
-                          onClick={() => void setAvailability(row, true)}
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            visible
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-slate-100 text-slate-400'
-                          }`}
-                        >
-                          Visible
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={!visible}
-                          onClick={() => void setAvailability(row, false)}
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${
-                            visible
-                              ? 'bg-slate-100 text-slate-400'
-                              : 'bg-slate-700 text-white'
-                          }`}
-                        >
-                          Ocultar
-                        </button>
-                      </div>
+                      <VisibilityToggle
+                        compact
+                        visible={visible}
+                        disabled={!canManage}
+                        label={row.product.name}
+                        onToggle={() => void setAvailability(row, !visible)}
+                      />
                     </td>
                   </tr>
                   );
@@ -857,32 +895,16 @@ export function ProductsManager({
               </div>
               <div className="space-y-1.5">
                 <p className="text-sm font-medium text-slate-800">Visible en tienda</p>
-                <div role="group" aria-label="Visible en tienda" className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    aria-pressed={form.isAvailable}
-                    onClick={() => setForm((f) => ({ ...f, isAvailable: true, isActive: true }))}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                      form.isAvailable
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-slate-100 text-slate-400'
-                    }`}
-                  >
-                    Visible
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={!form.isAvailable}
-                    onClick={() => setForm((f) => ({ ...f, isAvailable: false, isActive: false }))}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                      form.isAvailable
-                        ? 'bg-slate-100 text-slate-400'
-                        : 'bg-slate-700 text-white'
-                    }`}
-                  >
-                    Ocultar
-                  </button>
-                </div>
+                <VisibilityToggle
+                  visible={form.isAvailable}
+                  onToggle={() =>
+                    setForm((f) => ({
+                      ...f,
+                      isAvailable: !f.isAvailable,
+                      isActive: !f.isAvailable,
+                    }))
+                  }
+                />
               </div>
               {form.unit === 'kg' ? (
               <label className="flex items-start gap-2 text-sm">
