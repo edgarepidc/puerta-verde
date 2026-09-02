@@ -328,6 +328,15 @@ export {
   type IncomeEntryType,
 } from './income-entries';
 export {
+  resolveMoneyPosition,
+  validateMoneyPositionInput,
+  type MoneyPositionFlows,
+  type MoneyPositionInput,
+  type MoneyPositionSnapshot,
+  type MoneyPositionSource,
+  type MoneyPositionView,
+} from './money-position';
+export {
   COST_IMPORT_TEMPLATE_CSV,
   mapCostImportHeaders,
   normalizeProductName,

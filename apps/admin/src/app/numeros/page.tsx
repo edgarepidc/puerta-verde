@@ -7,6 +7,7 @@ import { LowStockThresholdsManager } from '@/components/LowStockThresholdsManage
 import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
+import { fetchMoneyPosition } from '@/lib/money-position';
 import { getDefaultTenant } from '@/lib/tenant';
 import type { OperatingCostPeriod, OperatingCostType, ProductUnit } from '@puertaverde/shared';
 
@@ -29,6 +30,7 @@ export default async function NumerosPage() {
     { data: stockProducts },
     { data: stockCategories },
     profitBundle,
+    moneyPosition,
   ] = await Promise.all([
     supabase.rpc('get_restock_forecast', {
       p_branch_id: staff.branchId,
@@ -90,6 +92,9 @@ export default async function NumerosPage() {
             .limit(2000),
         ])
       : Promise.resolve(null),
+    canViewProfit
+      ? fetchMoneyPosition(tenant.branchId, range.start, range.end).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
@@ -147,6 +152,7 @@ export default async function NumerosPage() {
               notes: string | null;
             }>}
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
+            initialMoneyPosition={moneyPosition}
             initialSummary={(summaryRows?.data?.[0] as {
               period_days: number;
               revenue: number;
