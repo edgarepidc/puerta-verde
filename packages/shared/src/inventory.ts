@@ -77,3 +77,24 @@ export function isLowStock(input: {
       : getDefaultLowStockThreshold(input);
   return stock < threshold;
 }
+
+/** Matches `branch_products.stock numeric(10, 3)`. */
+export const STOCK_QTY_DECIMALS = 3;
+
+/**
+ * Quantity to send to `record_inventory_movement` from a physical count.
+ * Count 0 means write off whatever is left (not the 2-decimal display).
+ */
+export function quantityForStockCount(input: {
+  system: number;
+  counted: number;
+  kind: 'waste' | 'adjustment';
+}): number {
+  const system = Number(input.system);
+  const counted = Number(input.counted);
+  if (counted === 0) {
+    return input.kind === 'waste' ? system : -system;
+  }
+  const delta = Number((counted - system).toFixed(STOCK_QTY_DECIMALS));
+  return input.kind === 'waste' ? Math.abs(delta) : delta;
+}
