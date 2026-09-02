@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { PRODUCT_UNIT_LABELS, type ProductUnit } from '@puertaverde/shared';
+
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 
@@ -25,12 +27,33 @@ function categoryEmoji(name: string) {
   return '🧺';
 }
 
+function unitLabelForCategory(
+  categoryId: string,
+  products: Array<{ categoryId: string | null; unit: ProductUnit }>,
+): string | null {
+  const units = products.filter((product) => product.categoryId === categoryId).map((product) => product.unit);
+  if (units.length === 0) return null;
+  const counts = new Map<ProductUnit, number>();
+  for (const unit of units) counts.set(unit, (counts.get(unit) ?? 0) + 1);
+  let best = units[0];
+  let bestCount = 0;
+  for (const [unit, count] of counts) {
+    if (count > bestCount) {
+      best = unit;
+      bestCount = count;
+    }
+  }
+  return PRODUCT_UNIT_LABELS[best];
+}
+
 export function LowStockThresholdsManager({
   initialCategories,
   canEdit,
+  products = [],
 }: {
   initialCategories: CategoryThreshold[];
   canEdit: boolean;
+  products?: Array<{ categoryId: string | null; unit: ProductUnit }>;
 }) {
   const [rows, setRows] = useState(() =>
     initialCategories.map((row) => ({
@@ -46,6 +69,15 @@ export function LowStockThresholdsManager({
   useEffect(() => {
     if (window.location.hash === '#minimo-categoria') setOpenMinimos(true);
   }, []);
+
+  const unitByCategory = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of rows) {
+      const label = unitLabelForCategory(row.id, products);
+      if (label) map[row.id] = label;
+    }
+    return map;
+  }, [products, rows]);
 
   const dirty = useMemo(
     () =>
@@ -140,21 +172,32 @@ export function LowStockThresholdsManager({
                       {row.name}
                     </p>
                   </td>
-                  <td className="w-28 px-3 py-2.5 text-right">
-                    {canEdit ? (
-                      <DecimalInput
-                        aria-label={`Mínimo de ${row.name}`}
-                        className="ml-auto w-20 rounded-[0.875rem] border border-slate-200 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                        value={row.text}
-                        onChange={(value) =>
-                          setRows((current) =>
-                            current.map((item) => (item.id === row.id ? { ...item, text: value } : item)),
-                          )
-                        }
-                      />
-                    ) : (
-                      <span className="tabular-nums font-semibold text-slate-900">{row.text}</span>
-                    )}
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                    <div className="inline-flex items-center justify-end gap-1.5">
+                      {canEdit ? (
+                        <DecimalInput
+                          aria-label={
+                            unitByCategory[row.id]
+                              ? `Mínimo de ${row.name} en ${unitByCategory[row.id]}`
+                              : `Mínimo de ${row.name}`
+                          }
+                          className="w-20 rounded-[0.875rem] border border-slate-200 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                          value={row.text}
+                          onChange={(value) =>
+                            setRows((current) =>
+                              current.map((item) => (item.id === row.id ? { ...item, text: value } : item)),
+                            )
+                          }
+                        />
+                      ) : (
+                        <span className="tabular-nums font-semibold text-slate-900">{row.text}</span>
+                      )}
+                      {unitByCategory[row.id] ? (
+                        <span className="min-w-[3.25rem] text-left text-xs text-slate-500">
+                          {unitByCategory[row.id]}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

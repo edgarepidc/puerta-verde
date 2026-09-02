@@ -1124,6 +1124,10 @@ export function ProductsManager({
       <LowStockThresholdsManager
         canEdit={canEditStockThresholds}
         initialCategories={initialThresholdCategories}
+        products={products.map((row) => ({
+          categoryId: row.product.category_id ?? row.product.category?.id ?? null,
+          unit: row.product.unit,
+        }))}
       />
 
       <StockMovementHistory
