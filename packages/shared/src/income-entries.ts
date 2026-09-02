@@ -8,8 +8,8 @@ export const INCOME_ENTRY_TYPE_LABELS: Record<IncomeEntryType, string> = {
 };
 
 export const INCOME_ENTRY_TYPE_HINTS: Record<IncomeEntryType, string> = {
-  contribution: 'Capital que metiste. Suma a Te quedó.',
-  operating: 'Reembolso o venta suelta. Sí entra a Te quedó.',
+  contribution: 'Capital que metiste. Suma a Tienes.',
+  operating: 'Reembolso o venta suelta. Sí entra a Tienes.',
 };
 
 export interface IncomeEntryInput {

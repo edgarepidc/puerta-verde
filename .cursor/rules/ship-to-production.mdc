@@ -1,0 +1,13 @@
+---
+description: Ship finished work to production unless told to keep it local
+alwaysApply: true
+---
+
+# Ship to production by default
+
+When the requested work is done and verified, put it on production. Do not wait for “súbelo” or “¿ya está en productivo?”.
+
+1. Commit, open a PR, merge to `main`, and wait until the admin Vercel deploy succeeds.
+2. Reply with the production URL when it is live.
+3. Skip shipping only if they say to keep it local / not yet, or if the work is unfinished, broken, or blocked.
+4. Do not commit secrets or force-push to `main`.
