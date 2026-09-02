@@ -304,7 +304,7 @@ function TeQuedoCard({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Te quedó</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tienes</p>
           {canAdjust && !adjusting ? (
             <button
               type="button"
@@ -1155,38 +1155,17 @@ export function ProfitabilityManager({
             value={formatMoney(revenue)}
             hint={`${summary?.order_count ?? 0} ticket${summary?.order_count === 1 ? '' : 's'} · ${activePeriodLabel}`}
           />
-          <TeQuedoCard
-            total={leftover}
-            totalPositive={leftoverPositive}
-            position={moneyPosition}
-            adjusting={adjustingPockets}
-            cashText={cashAdjustText}
-            accountText={accountAdjustText}
-            saving={saving}
-            canAdjust={canAdjustMoney}
-            onCashText={setCashAdjustText}
-            onAccountText={setAccountAdjustText}
-            onToggleAdjust={() => {
-              if (!canAdjustMoney) return;
-              if (adjustingPockets) {
-                setAdjustingPockets(false);
-                return;
-              }
-              setCashAdjustText(formatDecimal(moneyPosition?.cash ?? 0));
-              setAccountAdjustText(formatDecimal(moneyPosition?.account ?? 0));
-              setAdjustingPockets(true);
-            }}
-            onSave={() => void saveMoneyAdjust()}
+          <MetricCard
+            emoji="🏷️"
+            tone="leaf"
+            label="Inventario a venta"
+            value={formatMoney(totals.inventorySale)}
+            hint={
+              inventorySpread >= 0
+                ? `Si se vende todo · ${formatMoney(inventorySpread)} de margen`
+                : 'Si se vende todo, al precio de lista'
+            }
           />
-          {contributionsTotal > 0 ? (
-            <MetricCard
-              emoji="💵"
-              tone="green"
-              label="Aportaste"
-              value={formatMoney(contributionsTotal)}
-              hint="Capital que metiste. Ya está en Te quedó."
-            />
-          ) : null}
         </div>
         <div className="grid grid-cols-1 gap-2 sm:gap-3">
           <MetricCard
@@ -1216,17 +1195,38 @@ export function ProfitabilityManager({
             value={formatMoney(cashOut)}
             hint="Compras, renta y visita · caja y cuenta"
           />
-          <MetricCard
-            emoji="🏷️"
-            tone="leaf"
-            label="Inventario a venta"
-            value={formatMoney(totals.inventorySale)}
-            hint={
-              inventorySpread >= 0
-                ? `Si se vende todo · ${formatMoney(inventorySpread)} de margen`
-                : 'Si se vende todo, al precio de lista'
-            }
+          <TeQuedoCard
+            total={leftover}
+            totalPositive={leftoverPositive}
+            position={moneyPosition}
+            adjusting={adjustingPockets}
+            cashText={cashAdjustText}
+            accountText={accountAdjustText}
+            saving={saving}
+            canAdjust={canAdjustMoney}
+            onCashText={setCashAdjustText}
+            onAccountText={setAccountAdjustText}
+            onToggleAdjust={() => {
+              if (!canAdjustMoney) return;
+              if (adjustingPockets) {
+                setAdjustingPockets(false);
+                return;
+              }
+              setCashAdjustText(formatDecimal(moneyPosition?.cash ?? 0));
+              setAccountAdjustText(formatDecimal(moneyPosition?.account ?? 0));
+              setAdjustingPockets(true);
+            }}
+            onSave={() => void saveMoneyAdjust()}
           />
+          {contributionsTotal > 0 ? (
+            <MetricCard
+              emoji="💵"
+              tone="green"
+              label="Aportaste"
+              value={formatMoney(contributionsTotal)}
+              hint="Capital que metiste. Ya está en Tienes."
+            />
+          ) : null}
         </div>
       </div>
 
@@ -1730,7 +1730,7 @@ export function ProfitabilityManager({
                             <p className="text-xs text-slate-500">
                               {INCOME_ENTRY_TYPE_LABELS[row.entryType]} · {row.date}
                               {row.notes ? ` · ${row.notes}` : ''}
-                              {' · entra a Te quedó'}
+                              {' · entra a Tienes'}
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -1841,7 +1841,7 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Cada gasto se suma el día que eliges, completo. Así Te quedó baja cuando sale el
+              Cada gasto se suma el día que eliges, completo. Así Tienes baja cuando sale el
               dinero. Quitar de la lista lo oculta de este mes en adelante; en los meses anteriores
               se queda. Si el mes no llega a ese día, se suma el último.
             </p>
