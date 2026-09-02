@@ -123,32 +123,43 @@ export function LowStockThresholdsManager({
       {rows.length === 0 ? (
         <p className="text-sm text-slate-500">Aún no hay categorías. Créalas en el listado de arriba.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {rows.map((row) => (
-            <label
-              key={row.id}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 text-sm text-slate-700 shadow-sm"
-            >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-base"
-                aria-hidden
-              >
-                {categoryEmoji(row.name)}
-              </span>
-              <span className="max-w-[10rem] truncate font-medium">{row.name}</span>
-              <DecimalInput
-                aria-label={`Mínimo de ${row.name}`}
-                disabled={!canEdit}
-                className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 outline-none"
-                value={row.text}
-                onChange={(value) =>
-                  setRows((current) =>
-                    current.map((item) => (item.id === row.id ? { ...item, text: value } : item)),
-                  )
-                }
-              />
-            </label>
-          ))}
+        <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-2.5 font-semibold">Categoría</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Mínimo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2.5">
+                    <p className="flex items-center gap-2 font-medium text-slate-900">
+                      <span aria-hidden>{categoryEmoji(row.name)}</span>
+                      {row.name}
+                    </p>
+                  </td>
+                  <td className="w-28 px-3 py-2.5 text-right">
+                    {canEdit ? (
+                      <DecimalInput
+                        aria-label={`Mínimo de ${row.name}`}
+                        className="ml-auto w-20 rounded-[0.875rem] border border-slate-200 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                        value={row.text}
+                        onChange={(value) =>
+                          setRows((current) =>
+                            current.map((item) => (item.id === row.id ? { ...item, text: value } : item)),
+                          )
+                        }
+                      />
+                    ) : (
+                      <span className="tabular-nums font-semibold text-slate-900">{row.text}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </details>
