@@ -2,6 +2,7 @@ import {
   addCollectedTicket,
   addPocketOutflow,
   applyOperatingCostsToPockets,
+  calendarMonthStart,
   parseMoneyPocket,
   pocketTotal,
   resolveMoneyPosition,
@@ -77,6 +78,19 @@ export async function fetchMoneyPosition(
 
   const flows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   const ticketFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  const pausedFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+
+  if (snapshot && !closesThisPeriod) {
+    const monthStart = calendarMonthStart(snapshot.asOfDate);
+    applyOperatingCostsToPockets(pausedFlows, costs, {
+      from: monthStart,
+      to: snapshot.asOfDate,
+      dayBeforeFrom: addMexicoDays(monthStart, -1),
+      mode: 'paused-addback',
+    });
+    flows.cashIn += pausedFlows.cashIn;
+    flows.accountIn += pausedFlows.accountIn;
+  }
 
   if (!closesThisPeriod && movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
@@ -179,5 +193,6 @@ export async function fetchMoneyPosition(
     ticketIn: roundMoney(ticketInCash + ticketInAccount),
     ticketInCash,
     ticketInAccount,
+    pausedIn: roundMoney(pausedFlows.cashIn + pausedFlows.accountIn),
   };
 }

@@ -63,6 +63,8 @@ export interface MoneyPositionView {
   ticketIn: number;
   ticketInCash: number;
   ticketInAccount: number;
+  /** Rent/costs paused in the conteo month that never left, so they still sit in Tienes. */
+  pausedIn: number;
 }
 
 export function ticketCollectedAmount(order: {
