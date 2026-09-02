@@ -117,26 +117,27 @@ function VisibilityToggle({
   disabled = false,
   compact = false,
   label,
+  outOfStock = false,
 }: {
   visible: boolean;
   onToggle: () => void;
   disabled?: boolean;
   compact?: boolean;
   label?: string;
+  outOfStock?: boolean;
 }) {
+  const name = label ? `${label} ` : '';
+  const ariaLabel = outOfStock
+    ? `${name}sin stock, oculto hasta reponer`
+    : visible
+      ? `${name}visible en tienda. Clic para ocultar`
+      : `${name}oculto en tienda. Clic para mostrar`;
   return (
     <button
       type="button"
       aria-pressed={visible}
-      aria-label={
-        label
-          ? visible
-            ? `${label} visible en tienda. Clic para ocultar`
-            : `${label} oculto en tienda. Clic para mostrar`
-          : visible
-            ? 'Visible en tienda. Clic para ocultar'
-            : 'Oculto en tienda. Clic para mostrar'
-      }
+      aria-label={ariaLabel.trim()}
+      title={outOfStock ? 'Sin stock: se oculta solo. Reponer para volver a Visible.' : undefined}
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
@@ -734,7 +735,8 @@ export function ProductsManager({
                       <VisibilityToggle
                         compact
                         visible={visible}
-                        disabled={!canManage}
+                        outOfStock={stock <= 0}
+                        disabled={!canManage || stock <= 0}
                         label={row.product.name}
                         onToggle={() => void setAvailability(row, !visible)}
                       />
@@ -897,6 +899,8 @@ export function ProductsManager({
                 <p className="text-sm font-medium text-slate-800">Visible en tienda</p>
                 <VisibilityToggle
                   visible={form.isAvailable}
+                  outOfStock={Number(editingRow?.stock ?? 0) <= 0 && Boolean(editing)}
+                  disabled={Number(editingRow?.stock ?? 0) <= 0 && Boolean(editing)}
                   onToggle={() =>
                     setForm((f) => ({
                       ...f,
