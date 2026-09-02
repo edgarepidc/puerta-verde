@@ -82,17 +82,18 @@ async function applyPosPriceOverrides(
 
   const { data: order, error: orderReadError } = await supabase
     .from('orders')
-    .select('delivery_fee')
+    .select('delivery_fee, discount_amount')
     .eq('id', orderId)
     .single();
   if (orderReadError) throw new Error(orderReadError.message);
 
   const deliveryFee = Number(order?.delivery_fee ?? 0);
+  const discount = Number(order?.discount_amount ?? 0);
   const { error: orderError } = await supabase
     .from('orders')
     .update({
       subtotal: roundMoney(subtotal),
-      total: roundMoney(subtotal + deliveryFee),
+      total: roundMoney(Math.max(0, subtotal - discount) + deliveryFee),
     })
     .eq('id', orderId);
   if (orderError) throw new Error(orderError.message);

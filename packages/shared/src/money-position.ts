@@ -59,6 +59,53 @@ export interface MoneyPositionView {
   openingAsOf: string | null;
   periodIn: number;
   periodOut: number;
+  /** Paid tickets (not cancelled / not por pagar) that entered after the conteo. */
+  ticketIn: number;
+  ticketInCash: number;
+  ticketInAccount: number;
+}
+
+export function ticketCollectedAmount(order: {
+  subtotal?: number | null;
+  discount_amount?: number | null;
+  delivery_fee?: number | null;
+}): number {
+  const net = Math.max(Number(order.subtotal ?? 0) - Number(order.discount_amount ?? 0), 0);
+  return roundMoney(net + Number(order.delivery_fee ?? 0));
+}
+
+/** Pocket that receives a collected ticket, or null when it should not enter caja/cuenta. */
+export function ticketMoneyPocket(method: string | null | undefined): MoneyPocket | null {
+  if (method === 'on_account') return null;
+  if (method === 'card_terminal' || method === 'transfer' || method === 'online') return 'account';
+  return 'cash';
+}
+
+export function isCollectedTicket(order: {
+  status?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+}): boolean {
+  if (order.status === 'cancelled') return false;
+  if (order.payment_status !== 'paid') return false;
+  return ticketMoneyPocket(order.payment_method) != null;
+}
+
+export function addCollectedTicket(
+  flows: MoneyPositionFlows,
+  order: {
+    status?: string | null;
+    payment_status?: string | null;
+    payment_method?: string | null;
+    subtotal?: number | null;
+    discount_amount?: number | null;
+    delivery_fee?: number | null;
+  },
+): void {
+  if (!isCollectedTicket(order)) return;
+  const pocket = ticketMoneyPocket(order.payment_method);
+  if (!pocket) return;
+  addPocketInflow(flows, pocket, ticketCollectedAmount(order));
 }
 
 export interface MoneyPositionInput {
