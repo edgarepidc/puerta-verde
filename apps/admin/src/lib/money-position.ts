@@ -1,6 +1,7 @@
 import {
   addPocketOutflow,
   applyOperatingCostsToPockets,
+  calendarMonthStart,
   costPausedAtPeriodStart,
   parseMoneyPocket,
   resolveMoneyPosition,
@@ -55,6 +56,16 @@ export async function fetchMoneyPosition(
   const movementStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
 
   const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+
+  if (snapshot && !closesThisPeriod) {
+    const monthStart = calendarMonthStart(snapshot.asOfDate);
+    applyOperatingCostsToPockets(flows, costs, {
+      from: monthStart,
+      to: snapshot.asOfDate,
+      dayBeforeFrom: addMexicoDays(monthStart, -1),
+      mode: 'paused-addback',
+    });
+  }
 
   if (!closesThisPeriod && movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;

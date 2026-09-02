@@ -431,6 +431,7 @@ function CashSquare({
   otherIncome,
   purchases,
   visit,
+  operating,
   inventoryCost,
 }: {
   revenue: number;
@@ -438,15 +439,16 @@ function CashSquare({
   otherIncome: number;
   purchases: number;
   visit: number;
+  operating: number;
   inventoryCost: number;
 }) {
   const inflow = revenue + contributions + otherIncome;
-  const outflow = purchases + visit;
+  const outflow = purchases + visit + operating;
   return (
     <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
       <h3 className="text-sm font-semibold text-slate-900">Para cuadrar</h3>
       <p className="mt-0.5 text-xs text-slate-500">
-        Efectivo del periodo, no la utilidad. Las compras de inventario no son un gasto.
+        Efectivo del periodo, no la utilidad. El inventario a costo ya está pagado; no es un segundo gasto.
       </p>
       <ul className="mt-3 space-y-2.5 text-sm">
         <li className="flex items-baseline justify-between gap-3">
@@ -466,7 +468,9 @@ function CashSquare({
           <span className="min-w-0">
             <span className="font-medium text-slate-800">Salió</span>
             <span className="mt-0.5 block text-xs text-slate-500">
-              Compras {formatMoney(purchases)} · visita {formatMoney(visit)}
+              Compras {formatMoney(purchases)}
+              {operating > 0 ? ` · renta y fijos ${formatMoney(operating)}` : ''}
+              {` · visita ${formatMoney(visit)}`}
             </span>
           </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
@@ -476,7 +480,9 @@ function CashSquare({
         <li className="flex items-baseline justify-between gap-3 border-t border-emerald-100 pt-2.5">
           <span className="min-w-0">
             <span className="font-medium text-slate-800">Sigue en mercancía</span>
-            <span className="mt-0.5 block text-xs text-slate-500">Inventario a costo</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Inventario a costo · ya pagado al comprar
+            </span>
           </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
             {formatMoney(inventoryCost)}
@@ -615,14 +621,14 @@ export function ProfitabilityManager({
   );
 
   const costBreakdown = useMemo(() => {
-    const cogs = Number(summary?.cogs ?? 0);
+    const purchases = purchasesTotal;
     const fixed = Number(summary?.fixed_costs ?? 0);
     const visit = Number(summary?.visit_expenses ?? 0);
     const variableTotal = Number(summary?.variable_costs ?? 0);
     const configuredVariable = Math.max(variableTotal - visit, 0);
-    const total = cogs + fixed + configuredVariable + visit;
+    const total = purchases + fixed + configuredVariable + visit;
     const segments = [
-      { key: 'cogs', label: 'Mercancía vendida', emoji: '🥕', amount: cogs, color: 'bg-amber-400' },
+      { key: 'purchases', label: 'Compras', emoji: '🛒', amount: purchases, color: 'bg-amber-400' },
       { key: 'fixed', label: 'Gastos fijos', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
       {
         key: 'variable',
@@ -640,7 +646,7 @@ export function ProfitabilityManager({
         percent: total > 0 ? (s.amount / total) * 100 : 0,
       })),
     };
-  }, [summary]);
+  }, [summary, purchasesTotal]);
 
   async function applyTrends(payload: {
     series?: TrendPoint[];
@@ -1038,10 +1044,8 @@ export function ProfitabilityManager({
             emoji="🧾"
             tone="amber"
             label="Te costó"
-            value={formatMoney(
-              Number(summary?.cogs ?? 0) + Number(summary?.operating_costs_total ?? 0),
-            )}
-            hint="Mercancía + fijos + visita"
+            value={formatMoney(purchasesTotal + Number(summary?.operating_costs_total ?? 0))}
+            hint="Lo que salió de caja y cuenta"
           />
           <MetricCard
             emoji="🏷️"
@@ -1294,7 +1298,7 @@ export function ProfitabilityManager({
       >
         <FoldableSummary
           title="Gastos del mes"
-          hint="Mercancía vendida, renta y visita. Las compras de inventario van aparte, para cuadrar. Las aportaciones sí entran a Te quedó."
+          hint="Lo que salió de caja y cuenta: compras, renta y visita. La mercancía vendida va en Cálculo de utilidad."
           emoji="🧾"
           iconClass="bg-amber-100"
         />
@@ -1305,6 +1309,10 @@ export function ProfitabilityManager({
           otherIncome={Number(summary?.other_income ?? 0)}
           purchases={purchasesTotal}
           visit={Number(summary?.visit_expenses ?? 0)}
+          operating={
+            Number(summary?.fixed_costs ?? 0) +
+            Math.max(Number(summary?.variable_costs ?? 0) - Number(summary?.visit_expenses ?? 0), 0)
+          }
           inventoryCost={totals.inventoryCost}
         />
 
@@ -1328,13 +1336,13 @@ export function ProfitabilityManager({
             </div>
 
             <div className="grid gap-2 sm:grid-cols-3">
-              {(['cogs', 'fixed', 'visit'] as const).map((key) => {
+              {(['purchases', 'fixed', 'visit'] as const).map((key) => {
                 const seg = costBreakdown.segments.find((s) => s.key === key) ?? {
                   key,
-                  label: key === 'cogs' ? 'Mercancía vendida' : key === 'fixed' ? 'Gastos fijos' : 'Gastos de visita',
-                  emoji: key === 'cogs' ? '🥕' : key === 'fixed' ? '🏠' : '🛻',
+                  label: key === 'purchases' ? 'Compras' : key === 'fixed' ? 'Gastos fijos' : 'Gastos de visita',
+                  emoji: key === 'purchases' ? '🛒' : key === 'fixed' ? '🏠' : '🛻',
                   amount: 0,
-                  color: key === 'cogs' ? 'bg-amber-400' : key === 'fixed' ? 'bg-slate-400' : 'bg-sky-400',
+                  color: key === 'purchases' ? 'bg-amber-400' : key === 'fixed' ? 'bg-slate-400' : 'bg-sky-400',
                   percent: 0,
                 };
                 return (

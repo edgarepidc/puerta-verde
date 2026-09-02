@@ -3,10 +3,12 @@ import test from 'node:test';
 
 import {
   applyOperatingCostsToPockets,
+  calendarMonthStart,
   costAppliesToRange,
   costPausedAtPeriodStart,
   operatingCostAmountForRange,
 } from './profitability';
+import { pocketTotal, resolveMoneyPosition } from './money-position';
 
 test('costAppliesToRange is true for an open term that started before the period', () => {
   assert.equal(
@@ -145,6 +147,46 @@ test('applyOperatingCostsToPockets adds paused August rent back to the account',
   );
   assert.equal(flows.accountIn, 9500);
   assert.equal(flows.cashIn, 0);
+});
+
+test('calendarMonthStart is the first day of that month', () => {
+  assert.equal(calendarMonthStart('2026-08-31'), '2026-08-01');
+});
+
+test('paused August rent rolls into September starting pockets then September rent leaves', () => {
+  const costs = [
+    {
+      costType: 'fixed' as const,
+      period: 'monthly' as const,
+      amount: 9500,
+      paidFrom: 'account' as const,
+      terms: [
+        { start_date: '2026-08-01', end_date: '2026-07-31' },
+        { start_date: '2026-09-01', end_date: null },
+      ],
+    },
+  ];
+  const flows = { cashIn: 1351.24, accountIn: 3461.98, cashOut: 0, accountOut: 0 };
+  applyOperatingCostsToPockets(flows, costs, {
+    from: calendarMonthStart('2026-08-31'),
+    to: '2026-08-31',
+    dayBeforeFrom: '2026-07-31',
+    mode: 'paused-addback',
+  });
+  applyOperatingCostsToPockets(flows, costs, {
+    from: '2026-09-01',
+    to: '2026-09-02',
+    dayBeforeFrom: '2026-08-31',
+    mode: 'outflow',
+  });
+  const result = resolveMoneyPosition({
+    snapshot: { asOfDate: '2026-08-31', cash: 2605, account: 4362 },
+    periodEnd: '2026-09-02',
+    flows,
+  });
+  assert.equal(result.cash, 3956.24);
+  assert.equal(result.account, 7823.98);
+  assert.equal(pocketTotal(result), 11780.22);
 });
 
 test('applyOperatingCostsToPockets does not add back rent that still applies', () => {

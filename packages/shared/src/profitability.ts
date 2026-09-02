@@ -63,6 +63,11 @@ export function costPausedAtPeriodStart(
   );
 }
 
+/** First calendar day of the month that contains `ymd`. */
+export function calendarMonthStart(ymd: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd.slice(0, 7)}-01` : ymd;
+}
+
 export interface OperatingCostPocketInput {
   costType: OperatingCostType;
   period: OperatingCostPeriod;
