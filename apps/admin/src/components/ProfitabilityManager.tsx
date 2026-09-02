@@ -512,21 +512,28 @@ function ProfitBuildUp({
 function CashBridge({
   openingTotal,
   openingAsOf,
+  ticketIn,
+  ticketInCash,
+  ticketInAccount,
   periodIn,
   periodOut,
   closing,
 }: {
   openingTotal: number;
   openingAsOf: string | null;
+  ticketIn: number;
+  ticketInCash: number;
+  ticketInAccount: number;
   periodIn: number;
   periodOut: number;
   closing: number;
 }) {
+  const otherIn = Math.max(periodIn - ticketIn, 0);
   return (
     <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
       <h3 className="text-sm font-semibold text-slate-900">Caja y cuenta</h3>
       <p className="mt-0.5 text-xs text-slate-500">
-        Del último conteo a Tienes. No es la utilidad.
+        Del último conteo a Tienes, con los tickets cobrados. No es la utilidad.
       </p>
       <ul className="mt-3 space-y-2.5 text-sm">
         <li className="flex items-baseline justify-between gap-3">
@@ -541,19 +548,42 @@ function CashBridge({
           </span>
         </li>
         <li className="flex items-baseline justify-between gap-3">
-          <span className="font-medium text-slate-800">+ Entró</span>
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">+ Tickets cobrados</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Efectivo {formatMoney(ticketInCash)} · cuenta {formatMoney(ticketInAccount)}
+            </span>
+          </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(periodIn)}
+            {formatMoney(ticketIn)}
           </span>
         </li>
+        {otherIn > 0.009 ? (
+          <li className="flex items-baseline justify-between gap-3">
+            <span className="font-medium text-slate-800">+ Aportaciones y otros</span>
+            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+              {formatMoney(otherIn)}
+            </span>
+          </li>
+        ) : null}
         <li className="flex items-baseline justify-between gap-3">
-          <span className="font-medium text-slate-800">− Salió</span>
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">− Salió</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Compras, renta, visita y gastos
+            </span>
+          </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
             {formatMoney(periodOut)}
           </span>
         </li>
         <li className="flex items-baseline justify-between gap-3 border-t border-emerald-100 pt-2.5">
-          <span className="font-medium text-slate-800">= Tienes</span>
+          <span className="min-w-0">
+            <span className="font-medium text-slate-800">= Tienes</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Caja + cuenta. La tarjeta entra al cobrar, no cuando el banco deposita.
+            </span>
+          </span>
           <span className="shrink-0 font-semibold tabular-nums text-slate-900">
             {formatMoney(closing)}
           </span>
@@ -586,6 +616,10 @@ export function ProfitabilityManager({
   initialPurchasesTotal,
   initialWasteCost,
   initialZeroCostSold,
+  initialUnpaidRevenue,
+  initialUnpaidCount,
+  initialCollectedRevenue,
+  initialCollectedCount,
   initialMoneyPosition,
   initialSummary,
   initialCategories,
@@ -601,6 +635,10 @@ export function ProfitabilityManager({
   initialPurchasesTotal: number;
   initialWasteCost: number;
   initialZeroCostSold: Array<{ name: string; revenue: number }>;
+  initialUnpaidRevenue: number;
+  initialUnpaidCount: number;
+  initialCollectedRevenue: number;
+  initialCollectedCount: number;
   initialMoneyPosition: MoneyPositionView | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
@@ -613,6 +651,10 @@ export function ProfitabilityManager({
   const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
   const [wasteCost, setWasteCost] = useState(initialWasteCost);
   const [zeroCostSold, setZeroCostSold] = useState(initialZeroCostSold);
+  const [unpaidRevenue, setUnpaidRevenue] = useState(initialUnpaidRevenue);
+  const [unpaidCount, setUnpaidCount] = useState(initialUnpaidCount);
+  const [collectedRevenue, setCollectedRevenue] = useState(initialCollectedRevenue);
+  const [collectedCount, setCollectedCount] = useState(initialCollectedCount);
   const [summary, setSummary] = useState(initialSummary);
   const [categories, setCategories] = useState(initialCategories);
   const [activePeriodLabel, setActivePeriodLabel] = useState(periodLabel);
@@ -778,6 +820,10 @@ export function ProfitabilityManager({
       setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
       setWasteCost(Number(profitPayload.wasteCost ?? 0));
       setZeroCostSold(profitPayload.zeroCostSold ?? []);
+      setUnpaidRevenue(Number(profitPayload.unpaidRevenue ?? 0));
+      setUnpaidCount(Number(profitPayload.unpaidCount ?? 0));
+      setCollectedRevenue(Number(profitPayload.collectedRevenue ?? 0));
+      setCollectedCount(Number(profitPayload.collectedCount ?? 0));
       setCategories(categoriesPayload.categories);
       setVisitExpenses(expensesPayload.expenses ?? []);
       setIncomes(incomesPayload.incomes ?? []);
@@ -1165,9 +1211,11 @@ export function ProfitabilityManager({
             label="Vendiste"
             value={formatMoney(revenue)}
             hint={
-              ticketAvg == null
-                ? `${ticketCount} tickets · ${activePeriodLabel}`
-                : `${ticketCount} ticket${ticketCount === 1 ? '' : 's'} · ${formatMoney(ticketAvg)} c/u · ${activePeriodLabel}`
+              unpaidCount > 0
+                ? `${collectedCount} cobrados ${formatMoney(collectedRevenue)} · ${unpaidCount} por cobrar ${formatMoney(unpaidRevenue)} · ${activePeriodLabel}`
+                : ticketAvg == null
+                  ? `${ticketCount} tickets · ${activePeriodLabel}`
+                  : `${ticketCount} ticket${ticketCount === 1 ? '' : 's'} · ${formatMoney(ticketAvg)} c/u · ${activePeriodLabel}`
             }
           />
           <MetricCard
@@ -1450,6 +1498,9 @@ export function ProfitabilityManager({
         <CashBridge
           openingTotal={Number(moneyPosition?.openingTotal ?? 0)}
           openingAsOf={moneyPosition?.openingAsOf ?? null}
+          ticketIn={Number(moneyPosition?.ticketIn ?? 0)}
+          ticketInCash={Number(moneyPosition?.ticketInCash ?? 0)}
+          ticketInAccount={Number(moneyPosition?.ticketInAccount ?? 0)}
           periodIn={Number(moneyPosition?.periodIn ?? 0)}
           periodOut={Number(moneyPosition?.periodOut ?? 0)}
           closing={leftover}

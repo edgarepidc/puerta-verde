@@ -268,7 +268,7 @@ test('calendarMonthStart is the first day of that month', () => {
   assert.equal(calendarMonthStart('2026-08-31'), '2026-08-01');
 });
 
-test('paused August rent rolls into September starting pockets then September rent leaves', () => {
+test('a counted snapshot is not inflated by paused rent; September rent still leaves', () => {
   const costs = [
     {
       costType: 'fixed' as const,
@@ -284,12 +284,6 @@ test('paused August rent rolls into September starting pockets then September re
   ];
   const flows = { cashIn: 1351.24, accountIn: 3461.98, cashOut: 0, accountOut: 0 };
   applyOperatingCostsToPockets(flows, costs, {
-    from: calendarMonthStart('2026-08-31'),
-    to: '2026-08-31',
-    dayBeforeFrom: '2026-07-31',
-    mode: 'paused-addback',
-  });
-  applyOperatingCostsToPockets(flows, costs, {
     from: '2026-09-01',
     to: '2026-09-02',
     dayBeforeFrom: '2026-08-31',
@@ -301,8 +295,8 @@ test('paused August rent rolls into September starting pockets then September re
     flows,
   });
   assert.equal(result.cash, 3956.24);
-  assert.equal(result.account, 7823.98);
-  assert.equal(pocketTotal(result), 11780.22);
+  assert.equal(result.account, -1676.02);
+  assert.equal(pocketTotal(result), 2280.22);
 });
 
 test('applyOperatingCostsToPockets does not add back rent that still applies', () => {

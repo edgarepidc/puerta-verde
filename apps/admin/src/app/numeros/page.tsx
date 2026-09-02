@@ -6,7 +6,7 @@ import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
 import { fetchMoneyPosition } from '@/lib/money-position';
-import { fetchPeriodProfitExtras } from '@/lib/profit-extras';
+import { emptyPeriodProfitExtras, fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
 import type { OperatingCostPeriod, OperatingCostType, ProductUnit } from '@puertaverde/shared';
 
@@ -68,11 +68,10 @@ export default async function NumerosPage() {
       ? fetchMoneyPosition(tenant.branchId, range.start, range.end).catch(() => null)
       : Promise.resolve(null),
     canViewProfit
-      ? fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end).catch(() => ({
-          wasteCost: 0,
-          zeroCostSold: [],
-        }))
-      : Promise.resolve({ wasteCost: 0, zeroCostSold: [] as Array<{ name: string; revenue: number }> }),
+      ? fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end).catch(() =>
+          emptyPeriodProfitExtras(),
+        )
+      : Promise.resolve(emptyPeriodProfitExtras()),
   ]);
 
   const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
@@ -135,6 +134,10 @@ export default async function NumerosPage() {
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
             initialZeroCostSold={profitExtras.zeroCostSold ?? []}
+            initialUnpaidRevenue={Number(profitExtras.unpaidRevenue ?? 0)}
+            initialUnpaidCount={Number(profitExtras.unpaidCount ?? 0)}
+            initialCollectedRevenue={Number(profitExtras.collectedRevenue ?? 0)}
+            initialCollectedCount={Number(profitExtras.collectedCount ?? 0)}
             initialMoneyPosition={moneyPosition}
             canAdjustMoney={canAdjustMoney}
             initialSummary={(summaryRows?.data?.[0] as {

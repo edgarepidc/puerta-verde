@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  addCollectedTicket,
   addPocketInflow,
   addPocketOutflow,
+  isCollectedTicket,
   pocketTotal,
   resolveMoneyPosition,
+  ticketCollectedAmount,
+  ticketMoneyPocket,
   validateMoneyPositionInput,
 } from './money-position';
 
@@ -87,4 +91,85 @@ test('addPocketInflow returns money to the matching pocket', () => {
 
 test('pocketTotal is caja plus cuenta', () => {
   assert.equal(pocketTotal({ cash: 2605, account: 4362 }), 6967);
+});
+
+test('ticketCollectedAmount is subtotal minus discount plus delivery', () => {
+  assert.equal(
+    ticketCollectedAmount({ subtotal: 100, discount_amount: 10, delivery_fee: 25 }),
+    115,
+  );
+});
+
+test('ticketMoneyPocket sends card and transfer to the account', () => {
+  assert.equal(ticketMoneyPocket('cash'), 'cash');
+  assert.equal(ticketMoneyPocket('card_terminal'), 'account');
+  assert.equal(ticketMoneyPocket('transfer'), 'account');
+  assert.equal(ticketMoneyPocket('online'), 'account');
+  assert.equal(ticketMoneyPocket('on_account'), null);
+  assert.equal(ticketMoneyPocket(null), 'cash');
+});
+
+test('cancelled or unpaid tickets do not enter caja or cuenta', () => {
+  assert.equal(
+    isCollectedTicket({ status: 'cancelled', payment_status: 'paid', payment_method: 'cash' }),
+    false,
+  );
+  assert.equal(
+    isCollectedTicket({ status: 'delivered', payment_status: 'pending', payment_method: 'cash' }),
+    false,
+  );
+  assert.equal(
+    isCollectedTicket({
+      status: 'delivered',
+      payment_status: 'paid',
+      payment_method: 'on_account',
+    }),
+    false,
+  );
+  assert.equal(
+    isCollectedTicket({
+      status: 'delivered',
+      payment_status: 'paid',
+      payment_method: 'card_terminal',
+    }),
+    true,
+  );
+});
+
+test('addCollectedTicket uses the ticket amount and the payment pocket', () => {
+  const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  addCollectedTicket(flows, {
+    status: 'delivered',
+    payment_status: 'paid',
+    payment_method: 'cash',
+    subtotal: 80,
+    discount_amount: 0,
+    delivery_fee: 0,
+  });
+  addCollectedTicket(flows, {
+    status: 'delivered',
+    payment_status: 'paid',
+    payment_method: 'transfer',
+    subtotal: 200,
+    discount_amount: 20,
+    delivery_fee: 0,
+  });
+  addCollectedTicket(flows, {
+    status: 'cancelled',
+    payment_status: 'paid',
+    payment_method: 'cash',
+    subtotal: 50,
+    discount_amount: 0,
+    delivery_fee: 0,
+  });
+  addCollectedTicket(flows, {
+    status: 'delivered',
+    payment_status: 'paid',
+    payment_method: 'on_account',
+    subtotal: 40,
+    discount_amount: 0,
+    delivery_fee: 0,
+  });
+  assert.equal(flows.cashIn, 80);
+  assert.equal(flows.accountIn, 180);
 });
