@@ -600,6 +600,27 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['daily_cash_closings']['Row']>;
         Relationships: [];
       };
+      branch_money_positions: {
+        Row: {
+          id: string;
+          branch_id: string;
+          as_of_date: string;
+          cash_amount: number;
+          account_amount: number;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['branch_money_positions']['Row']> & {
+          branch_id: string;
+          as_of_date: string;
+          cash_amount: number;
+          account_amount: number;
+        };
+        Update: Partial<Database['public']['Tables']['branch_money_positions']['Row']>;
+        Relationships: [];
+      };
       whatsapp_message_logs: {
         Row: {
           id: string;
