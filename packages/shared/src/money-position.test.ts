@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { addPocketOutflow, resolveMoneyPosition, validateMoneyPositionInput } from './money-position';
+import {
+  addPocketInflow,
+  addPocketOutflow,
+  pocketTotal,
+  resolveMoneyPosition,
+  validateMoneyPositionInput,
+} from './money-position';
 
 test('validateMoneyPositionInput accepts August closing amounts', () => {
   assert.equal(
@@ -69,4 +75,16 @@ test('addPocketOutflow sends cash and account to different pockets', () => {
   addPocketOutflow(flows, 'cash', 0);
   assert.equal(flows.cashOut, 40);
   assert.equal(flows.accountOut, 15);
+});
+
+test('addPocketInflow returns money to the matching pocket', () => {
+  const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  addPocketInflow(flows, 'account', 9500);
+  addPocketInflow(flows, 'cash', 100);
+  assert.equal(flows.accountIn, 9500);
+  assert.equal(flows.cashIn, 100);
+});
+
+test('pocketTotal is caja plus cuenta', () => {
+  assert.equal(pocketTotal({ cash: 2605, account: 4362 }), 6967);
 });

@@ -14,6 +14,7 @@ import {
   OPERATING_COST_TYPES,
   costAppliesToRange,
   parseMoneyPocket,
+  pocketTotal,
   type IncomeEntryType,
   type MoneyPocket,
   type MoneyPositionView,
@@ -179,8 +180,8 @@ function MetricCard({
 }
 
 function TeQuedoCard({
-  net,
-  netPositive,
+  total,
+  totalPositive,
   position,
   adjusting,
   cashText,
@@ -192,8 +193,8 @@ function TeQuedoCard({
   onSave,
   canAdjust,
 }: {
-  net: number;
-  netPositive: boolean;
+  total: number;
+  totalPositive: boolean;
   position: MoneyPositionView | null;
   adjusting: boolean;
   cashText: string;
@@ -209,11 +210,11 @@ function TeQuedoCard({
     <div className="pv-glass-card flex gap-3 p-4">
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${
-          netPositive ? BADGE_TONES.profit : BADGE_TONES.loss
+          totalPositive ? BADGE_TONES.profit : BADGE_TONES.loss
         }`}
         aria-hidden
       >
-        {netPositive ? '💚' : '⚠️'}
+        {totalPositive ? '💚' : '⚠️'}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
@@ -228,7 +229,7 @@ function TeQuedoCard({
             </button>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(net)}</p>
+        <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(total)}</p>
         <p className="mt-0.5 truncate text-xs text-slate-500">
           En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
         </p>
@@ -927,8 +928,11 @@ export function ProfitabilityManager({
     }
   }
 
-  const net = summary ? Number(summary.estimated_net_profit) : 0;
-  const netPositive = net >= 0;
+  const leftover = pocketTotal({
+    cash: moneyPosition?.cash ?? 0,
+    account: moneyPosition?.account ?? 0,
+  });
+  const leftoverPositive = leftover >= 0;
   const exportQuery = qs(from, to);
 
   const inventorySpread = totals.inventorySale - totals.inventoryCost;
@@ -1053,8 +1057,8 @@ export function ProfitabilityManager({
         </div>
         <div className="grid grid-cols-1 gap-2 sm:gap-3">
           <TeQuedoCard
-            net={net}
-            netPositive={netPositive}
+            total={leftover}
+            totalPositive={leftoverPositive}
             position={moneyPosition}
             adjusting={adjustingPockets}
             cashText={cashAdjustText}

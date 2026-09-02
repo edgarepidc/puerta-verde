@@ -1,9 +1,12 @@
 import {
   addPocketOutflow,
+  applyOperatingCostsToPockets,
+  costPausedAtPeriodStart,
   parseMoneyPocket,
   resolveMoneyPosition,
   roundMoney,
   type MoneyPositionView,
+  type OperatingCostPocketInput,
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
@@ -17,14 +20,20 @@ export async function fetchMoneyPosition(
   to: string,
 ): Promise<MoneyPositionView> {
   const supabase = createAdminClient();
-  const { data: snapshotRow } = await supabase
-    .from('branch_money_positions')
-    .select('as_of_date, cash_amount, account_amount, notes')
-    .eq('branch_id', branchId)
-    .lte('as_of_date', to)
-    .order('as_of_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: snapshotRow }, { data: costRows }] = await Promise.all([
+    supabase
+      .from('branch_money_positions')
+      .select('as_of_date, cash_amount, account_amount, notes')
+      .eq('branch_id', branchId)
+      .lte('as_of_date', to)
+      .order('as_of_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('branch_operating_costs')
+      .select('cost_type, period, amount, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
+      .eq('branch_id', branchId),
+  ]);
 
   const snapshot = snapshotRow
     ? {
@@ -33,6 +42,14 @@ export async function fetchMoneyPosition(
         account: Number(snapshotRow.account_amount),
       }
     : null;
+
+  const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
+    costType: row.cost_type,
+    period: row.period,
+    amount: Number(row.amount),
+    paidFrom: parseMoneyPocket(row.paid_from, 'account'),
+    terms: row.terms ?? [],
+  }));
 
   const closesThisPeriod = Boolean(snapshot && snapshot.asOfDate >= to);
   const movementStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
@@ -100,6 +117,14 @@ export async function fetchMoneyPosition(
       if (row.entry_type === 'contribution') flows.accountIn += amount;
       else flows.cashIn += amount;
     }
+
+    applyOperatingCostsToPockets(flows, costs, {
+      from: movementStart,
+      to,
+      dayBeforeFrom: addMexicoDays(movementStart, -1),
+      orderCount: (ordersRes.data ?? []).length,
+      mode: 'outflow',
+    });
   }
 
   const resolved = resolveMoneyPosition({
@@ -112,6 +137,37 @@ export async function fetchMoneyPosition(
       accountOut: roundMoney(flows.accountOut),
     },
   });
+
+  if (closesThisPeriod) {
+    const addBack = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+    const needsOrderCount = costs.some(
+      (cost) =>
+        cost.period === 'per_order' &&
+        costPausedAtPeriodStart(cost.terms, from, addMexicoDays(from, -1)),
+    );
+    let orderCount = 0;
+    if (needsOrderCount) {
+      const saleStart = mexicoYmdBoundsIso(from).start;
+      const saleEnd = mexicoYmdBoundsIso(to).end;
+      const { count } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('branch_id', branchId)
+        .eq('payment_status', 'paid')
+        .gte('paid_at', saleStart)
+        .lt('paid_at', saleEnd);
+      orderCount = count ?? 0;
+    }
+    applyOperatingCostsToPockets(addBack, costs, {
+      from,
+      to,
+      dayBeforeFrom: addMexicoDays(from, -1),
+      orderCount,
+      mode: 'paused-addback',
+    });
+    resolved.cash = roundMoney(resolved.cash + addBack.cashIn);
+    resolved.account = roundMoney(resolved.account + addBack.accountIn);
+  }
 
   return {
     ...resolved,

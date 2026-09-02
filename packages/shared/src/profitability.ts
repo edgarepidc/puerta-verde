@@ -1,4 +1,11 @@
-import { isMoneyPocket, type MoneyPocket } from './money-position';
+import {
+  addPocketInflow,
+  addPocketOutflow,
+  isMoneyPocket,
+  parseMoneyPocket,
+  type MoneyPocket,
+  type MoneyPositionFlows,
+} from './money-position';
 
 export const OPERATING_COST_TYPES = ['fixed', 'variable'] as const;
 export type OperatingCostType = (typeof OPERATING_COST_TYPES)[number];
@@ -43,6 +50,52 @@ export function costAppliesToRange(
   return (terms ?? []).some(
     (term) => term.start_date <= to && (term.end_date == null || term.end_date >= from),
   );
+}
+
+/** True when Pausar closed a term the day before this period (end_date = from − 1). */
+export function costPausedAtPeriodStart(
+  terms: OperatingCostTerm[] | undefined,
+  periodStart: string,
+  dayBefore: string,
+): boolean {
+  return (terms ?? []).some(
+    (term) => term.end_date === dayBefore && term.start_date <= periodStart,
+  );
+}
+
+export interface OperatingCostPocketInput {
+  costType: OperatingCostType;
+  period: OperatingCostPeriod;
+  amount: number;
+  paidFrom?: MoneyPocket | null;
+  terms?: OperatingCostTerm[];
+}
+
+/** Rent, payroll, and services leave (or return to) caja/cuenta. */
+export function applyOperatingCostsToPockets(
+  flows: MoneyPositionFlows,
+  costs: OperatingCostPocketInput[],
+  options: {
+    from: string;
+    to: string;
+    dayBeforeFrom: string;
+    orderCount?: number;
+    mode: 'outflow' | 'paused-addback';
+  },
+): void {
+  const orderCount = options.orderCount ?? 0;
+  for (const cost of costs) {
+    const applies = costAppliesToRange(cost.terms, options.from, options.to);
+    const include =
+      options.mode === 'outflow'
+        ? applies
+        : !applies && costPausedAtPeriodStart(cost.terms, options.from, options.dayBeforeFrom);
+    if (!include) continue;
+    const amount = operatingCostAmountForRange(cost, options.from, options.to, orderCount);
+    const pocket = parseMoneyPocket(cost.paidFrom, 'account');
+    if (options.mode === 'outflow') addPocketOutflow(flows, pocket, amount);
+    else addPocketInflow(flows, pocket, amount);
+  }
 }
 
 export function validateOperatingCostInput(input: OperatingCostInput): string | null {

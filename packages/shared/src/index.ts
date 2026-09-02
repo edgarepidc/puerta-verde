@@ -302,6 +302,8 @@ export {
   calcMarginPercent,
   validateOperatingCostInput,
   costAppliesToRange,
+  costPausedAtPeriodStart,
+  applyOperatingCostsToPockets,
   operatingCostAmountForRange,
   OPERATING_COST_TYPES,
   OPERATING_COST_PERIODS,
@@ -311,6 +313,7 @@ export {
   type OperatingCostTerm,
   type OperatingCostType,
   type OperatingCostPeriod,
+  type OperatingCostPocketInput,
 } from './profitability';
 
 export {
@@ -332,6 +335,8 @@ export {
   MONEY_POCKETS,
   MONEY_POCKET_LABELS,
   addPocketOutflow,
+  addPocketInflow,
+  pocketTotal,
   isMoneyPocket,
   parseMoneyPocket,
   resolveMoneyPosition,
