@@ -112,7 +112,7 @@ export async function PATCH(
           const startsFromHere = term.start_date >= periodStart;
           if (!coversFromHere && !startsFromHere) continue;
 
-          if (startsFromHere) {
+          if (term.start_date > periodStart) {
             const { error: deleteError } = await supabase
               .from('branch_operating_cost_terms')
               .delete()

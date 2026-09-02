@@ -22,6 +22,16 @@ export function addPocketOutflow(flows: MoneyPositionFlows, pocket: MoneyPocket,
   else flows.cashOut += amount;
 }
 
+export function addPocketInflow(flows: MoneyPositionFlows, pocket: MoneyPocket, amount: number) {
+  if (!(amount > 0)) return;
+  if (pocket === 'account') flows.accountIn += amount;
+  else flows.cashIn += amount;
+}
+
+export function pocketTotal(position: { cash: number; account: number }): number {
+  return roundMoney(position.cash + position.account);
+}
+
 export interface MoneyPositionSnapshot {
   asOfDate: string;
   cash: number;
