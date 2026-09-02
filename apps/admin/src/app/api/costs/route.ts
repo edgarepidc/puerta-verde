@@ -71,6 +71,7 @@ export async function POST(request: Request) {
         amount: body.amount,
         notes: body.notes?.trim() || null,
         is_active: true,
+        paid_from: body.paidFrom === 'cash' ? 'cash' : 'account',
       })
       .select('id')
       .single();
