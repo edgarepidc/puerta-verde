@@ -27,12 +27,21 @@ function categoryEmoji(name: string) {
   return '🧺';
 }
 
+function fallbackUnitFromName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('hierba')) return PRODUCT_UNIT_LABELS.bunch;
+  if (n.includes('hongo')) return PRODUCT_UNIT_LABELS.box;
+  if (n.includes('dulce')) return PRODUCT_UNIT_LABELS.box;
+  return PRODUCT_UNIT_LABELS.kg;
+}
+
 function unitLabelForCategory(
   categoryId: string,
+  categoryName: string,
   products: Array<{ categoryId: string | null; unit: ProductUnit }>,
-): string | null {
+): string {
   const units = products.filter((product) => product.categoryId === categoryId).map((product) => product.unit);
-  if (units.length === 0) return null;
+  if (units.length === 0) return fallbackUnitFromName(categoryName);
   const counts = new Map<ProductUnit, number>();
   for (const unit of units) counts.set(unit, (counts.get(unit) ?? 0) + 1);
   let best = units[0];
@@ -73,8 +82,7 @@ export function LowStockThresholdsManager({
   const unitByCategory = useMemo(() => {
     const map: Record<string, string> = {};
     for (const row of rows) {
-      const label = unitLabelForCategory(row.id, products);
-      if (label) map[row.id] = label;
+      map[row.id] = unitLabelForCategory(row.id, row.name, products);
     }
     return map;
   }, [products, rows]);
@@ -173,14 +181,11 @@ export function LowStockThresholdsManager({
                     </p>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                    <div className="inline-flex items-center justify-end gap-1.5">
+                    <div className="ml-auto inline-flex items-center justify-end gap-1.5">
+                      <span className="w-[4.5rem] text-right text-xs text-slate-500">{unitByCategory[row.id]}</span>
                       {canEdit ? (
                         <DecimalInput
-                          aria-label={
-                            unitByCategory[row.id]
-                              ? `Mínimo de ${row.name} en ${unitByCategory[row.id]}`
-                              : `Mínimo de ${row.name}`
-                          }
+                          aria-label={`Mínimo de ${row.name} en ${unitByCategory[row.id]}`}
                           className="w-20 rounded-[0.875rem] border border-slate-200 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                           value={row.text}
                           onChange={(value) =>
@@ -192,11 +197,6 @@ export function LowStockThresholdsManager({
                       ) : (
                         <span className="tabular-nums font-semibold text-slate-900">{row.text}</span>
                       )}
-                      {unitByCategory[row.id] ? (
-                        <span className="min-w-[3.25rem] text-left text-xs text-slate-500">
-                          {unitByCategory[row.id]}
-                        </span>
-                      ) : null}
                     </div>
                   </td>
                 </tr>
