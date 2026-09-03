@@ -65,6 +65,11 @@ const TONES = {
     shadow: 'shadow-[0_4px_16px_rgba(37,211,102,0.28)]',
     icon: 'bg-[#25D366] text-white',
   },
+  amber: {
+    chip: 'border-amber-300 text-amber-900 hover:bg-amber-50',
+    shadow: 'shadow-[0_4px_16px_rgba(245,158,11,0.30)]',
+    icon: 'bg-amber-100',
+  },
 } as const;
 
 const SIZES = {

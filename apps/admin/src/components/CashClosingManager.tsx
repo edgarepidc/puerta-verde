@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { PAYMENT_METHOD_LABELS, formatMoney } from '@puertaverde/shared';
+import { PAYMENT_METHOD_LABELS, formatMoney, todayMexicoYmd } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput } from '@/components/DecimalInput';
@@ -57,7 +57,19 @@ function formatWeekday(value: string): string {
   return date.toLocaleDateString('es-MX', { weekday: 'long' }).toLowerCase();
 }
 
+function yesterdayMexicoYmd(): string {
+  const today = todayMexicoYmd();
+  const d = new Date(`${today}T12:00:00-06:00`);
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function CashClosingManager({ canManage = true }: { canManage?: boolean }) {
+  const todayYmd = todayMexicoYmd();
+  const [selectedDate, setSelectedDate] = useState(todayYmd);
   const [summary, setSummary] = useState<CashSummary | null>(null);
   const [notes, setNotes] = useState('');
   const [openingFloat, setOpeningFloat] = useState('');
@@ -68,11 +80,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   const [openCaja, setOpenCaja] = useState(true);
   const [openDesglose, setOpenDesglose] = useState(false);
 
-  async function load() {
+  async function load(date?: string) {
     setLoading(true);
     setError(null);
+    const d = date ?? selectedDate;
     try {
-      const response = await fetch('/api/cash-closing');
+      const response = await fetch(`/api/cash-closing?date=${d}`);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja');
       setSummary(payload);
@@ -91,8 +104,9 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    load(selectedDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
 
   async function closeDay() {
     if (!canManage) {
@@ -121,24 +135,20 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     }
   }
 
-  if (loading) {
-    return <p className="text-sm text-slate-500">Cargando caja del día...</p>;
-  }
-
-  if (!summary) return null;
-
   const otherTotal =
-    Number(summary.totals.card_terminal ?? 0) +
-    Number(summary.totals.transfer ?? 0) +
-    Number(summary.totals.online ?? 0);
-  const expectedCash = Number(openingFloat || 0) + Number(summary.totals.cash);
+    Number(summary?.totals.card_terminal ?? 0) +
+    Number(summary?.totals.transfer ?? 0) +
+    Number(summary?.totals.online ?? 0);
+  const expectedCash = Number(openingFloat || 0) + Number(summary?.totals.cash ?? 0);
   const cashDiff =
     countedCash === '' ? null : Number(countedCash) - expectedCash;
 
   const channelCards = [
-    { label: 'Mostrador', emoji: '🛒', iconClass: 'bg-emerald-100', value: summary.channels?.pos },
-    { label: 'Tienda web', emoji: '🌐', iconClass: 'bg-sky-100', value: summary.channels?.web },
+    { label: 'Mostrador', emoji: '🛒', iconClass: 'bg-emerald-100', value: summary?.channels?.pos },
+    { label: 'Tienda web', emoji: '🌐', iconClass: 'bg-sky-100', value: summary?.channels?.web },
   ];
+
+  const isToday = selectedDate === todayYmd;
 
   return (
     <div className="space-y-6">
@@ -148,7 +158,43 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         </p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      {/* Day filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ActionChip
+          tone={isToday ? 'emerald' : 'slate'}
+          elevated={isToday}
+          onClick={() => setSelectedDate(todayYmd)}
+        >
+          Hoy
+        </ActionChip>
+        <ActionChip
+          tone={selectedDate === yesterdayMexicoYmd() ? 'emerald' : 'slate'}
+          elevated={selectedDate === yesterdayMexicoYmd()}
+          onClick={() => setSelectedDate(yesterdayMexicoYmd())}
+        >
+          Ayer
+        </ActionChip>
+        <label className="flex items-center gap-1.5 text-sm text-slate-500">
+          <span>📅</span>
+          <input
+            type="date"
+            max={todayYmd}
+            value={selectedDate}
+            onChange={(e) => {
+              if (e.target.value) setSelectedDate(e.target.value);
+            }}
+            className="pv-input h-8 py-1 text-sm"
+          />
+        </label>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Cargando caja…</p>
+      ) : !summary ? (
+        <p className="text-sm text-slate-500">Sin datos para este día.</p>
+      ) : null}
+
+      {summary ? (<><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <div className="pv-glass-card flex gap-3 p-4">
           <div
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
@@ -349,6 +395,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           ))}
         </div>
       </details>
+      </>) : null}
     </div>
   );
 }
