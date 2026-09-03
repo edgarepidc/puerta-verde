@@ -352,12 +352,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         />
 
         <div className="mt-4 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-wrap items-end gap-3">
             <label className="block text-sm font-medium text-slate-700">
               Fondo inicial
               <DecimalInput
                 placeholder="0"
-                className="pv-input mt-2"
+                className="pv-input mt-1 w-32"
                 value={openingFloat}
                 onChange={setOpeningFloat}
                 disabled={Boolean(summary.closing)}
@@ -367,23 +367,23 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               Efectivo contado
               <DecimalInput
                 placeholder="0"
-                className="pv-input mt-2"
+                className="pv-input mt-1 w-32"
                 value={countedCash}
                 onChange={setCountedCash}
                 disabled={Boolean(summary.closing)}
               />
             </label>
+            {cashDiff != null ? (
+              <>
+                <ActionChip as="span" emoji="🧮">
+                  Esperado {formatMoney(expectedCash)}
+                </ActionChip>
+                <ActionChip as="span" tone={cashDiff < 0 ? 'rose' : 'emerald'} emoji={cashDiff < 0 ? '📉' : '📈'}>
+                  Diferencia {formatMoney(cashDiff)}
+                </ActionChip>
+              </>
+            ) : null}
           </div>
-          {cashDiff != null ? (
-            <div className="flex flex-wrap gap-2">
-              <ActionChip as="span" emoji="🧮">
-                Esperado {formatMoney(expectedCash)}
-              </ActionChip>
-              <ActionChip as="span" tone={cashDiff < 0 ? 'rose' : 'emerald'} emoji={cashDiff < 0 ? '📉' : '📈'}>
-                Diferencia {formatMoney(cashDiff)}
-              </ActionChip>
-            </div>
-          ) : null}
           <label className="block text-sm font-medium text-slate-700">
             Notas del cierre
             <textarea
