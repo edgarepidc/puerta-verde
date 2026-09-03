@@ -355,23 +355,31 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           <div className="flex flex-wrap items-end gap-3">
             <label className="block text-sm font-medium text-slate-700">
               Fondo inicial
-              <DecimalInput
-                placeholder="0"
-                className="pv-input mt-1 w-32"
-                value={openingFloat}
-                onChange={setOpeningFloat}
-                disabled={Boolean(summary.closing)}
-              />
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">$</span>
+                <DecimalInput
+                  placeholder="0"
+                  className="pv-input w-36 pl-6"
+                  value={openingFloat}
+                  onChange={setOpeningFloat}
+                  disabled={Boolean(summary.closing)}
+                  groupThousands
+                />
+              </div>
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Efectivo contado
-              <DecimalInput
-                placeholder="0"
-                className="pv-input mt-1 w-32"
-                value={countedCash}
-                onChange={setCountedCash}
-                disabled={Boolean(summary.closing)}
-              />
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">$</span>
+                <DecimalInput
+                  placeholder="0"
+                  className="pv-input w-36 pl-6"
+                  value={countedCash}
+                  onChange={setCountedCash}
+                  disabled={Boolean(summary.closing)}
+                  groupThousands
+                />
+              </div>
             </label>
             {cashDiff != null ? (
               <>
