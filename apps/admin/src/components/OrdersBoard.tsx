@@ -108,7 +108,7 @@ interface OrderItem {
 
 const REFRESH_MS = 25_000;
 
-type BoardFilter = 'hoy' | 'atender' | 'mostrador' | 'web';
+type BoardFilter = 'hoy' | 'atender' | 'mostrador' | 'web' | 'por_pagar';
 
 function isAttentionOrder(order: Pick<OrderRow, 'status'>): boolean {
   const status = normalizeOrderStatus(order.status);
@@ -119,6 +119,10 @@ function matchesChannel(order: Pick<OrderRow, 'source' | 'delivery_notes'>, filt
   if (filter === 'mostrador') return isCounterSale(order);
   if (filter === 'web') return !isCounterSale(order);
   return true;
+}
+
+function isPorPagarOrder(order: Pick<OrderRow, 'payment_status' | 'payment_method'>): boolean {
+  return isUnpaidOrder(order);
 }
 
 function statusChipClass(status: OrderStatus): string {
@@ -307,13 +311,19 @@ export function OrdersBoard({
     let atender = 0;
     let mostrador = 0;
     let web = 0;
+    let porPagar = 0;
+    let porPagarTotal = 0;
     for (const order of searchedOrders) {
       if (mexicoYmdFromIso(order.created_at) === todayYmd) hoy += 1;
       if (isAttentionOrder(order)) atender += 1;
       if (isCounterSale(order)) mostrador += 1;
       else web += 1;
+      if (isPorPagarOrder(order)) {
+        porPagar += 1;
+        porPagarTotal += Number(order.total ?? 0);
+      }
     }
-    return { hoy, atender, mostrador, web };
+    return { hoy, atender, mostrador, web, porPagar, porPagarTotal };
   }, [searchedOrders, todayYmd]);
 
   const attentionOrders = useMemo(
@@ -321,6 +331,7 @@ export function OrdersBoard({
       searchedOrders.filter((order) => {
         if (!isAttentionOrder(order)) return false;
         if (boardFilter === 'atender' || boardFilter === 'hoy') return true;
+        if (boardFilter === 'por_pagar') return true;
         return matchesChannel(order, boardFilter);
       }),
     [searchedOrders, boardFilter],
@@ -330,6 +341,7 @@ export function OrdersBoard({
     () =>
       searchedOrders.filter((order) => {
         if (normalizeOrderStatus(order.status) !== 'delivered') return false;
+        if (boardFilter === 'por_pagar') return isPorPagarOrder(order);
         return matchesChannel(order, boardFilter);
       }),
     [searchedOrders, boardFilter],
@@ -813,6 +825,16 @@ export function OrdersBoard({
                 ) : null}
               </ActionChip>
             ))}
+            <ActionChip
+              tone={boardFilter === 'por_pagar' ? 'amber' : filterCounts.porPagar > 0 ? 'amber' : 'slate'}
+              elevated={boardFilter === 'por_pagar'}
+              onClick={() => setBoardFilter('por_pagar')}
+            >
+              Por pagar
+              {filterCounts.porPagar > 0 ? (
+                <span className="tabular-nums text-amber-700"> · {filterCounts.porPagar}</span>
+              ) : null}
+            </ActionChip>
           </>
         }
         queueHint={queueHint}

@@ -17,12 +17,14 @@ function isPosOrder(order: {
   return (order.delivery_notes ?? '').startsWith('[mostrador]');
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return auth;
 
+  const { searchParams } = new URL(request.url);
+  const rawDate = searchParams.get('date')?.trim() ?? '';
   const supabase = createAdminClient();
-  const closingDate = todayMexicoYmd();
+  const closingDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayMexicoYmd();
   const startOfDay = `${closingDate}T00:00:00-06:00`;
   const endOfDay = `${closingDate}T23:59:59-06:00`;
 
