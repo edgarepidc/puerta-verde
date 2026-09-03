@@ -67,6 +67,14 @@ function yesterdayMexicoYmd(): string {
   return `${y}-${m}-${day}`;
 }
 
+interface Withdrawal {
+  id: string;
+  amount: number;
+  withdrawal_date: string;
+  withdrawn_at: string;
+  notes: string | null;
+}
+
 export function CashClosingManager({ canManage = true }: { canManage?: boolean }) {
   const todayYmd = todayMexicoYmd();
   const [selectedDate, setSelectedDate] = useState(todayYmd);
@@ -79,15 +87,25 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   const [error, setError] = useState<string | null>(null);
   const [openCaja, setOpenCaja] = useState(true);
   const [openDesglose, setOpenDesglose] = useState(false);
+  // Withdrawals
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalNotes, setWithdrawalNotes] = useState('');
+  const [savingWithdrawal, setSavingWithdrawal] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
+  const [openRetiros, setOpenRetiros] = useState(false);
 
   async function load(date?: string) {
     setLoading(true);
     setError(null);
     const d = date ?? selectedDate;
     try {
-      const response = await fetch(`/api/cash-closing?date=${d}`);
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja');
+      const [cashRes, wdRes] = await Promise.all([
+        fetch(`/api/cash-closing?date=${d}`),
+        fetch(`/api/cash-withdrawals?date=${d}`),
+      ]);
+      const payload = await cashRes.json();
+      if (!cashRes.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja');
       setSummary(payload);
       setNotes(payload.closing?.notes ?? '');
       setOpeningFloat(
@@ -96,10 +114,51 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       setCountedCash(
         payload.closing?.counted_cash != null ? String(payload.closing.counted_cash) : '',
       );
+      const wdPayload = await wdRes.json();
+      setWithdrawals(wdPayload.withdrawals ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveWithdrawal() {
+    const amount = Number(withdrawalAmount);
+    if (!amount || amount <= 0) {
+      setWithdrawalError('Ingresa un monto válido');
+      return;
+    }
+    setSavingWithdrawal(true);
+    setWithdrawalError(null);
+    try {
+      const response = await fetch('/api/cash-withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, notes: withdrawalNotes, date: selectedDate }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar');
+      setWithdrawals((current) => [payload.withdrawal, ...current]);
+      setWithdrawalAmount('');
+      setWithdrawalNotes('');
+    } catch (err) {
+      setWithdrawalError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setSavingWithdrawal(false);
+    }
+  }
+
+  async function deleteWithdrawal(id: string) {
+    try {
+      const response = await fetch(`/api/cash-withdrawals?id=${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.error ?? 'No se pudo eliminar');
+      }
+      setWithdrawals((current) => current.filter((w) => w.id !== id));
+    } catch (err) {
+      setWithdrawalError(err instanceof Error ? err.message : 'Error al eliminar');
     }
   }
 
@@ -348,6 +407,91 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
             </ActionChip>
           ) : null}
+        </div>
+      </details>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openRetiros}
+        onToggle={(event) => setOpenRetiros(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Retiros de efectivo"
+          hint={
+            withdrawals.length > 0
+              ? `${withdrawals.length} retiro${withdrawals.length === 1 ? '' : 's'} · ${formatMoney(withdrawals.reduce((s, w) => s + Number(w.amount), 0))}`
+              : 'Mueve efectivo a la cuenta bancaria'
+          }
+          emoji="💸"
+          iconClass="bg-violet-100"
+          actions={
+            withdrawals.length > 0 ? (
+              <ActionChip as="span" emoji="💜" tone="slate" elevated={false}>
+                {formatMoney(withdrawals.reduce((s, w) => s + Number(w.amount), 0))}
+              </ActionChip>
+            ) : undefined
+          }
+        />
+        <div className="mt-4 space-y-4">
+          {canManage ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Monto a retirar
+                <DecimalInput
+                  placeholder="0"
+                  className="pv-input mt-2"
+                  value={withdrawalAmount}
+                  onChange={setWithdrawalAmount}
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Notas (opcional)
+                <input
+                  type="text"
+                  className="pv-input mt-2"
+                  placeholder="Ej. depósito bancario"
+                  value={withdrawalNotes}
+                  onChange={(e) => setWithdrawalNotes(e.target.value)}
+                />
+              </label>
+            </div>
+          ) : null}
+          {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
+          {canManage ? (
+            <ActionChip
+              size="lg"
+              emoji="💸"
+              tone="slate"
+              disabled={savingWithdrawal || !withdrawalAmount}
+              onClick={saveWithdrawal}
+            >
+              {savingWithdrawal ? 'Guardando…' : 'Registrar retiro'}
+            </ActionChip>
+          ) : null}
+          {withdrawals.length > 0 ? (
+            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
+              {withdrawals.map((w) => (
+                <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="font-semibold tabular-nums text-slate-900">{formatMoney(Number(w.amount))}</p>
+                    {w.notes ? <p className="text-xs text-slate-500">{w.notes}</p> : null}
+                  </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs text-slate-400 hover:text-red-600"
+                      onClick={() => void deleteWithdrawal(w.id)}
+                      title="Eliminar retiro"
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-400">Sin retiros registrados hoy.</p>
+          )}
         </div>
       </details>
 
