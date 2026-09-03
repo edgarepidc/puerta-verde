@@ -713,7 +713,7 @@ export function CounterSalePanel({
 
   if (!open) {
     return (
-      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="mb-3 flex items-center gap-x-2 overflow-x-auto">
         <div className="w-[7.25rem] shrink-0 sm:w-32">
           <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
           <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
@@ -721,9 +721,9 @@ export function CounterSalePanel({
           </p>
         </div>
         {boardFilters ? (
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{boardFilters}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">{boardFilters}</div>
         ) : null}
-        <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           {printerChip}
           <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
             Nueva venta
