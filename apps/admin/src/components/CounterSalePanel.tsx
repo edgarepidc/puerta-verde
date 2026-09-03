@@ -714,14 +714,12 @@ export function CounterSalePanel({
   if (!open) {
     return (
       <div className="mb-3 flex items-center gap-x-2 overflow-x-auto">
-        <div className="w-[7.25rem] shrink-0 sm:w-32">
+        <div className="shrink-0">
           <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
-          <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">
-            ventas del día
-          </p>
+          <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">ventas del día</p>
         </div>
         {boardFilters ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">{boardFilters}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [&_button]:whitespace-nowrap [&_span]:whitespace-nowrap">{boardFilters}</div>
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           {printerChip}

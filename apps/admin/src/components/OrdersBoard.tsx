@@ -789,7 +789,7 @@ export function OrdersBoard({
         usbScaleEnabled={usbScaleEnabled}
         printerChip={
           <>
-            <div className="w-28 shrink-0 sm:w-36">
+            <div className="w-20 shrink-0 sm:w-28">
               <input
                 type="search"
                 value={orderSearch}
