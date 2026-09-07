@@ -1655,7 +1655,7 @@ export function CounterSalePanel({
                   </label>
                 )}
                 {canEditPrice ? (
-                  <label className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
+                  <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
                     <span className="font-medium">$/</span>
                     <DecimalInput
                       className="pv-input w-16! shrink-0 px-1.5! py-2 text-center"
@@ -1670,10 +1670,13 @@ export function CounterSalePanel({
                     />
                   </label>
                 ) : (
-                  <span className="ml-auto shrink-0 text-sm text-slate-500">
+                  <span className="shrink-0 text-sm text-slate-500">
                     {formatMoney(Number(product.price))} / {PRODUCT_UNIT_LABELS[unit]}
                   </span>
                 )}
+                <span className="ml-auto shrink-0 text-sm font-semibold text-slate-900">
+                  {formatMoney(lineTotal)}
+                </span>
               </div>
 
               {lineDraft.saleMode === 'piece' && !(parseDecimal(lineDraft.quantity) > 0) ? (
@@ -1689,10 +1692,7 @@ export function CounterSalePanel({
               ) : null}
               {lineError ? <p className="mt-2 text-sm text-rose-700">{lineError}</p> : null}
 
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">
-                  {formatMoney(lineTotal)}
-                </span>
+              <div className="mt-4 flex justify-end">
                 <ActionChip tone="emerald" emoji="🛒" onClick={confirmLineEditor}>
                   {updating ? 'Actualizar' : 'Agregar al pedido'}
                 </ActionChip>
