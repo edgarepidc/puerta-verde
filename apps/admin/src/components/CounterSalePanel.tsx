@@ -1172,7 +1172,7 @@ export function CounterSalePanel({
                               <span>Pza</span>
                               <DecimalInput
                                 data-cart-focus={item.branchProductId}
-                                className="pv-input w-11! shrink-0 px-1 py-1 text-center text-xs"
+                                className="pv-input w-12! shrink-0 px-1! py-1 text-center text-xs"
                                 value={item.pieces}
                                 onChange={(value) => updatePieces(item.branchProductId, value)}
                               />
@@ -1180,7 +1180,7 @@ export function CounterSalePanel({
                             <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">
                               <span>Kg</span>
                               <DecimalInput
-                                className="pv-input w-12! shrink-0 px-1 py-1 text-center text-xs"
+                                className="pv-input w-16! shrink-0 px-1! py-1 text-center text-xs"
                                 value={item.quantity}
                                 onChange={(value) => updateQty(item.branchProductId, value)}
                                 onBlur={() => commitQty(item.branchProductId)}
@@ -1199,7 +1199,7 @@ export function CounterSalePanel({
                             </button>
                             <DecimalInput
                               data-cart-focus={item.branchProductId}
-                              className="pv-input w-12! shrink-0 px-1 py-1 text-center text-xs"
+                              className="pv-input w-16! shrink-0 px-1! py-1 text-center text-xs"
                               value={item.quantity}
                               onChange={(value) => updateQty(item.branchProductId, value)}
                               onBlur={() => commitQty(item.branchProductId)}
@@ -1217,7 +1217,7 @@ export function CounterSalePanel({
                           <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">
                             <span>$/</span>
                             <DecimalInput
-                              className="pv-input w-12! shrink-0 px-1 py-1 text-center text-xs"
+                              className="pv-input w-14! shrink-0 px-1! py-1 text-center text-xs"
                               value={item.unitPrice}
                               onChange={(value) => updateUnitPrice(item.branchProductId, value)}
                               onBlur={() => commitUnitPrice(item.branchProductId)}
@@ -1652,7 +1652,7 @@ export function CounterSalePanel({
                     <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
                       <span className="font-medium">Pza</span>
                       <DecimalInput
-                        className="pv-input w-12! shrink-0 px-1.5 py-2 text-center"
+                        className="pv-input w-14! shrink-0 px-1.5! py-2 text-center"
                         value={lineDraft.pieces}
                         onChange={(value) =>
                           setLineDraft((current) =>
@@ -1665,7 +1665,7 @@ export function CounterSalePanel({
                       <span className="font-medium">Kg</span>
                       <DecimalInput
                         data-line-qty
-                        className="pv-input w-16! shrink-0 px-1.5 py-2 text-center"
+                        className="pv-input w-20! shrink-0 px-1.5! py-2 text-center"
                         value={lineDraft.quantity}
                         onChange={(value) =>
                           setLineDraft((current) =>
@@ -1688,7 +1688,7 @@ export function CounterSalePanel({
                     </button>
                     <DecimalInput
                       data-line-qty
-                      className="pv-input w-16! shrink-0 px-1.5 py-2 text-center"
+                      className="pv-input w-20! shrink-0 px-1.5! py-2 text-center"
                       value={lineDraft.quantity}
                       onChange={(value) =>
                         setLineDraft((current) =>
@@ -1710,7 +1710,7 @@ export function CounterSalePanel({
                   <label className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
                     <span className="font-medium">$/</span>
                     <DecimalInput
-                      className="pv-input w-16! shrink-0 px-1.5 py-2 text-center"
+                      className="pv-input w-16! shrink-0 px-1.5! py-2 text-center"
                       value={lineDraft.unitPrice}
                       onChange={(value) =>
                         setLineDraft((current) =>
