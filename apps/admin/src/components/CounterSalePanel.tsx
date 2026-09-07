@@ -1202,14 +1202,17 @@ export function CounterSalePanel({
             <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
               <p className="text-xs font-medium text-slate-600">Monto por método</p>
               {paymentSplits.map((row, index) => (
-                <div key={`${row.method}-${index}`} className="flex items-center gap-2">
+                <div
+                  key={`${row.method}-${index}`}
+                  className="grid grid-cols-[7rem_minmax(0,1fr)_2.75rem] items-center gap-2"
+                >
                   {index === 0 ? (
-                    <span className="w-28 shrink-0 text-sm text-slate-700">
+                    <span className="truncate text-sm text-slate-700">
                       {PAYMENT_METHOD_LABELS[row.method]}
                     </span>
                   ) : (
                     <select
-                      className="pv-input w-28 shrink-0 py-1 text-sm"
+                      className="pv-input w-full min-w-0 py-1 text-sm"
                       value={row.method}
                       onChange={(e) => {
                         const next = e.target.value;
@@ -1228,7 +1231,7 @@ export function CounterSalePanel({
                     </select>
                   )}
                   <DecimalInput
-                    className="pv-input flex-1 py-1"
+                    className="pv-input w-full min-w-0 py-1"
                     value={row.amount}
                     onChange={(value) => updateSplitAmount(index, value)}
                     groupThousands
@@ -1236,13 +1239,13 @@ export function CounterSalePanel({
                   {index > 0 ? (
                     <button
                       type="button"
-                      className="shrink-0 text-xs text-slate-400 hover:text-rose-600"
+                      className="justify-self-end text-xs text-slate-400 hover:text-rose-600"
                       onClick={() => removeSplit(index)}
                     >
                       Quitar
                     </button>
                   ) : (
-                    <span className="w-10 shrink-0" />
+                    <span />
                   )}
                 </div>
               ))}
