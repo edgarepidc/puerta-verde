@@ -89,7 +89,7 @@ test('buildSalesExportTables groups by Mexico day and keeps line items', () => {
   assert.equal(tables.items.length, 1);
   assert.equal(tables.items[0]?.Producto, 'Jitomate');
   assert.equal(tables.items[0]?.Pedido, 1015);
-  assert.equal(tables.items[0]?.Cantidad, 2.75);
+  assert.equal(tables.items[0]?.Cantidad, 2.746);
   assert.equal(tables.items[0]?.['Precio unitario'], 89.1);
   assert.equal(tables.items[0]?.Importe, 245.12);
 });

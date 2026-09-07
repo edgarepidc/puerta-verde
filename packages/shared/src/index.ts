@@ -143,14 +143,17 @@ export function isWalkInPhone(phone: string): boolean {
   return normalizePhone(phone) === WALK_IN_PHONE;
 }
 
-export function roundToDecimals(value: number, decimals = 2): number {
+/** Max places for kg/stock/qty. Trailing zeros are still stripped on display. */
+export const QUANTITY_DECIMALS = 3;
+
+export function roundToDecimals(value: number, decimals = QUANTITY_DECIMALS): number {
   if (!Number.isFinite(value)) return value;
   const factor = 10 ** decimals;
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
-/** At most two decimal places, without trailing zeros. */
-export function formatDecimal(value: number, decimals = 2): string {
+/** At most three decimal places, without trailing zeros (1.2 stays 1.2). */
+export function formatDecimal(value: number, decimals = QUANTITY_DECIMALS): string {
   if (!Number.isFinite(value)) return '';
   return String(roundToDecimals(value, decimals));
 }

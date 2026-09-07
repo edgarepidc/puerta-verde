@@ -62,7 +62,7 @@ function productRankValue(product: TopProduct, mode: ProductRankMode) {
 }
 
 function formatProductRankValue(product: TopProduct, mode: ProductRankMode) {
-  if (mode === 'quantity') return Number(product.quantity.toFixed(2));
+  if (mode === 'quantity') return Number(product.quantity.toFixed(3));
   return formatMoney(productRankValue(product, mode));
 }
 

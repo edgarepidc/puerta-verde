@@ -215,7 +215,7 @@ function emptyLine(key = String(Date.now())): LineDraft {
 
 function formatQty(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '';
-  return String(Number(n.toFixed(2)));
+  return String(Number(n.toFixed(3)));
 }
 
 function formatMoneyAmount(n: number): string {

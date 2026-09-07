@@ -293,7 +293,7 @@ export function Storefront({
           ];
         }
         const step = getQuantityStep(item.unit);
-        const next = Number((item.quantity + delta * step).toFixed(2));
+        const next = Number((item.quantity + delta * step).toFixed(3));
         if (next <= 0) return [];
         const maxStock = product ? Number(product.stock) : next;
         return [{ ...item, quantity: Math.min(next, maxStock) }];
@@ -1159,7 +1159,7 @@ export function Storefront({
                   const step = byPiece ? 1 : getQuantityStep(pickerProduct.product.unit as ProductUnit);
                   const min = 1;
                   setPickerQty((current) => {
-                    const next = Number((Number(current) - step).toFixed(2));
+                    const next = Number((Number(current) - step).toFixed(3));
                     return next < min ? min : next;
                   });
                 }}
@@ -1203,7 +1203,7 @@ export function Storefront({
                     ? maxPiecesFromStock(Number(pickerProduct.stock))
                     : Number(pickerProduct.stock);
                   setPickerQty((current) => {
-                    const next = Number((Number(current) + step).toFixed(2));
+                    const next = Number((Number(current) + step).toFixed(3));
                     return next > max ? max : next;
                   });
                 }}

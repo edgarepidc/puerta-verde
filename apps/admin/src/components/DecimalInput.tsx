@@ -41,7 +41,7 @@ function caretFromDigitCount(value: string, digitCount: number): number {
   return value.length;
 }
 
-function capFractionDigits(value: string, max = 2): string {
+function capFractionDigits(value: string, max = 3): string {
   const dot = value.indexOf('.');
   if (dot === -1) return value;
   return value.slice(0, dot + 1 + max);
