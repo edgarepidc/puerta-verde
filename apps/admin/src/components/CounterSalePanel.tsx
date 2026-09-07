@@ -12,7 +12,6 @@ import {
   formatMoney,
   getDefaultLowStockThreshold,
   getDefaultQuantity,
-  getQuantityStep,
   getStockStatus,
   isPaymentMethod,
   isSplitPaymentMethod,
@@ -571,16 +570,6 @@ export function CounterSalePanel({
     openLineEditor(product);
   }
 
-  function bumpDraftQty(delta: number) {
-    setLineDraft((current) => {
-      if (!current || current.saleMode === 'piece') return current;
-      const product = productById.get(current.productId);
-      const step = getQuantityStep(product?.product.unit ?? 'kg');
-      const next = Number((parseDecimal(current.quantity) + delta * step).toFixed(3));
-      return { ...current, quantity: next > 0 ? String(next) : '' };
-    });
-  }
-
   function commitDraftQty() {
     setLineDraft((current) => {
       if (!current) return current;
@@ -637,21 +626,6 @@ export function CounterSalePanel({
   function removeFromCart(productId: string) {
     setCart((current) => current.filter((item) => item.branchProductId !== productId));
     if (highlightId === productId) setHighlightId(null);
-  }
-
-  function bumpQty(productId: string, delta: number) {
-    const product = productById.get(productId);
-    const unit = product?.product.unit ?? 'kg';
-    const step = getQuantityStep(unit);
-    setCart((current) =>
-      current.flatMap((item) => {
-        if (item.branchProductId !== productId) return [item];
-        if (item.saleMode === 'piece') return [item];
-        const next = Number((parseDecimal(item.quantity) + delta * step).toFixed(3));
-        if (next <= 0) return [];
-        return [{ ...item, quantity: String(next) }];
-      }),
-    );
   }
 
   function updateUnitPrice(productId: string, unitPrice: string) {
@@ -1189,14 +1163,8 @@ export function CounterSalePanel({
                             </label>
                           </>
                         ) : (
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              className="h-7 w-7 shrink-0 rounded-full border border-slate-200"
-                              onClick={() => bumpQty(item.branchProductId, -1)}
-                            >
-                              −
-                            </button>
+                          <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">
+                            <span>{PRODUCT_UNIT_LABELS[unit]}</span>
                             <DecimalInput
                               data-cart-focus={item.branchProductId}
                               className="pv-input w-16! shrink-0 px-1! py-1 text-center text-xs"
@@ -1204,14 +1172,7 @@ export function CounterSalePanel({
                               onChange={(value) => updateQty(item.branchProductId, value)}
                               onBlur={() => commitQty(item.branchProductId)}
                             />
-                            <button
-                              type="button"
-                              className="h-7 w-7 shrink-0 rounded-full border border-slate-200"
-                              onClick={() => bumpQty(item.branchProductId, 1)}
-                            >
-                              +
-                            </button>
-                          </div>
+                          </label>
                         )}
                         {canEditPrice ? (
                           <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">
@@ -1678,14 +1639,8 @@ export function CounterSalePanel({
                     </label>
                   </>
                 ) : (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="h-9 w-9 shrink-0 rounded-full border border-slate-200 text-lg"
-                      onClick={() => bumpDraftQty(-1)}
-                    >
-                      −
-                    </button>
+                  <label className="flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
+                    <span className="font-medium">{PRODUCT_UNIT_LABELS[unit]}</span>
                     <DecimalInput
                       data-line-qty
                       className="pv-input w-20! shrink-0 px-1.5! py-2 text-center"
@@ -1697,14 +1652,7 @@ export function CounterSalePanel({
                       }
                       onBlur={commitDraftQty}
                     />
-                    <button
-                      type="button"
-                      className="h-9 w-9 shrink-0 rounded-full border border-slate-200 text-lg"
-                      onClick={() => bumpDraftQty(1)}
-                    >
-                      +
-                    </button>
-                  </div>
+                  </label>
                 )}
                 {canEditPrice ? (
                   <label className="ml-auto flex shrink-0 items-center gap-1.5 text-sm text-slate-700">
