@@ -73,8 +73,7 @@ function defaultBuyQty(row: ForecastRow) {
 }
 
 function qtyLabel(qty: number, unit: ProductUnit) {
-  const rounded = Number(Number(qty).toFixed(2));
-  return formatProductQuantity(rounded, unit);
+  return formatProductQuantity(qty, unit);
 }
 
 function daysLeftLabel(row: ForecastRow) {
@@ -241,7 +240,7 @@ export function ForecastManager({
       included[id] = selected;
       if (selected && !(qty[id]?.trim())) {
         const buy = defaultBuyQty(row);
-        qty[id] = buy > 0 ? String(Number(buy.toFixed(2))) : '';
+        qty[id] = buy > 0 ? String(Number(buy.toFixed(3))) : '';
       }
     });
     setPrintIncluded(included);
@@ -253,7 +252,7 @@ export function ForecastManager({
     const qty: Record<string, string> = {};
     for (const row of printRows) {
       const buy = defaultBuyQty(row);
-      qty[row.branch_product_id] = buy > 0 ? String(Number(buy.toFixed(2))) : '';
+      qty[row.branch_product_id] = buy > 0 ? String(Number(buy.toFixed(3))) : '';
     }
     setPrintError(null);
     setPrintOpen(true);

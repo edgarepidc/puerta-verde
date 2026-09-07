@@ -1043,7 +1043,7 @@ export function ProductsManager({
                   {(() => {
                     const system = Number(stockRow.stock);
                     const counted = parseDecimal(countedText, system);
-                    const delta = Number((counted - system).toFixed(2));
+                    const delta = Number((counted - system).toFixed(3));
                     if (!countedText.trim() || delta === 0) return null;
                     return (
                       <p className={`text-sm ${delta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>

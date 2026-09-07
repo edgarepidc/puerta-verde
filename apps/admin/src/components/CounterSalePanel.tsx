@@ -383,7 +383,7 @@ export function CounterSalePanel({
           );
         }
         const next = Number(
-          (parseDecimal(existing.quantity) + getQuantityStep(unit)).toFixed(2),
+          (parseDecimal(existing.quantity) + getQuantityStep(unit)).toFixed(3),
         );
         return current.map((item) =>
           item.branchProductId === product.id ? { ...item, quantity: String(next) } : item,
@@ -446,7 +446,7 @@ export function CounterSalePanel({
       current.flatMap((item) => {
         if (item.branchProductId !== productId) return [item];
         if (item.saleMode === 'piece') return [item];
-        const next = Number((parseDecimal(item.quantity) + delta * step).toFixed(2));
+        const next = Number((parseDecimal(item.quantity) + delta * step).toFixed(3));
         if (next <= 0) return [];
         return [{ ...item, quantity: String(next) }];
       }),
@@ -870,7 +870,7 @@ export function CounterSalePanel({
                             item.saleMode === 'piece' && !(parseDecimal(item.quantity) > 0),
                         ) ?? cart.find((item) => item.saleMode === 'piece');
                       if (target) {
-                        updateQty(target.branchProductId, String(Number(kg.toFixed(2))));
+                        updateQty(target.branchProductId, String(Number(kg.toFixed(3))));
                       }
                     }}
                   />

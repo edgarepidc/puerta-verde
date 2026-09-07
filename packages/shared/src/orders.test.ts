@@ -79,8 +79,9 @@ test('formatMoney uses MXN locale', () => {
   assert.match(formatMoney(45.5), /\$45\.50/);
 });
 
-test('formatDecimal keeps at most two places', () => {
-  assert.equal(formatDecimal(2.746), '2.75');
+test('formatDecimal keeps up to three places when needed', () => {
+  assert.equal(formatDecimal(2.746), '2.746');
+  assert.equal(formatDecimal(6.137), '6.137');
   assert.equal(formatDecimal(1.2), '1.2');
   assert.equal(formatDecimal(10), '10');
   assert.equal(formatDecimal(0.0700000001), '0.07');
