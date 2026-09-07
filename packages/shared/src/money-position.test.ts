@@ -173,3 +173,21 @@ test('addCollectedTicket uses the ticket amount and the payment pocket', () => {
   assert.equal(flows.cashIn, 80);
   assert.equal(flows.accountIn, 180);
 });
+
+test('addCollectedTicket splits cash and card into both pockets', () => {
+  const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  addCollectedTicket(flows, {
+    status: 'delivered',
+    payment_status: 'paid',
+    payment_method: 'cash',
+    payment_splits: [
+      { method: 'cash', amount: 40 },
+      { method: 'card_terminal', amount: 60 },
+    ],
+    subtotal: 100,
+    discount_amount: 0,
+    delivery_fee: 0,
+  });
+  assert.equal(flows.cashIn, 40);
+  assert.equal(flows.accountIn, 60);
+});

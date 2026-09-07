@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { isPaymentMethod, PAYMENT_METHODS, type PaymentMethod } from '@puertaverde/shared';
+import { isPaymentMethod, orderPaymentAmounts, PAYMENT_METHODS, type PaymentMethod } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi } from '@/lib/auth';
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     const supabase = createAdminClient();
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, subtotal, discount_amount, payment_method, payment_status')
+      .select('id, created_at, subtotal, discount_amount, payment_method, payment_splits, payment_status, total')
       .eq('branch_id', tenant.branchId)
       .neq('status', 'cancelled')
       .gte('created_at', startBound)
@@ -73,13 +73,19 @@ export async function GET(request: Request) {
       const day = todayMexicoYmd(new Date(order.created_at));
       const amount = Math.max(Number(order.subtotal ?? 0) - Number(order.discount_amount ?? 0), 0);
       daily.set(day, (daily.get(day) ?? 0) + amount);
-      const method: PaymentMethod =
-        order.payment_status !== 'paid' || order.payment_method === 'on_account'
-          ? 'on_account'
-          : isPaymentMethod(order.payment_method)
-            ? order.payment_method
-            : 'cash';
-      byPayment.set(method, (byPayment.get(method) ?? 0) + amount);
+      if (order.payment_status !== 'paid' || order.payment_method === 'on_account') {
+        byPayment.set('on_account', (byPayment.get('on_account') ?? 0) + amount);
+      } else {
+        const pieces = orderPaymentAmounts({
+          total: amount,
+          payment_method: order.payment_method,
+          payment_splits: order.payment_splits,
+        });
+        for (const piece of pieces) {
+          const method: PaymentMethod = isPaymentMethod(piece.method) ? piece.method : 'cash';
+          byPayment.set(method, (byPayment.get(method) ?? 0) + piece.amount);
+        }
+      }
     }
 
     for (const row of items ?? []) {

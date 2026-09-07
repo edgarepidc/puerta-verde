@@ -121,4 +121,15 @@ test('orderPaymentLabel names paid methods and por pagar', () => {
     orderPaymentLabel({ payment_status: 'paid', payment_method: 'card_terminal' }),
     'Pagado (TPV)',
   );
+  assert.equal(
+    orderPaymentLabel({
+      payment_status: 'paid',
+      payment_method: 'cash',
+      payment_splits: [
+        { method: 'cash', amount: 80 },
+        { method: 'card_terminal', amount: 20 },
+      ],
+    }),
+    'Efectivo 80.00 + TPV 20.00',
+  );
 });

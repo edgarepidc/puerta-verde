@@ -1,4 +1,5 @@
 import { roundMoney } from './market-prices';
+import { parsePaymentSplits } from './payment-splits';
 
 export const MONEY_POCKETS = ['cash', 'account'] as const;
 export type MoneyPocket = (typeof MONEY_POCKETS)[number];
@@ -99,12 +100,21 @@ export function addCollectedTicket(
     status?: string | null;
     payment_status?: string | null;
     payment_method?: string | null;
+    payment_splits?: unknown;
     subtotal?: number | null;
     discount_amount?: number | null;
     delivery_fee?: number | null;
   },
 ): void {
   if (!isCollectedTicket(order)) return;
+  const splits = parsePaymentSplits(order.payment_splits);
+  if (splits.length >= 2) {
+    for (const split of splits) {
+      const pocket = ticketMoneyPocket(split.method);
+      if (pocket) addPocketInflow(flows, pocket, split.amount);
+    }
+    return;
+  }
   const pocket = ticketMoneyPocket(order.payment_method);
   if (!pocket) return;
   addPocketInflow(flows, pocket, ticketCollectedAmount(order));

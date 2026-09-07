@@ -4,6 +4,7 @@ import {
   BRAND_NAME,
   formatMoney,
   isWalkInPhone,
+  parsePaymentSplits,
 } from '@puertaverde/shared';
 
 import {
@@ -37,7 +38,7 @@ export function ThermalReceipt({
 }) {
   const storeName = data.storeName?.trim() || BRAND_NAME;
   const showPhone = Boolean(data.customerPhone) && !isWalkInPhone(data.customerPhone ?? '');
-  const method = paymentLabel(data.paymentMethod);
+  const method = paymentLabel(data.paymentMethod, data.paymentSplits);
   const soldAt = formatSoldAt(data.soldAt);
 
   return (
@@ -83,7 +84,8 @@ export function ThermalReceipt({
         </p>
       ) : null}
 
-      {data.paymentMethod === 'cash' &&
+      {(data.paymentMethod === 'cash' ||
+        parsePaymentSplits(data.paymentSplits).some((split) => split.method === 'cash')) &&
       data.amountReceived != null &&
       Number.isFinite(Number(data.amountReceived)) ? (
         <div className="pv-thermal-cash">

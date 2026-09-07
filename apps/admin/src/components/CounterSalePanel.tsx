@@ -15,11 +15,17 @@ import {
   getQuantityStep,
   getStockStatus,
   isPaymentMethod,
+  isSplitPaymentMethod,
   isValidMexicanPhone,
   normalizePhone,
+  parsePaymentSplits,
+  primaryPaymentMethod,
   resolvePosCustomer,
+  SPLIT_PAYMENT_METHODS,
+  validatePaymentSplits,
   type PosPaymentMethod,
   type ProductUnit,
+  type SplitPaymentMethod,
 } from '@puertaverde/shared';
 
 import { ActionChip, ChevronDownIcon } from '@/components/ActionChip';
@@ -81,6 +87,7 @@ interface CreatedOrder {
   total: number;
   payment_status: string;
   payment_method: string | null;
+  payment_splits?: unknown;
   created_at: string;
   branch_id?: string;
 }
@@ -89,15 +96,22 @@ export function buildTicketText(input: {
   orderNumber: number;
   customerName: string;
   paymentMethod?: string | null;
+  paymentSplits?: unknown;
   statusLabel?: string;
   total: number;
   amountReceived?: number | null;
   changeDue?: number | null;
   items: ReceiptItem[];
 }) {
-  const method = isPaymentMethod(input.paymentMethod)
-    ? PAYMENT_METHOD_LABELS[input.paymentMethod]
-    : input.paymentMethod ?? 'Efectivo';
+  const splits = parsePaymentSplits(input.paymentSplits);
+  const method =
+    splits.length >= 2
+      ? splits
+          .map((split) => `${PAYMENT_METHOD_LABELS[split.method]} ${formatMoney(split.amount)}`)
+          .join(' + ')
+      : isPaymentMethod(input.paymentMethod)
+        ? PAYMENT_METHOD_LABELS[input.paymentMethod]
+        : input.paymentMethod ?? 'Efectivo';
   const lines = input.items.map((item) => {
     const unit = item.unit ? PRODUCT_UNIT_LABELS[item.unit as ProductUnit] ?? item.unit : '';
     const pieceNote =
@@ -107,7 +121,7 @@ export function buildTicketText(input: {
     return `• ${item.product_name} ${pieceNote}${formatDecimal(Number(item.quantity))} ${unit} — ${formatMoney(Number(item.line_total))}`;
   });
   const cashLines =
-    input.paymentMethod === 'cash' &&
+    (input.paymentMethod === 'cash' || splits.some((split) => split.method === 'cash')) &&
     input.amountReceived != null &&
     Number.isFinite(Number(input.amountReceived))
       ? [
@@ -166,6 +180,9 @@ export function CounterSalePanel({
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('cash');
+  const [paymentSplits, setPaymentSplits] = useState<
+    Array<{ method: SplitPaymentMethod; amount: string }>
+  >([]);
   const [amountReceived, setAmountReceived] = useState('');
   const [exactAmount, setExactAmount] = useState(false);
   const [soldOn, setSoldOn] = useState(() => todayMexicoYmd());
@@ -222,22 +239,33 @@ export function CounterSalePanel({
     [cart, productById],
   );
   const payableTotal = Math.max(0, Math.round((total - couponDiscount) * 100) / 100);
+  const splitMode = paymentSplits.length >= 2;
+  const parsedSplits = paymentSplits
+    .map((row) => ({ method: row.method, amount: parseDecimal(row.amount) }))
+    .filter((row) => row.amount > 0);
+  const cashDue = splitMode
+    ? parsedSplits.find((row) => row.method === 'cash')?.amount ?? 0
+    : paymentMethod === 'cash'
+      ? payableTotal
+      : 0;
+  const splitAllocated = Math.round(
+    paymentSplits.reduce((sum, row) => sum + parseDecimal(row.amount), 0) * 100,
+  ) / 100;
+  const splitRemaining = Math.round((payableTotal - splitAllocated) * 100) / 100;
 
   const receivedAmount = parseDecimal(amountReceived);
   const changeDue =
-    paymentMethod === 'cash' && amountReceived.trim() !== '' && receivedAmount >= payableTotal
-      ? Math.round((receivedAmount - payableTotal) * 100) / 100
+    cashDue > 0 && amountReceived.trim() !== '' && receivedAmount >= cashDue
+      ? Math.round((receivedAmount - cashDue) * 100) / 100
       : null;
   const cashShort =
-    paymentMethod === 'cash' &&
-    amountReceived.trim() !== '' &&
-    receivedAmount < payableTotal;
+    cashDue > 0 && amountReceived.trim() !== '' && receivedAmount < cashDue;
   const hasCustomerPhone = isValidMexicanPhone(phone);
 
   useEffect(() => {
-    if (!exactAmount || paymentMethod !== 'cash') return;
-    setAmountReceived(decimalFromNumber(payableTotal, false) || '0');
-  }, [exactAmount, paymentMethod, payableTotal]);
+    if (!exactAmount || cashDue <= 0) return;
+    setAmountReceived(decimalFromNumber(cashDue, false) || '0');
+  }, [exactAmount, cashDue]);
 
   useEffect(() => {
     if (!open || !isValidMexicanPhone(phone)) {
@@ -319,12 +347,71 @@ export function CounterSalePanel({
     }, 1600);
   }
 
+  function nextSplitMethod(used: SplitPaymentMethod[]): SplitPaymentMethod | null {
+    return SPLIT_PAYMENT_METHODS.find((method) => !used.includes(method)) ?? null;
+  }
+
+  function addPaymentSplit() {
+    if (paymentMethod === 'on_account') {
+      setPaymentMethod('cash');
+    }
+    const first: SplitPaymentMethod = isSplitPaymentMethod(paymentMethod)
+      ? paymentMethod
+      : 'cash';
+    if (paymentSplits.length === 0) {
+      const second = nextSplitMethod([first]);
+      if (!second) return;
+      setPaymentSplits([
+        { method: first, amount: '' },
+        { method: second, amount: '' },
+      ]);
+      return;
+    }
+    const used = paymentSplits.map((row) => row.method);
+    const extra = nextSplitMethod(used);
+    if (!extra) return;
+    setPaymentSplits((current) => [...current, { method: extra, amount: '' }]);
+  }
+
+  function updateSplitMethod(index: number, method: SplitPaymentMethod) {
+    setPaymentSplits((current) =>
+      current.map((row, i) => (i === index ? { ...row, method } : row)),
+    );
+    if (index === 0) setPaymentMethod(method);
+  }
+
+  function updateSplitAmount(index: number, amount: string) {
+    setPaymentSplits((current) => {
+      const next = current.map((row, i) => (i === index ? { ...row, amount } : row));
+      if (next.length === 2) {
+        const other = index === 0 ? 1 : 0;
+        const remainder = Math.round((payableTotal - parseDecimal(amount)) * 100) / 100;
+        if (remainder >= 0) {
+          next[other] = { ...next[other], amount: remainder > 0 ? decimalFromNumber(remainder, false) : '' };
+        }
+      }
+      return next;
+    });
+  }
+
+  function removeSplit(index: number) {
+    setPaymentSplits((current) => {
+      const next = current.filter((_, i) => i !== index);
+      if (next.length < 2) {
+        if (next[0]) setPaymentMethod(next[0].method);
+        return [];
+      }
+      return next;
+    });
+  }
+
   function resetForm() {
     setPhone('');
     setName('');
     setNotes('');
     setSearch('');
     setPaymentMethod('cash');
+    setPaymentSplits([]);
     setAmountReceived('');
     setExactAmount(false);
     setSoldOn(todayMexicoYmd());
@@ -521,11 +608,26 @@ export function CounterSalePanel({
       if ('error' in customer) throw new Error(customer.error);
 
       const cashReceived =
-        paymentMethod === 'cash' && amountReceived.trim() !== ''
+        cashDue > 0 && amountReceived.trim() !== ''
           ? Math.round(receivedAmount * 100) / 100
           : null;
       const cashChange =
-        cashReceived != null ? Math.round((cashReceived - payableTotal) * 100) / 100 : null;
+        cashReceived != null ? Math.round((cashReceived - cashDue) * 100) / 100 : null;
+
+      let splitsPayload: Array<{ method: SplitPaymentMethod; amount: number }> | undefined;
+      let methodToSend: PosPaymentMethod = paymentMethod;
+      if (splitMode) {
+        const splitError = validatePaymentSplits(
+          paymentSplits.map((row) => ({ method: row.method, amount: parseDecimal(row.amount) })),
+          payableTotal,
+        );
+        if (splitError) throw new Error(splitError);
+        splitsPayload = paymentSplits.map((row) => ({
+          method: row.method,
+          amount: parseDecimal(row.amount),
+        }));
+        methodToSend = (primaryPaymentMethod(splitsPayload) ?? 'cash') as PosPaymentMethod;
+      }
 
       const response = await fetch('/api/orders', {
         method: 'POST',
@@ -536,7 +638,8 @@ export function CounterSalePanel({
           walkIn: customer.walkIn,
           fulfillmentType: 'pickup',
           deliveryNotes: notes || null,
-          paymentMethod,
+          paymentMethod: methodToSend,
+          paymentSplits: splitsPayload,
           soldOn,
           markDelivered: true,
           sendWhatsApp: false,
@@ -591,6 +694,7 @@ export function CounterSalePanel({
         orderNumber: Number(payload.order.order_number),
         customerName: payload.order.customer_name,
         paymentMethod: payload.order.payment_method,
+        paymentSplits: payload.order.payment_splits ?? splitsPayload,
         total: Number(payload.order.total),
         amountReceived: cashReceived,
         changeDue: cashChange,
@@ -603,6 +707,7 @@ export function CounterSalePanel({
         customerName: payload.order.customer_name,
         customerPhone: payload.order.customer_phone,
         paymentMethod: payload.order.payment_method,
+        paymentSplits: payload.order.payment_splits ?? splitsPayload,
         total: Number(payload.order.total),
         amountReceived: cashReceived,
         changeDue: cashChange,
@@ -648,6 +753,7 @@ export function CounterSalePanel({
       customerName: receipt.order.customer_name,
       customerPhone: receipt.order.customer_phone,
       paymentMethod: receipt.order.payment_method,
+      paymentSplits: receipt.order.payment_splits,
       total: Number(receipt.order.total),
       amountReceived: receipt.amountReceived,
       changeDue: receipt.changeDue,
@@ -762,7 +868,7 @@ export function CounterSalePanel({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <div className="grid max-h-[28rem] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
+          <div className="grid max-h-[36rem] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
             {filteredProducts.map((product) => {
               const unit = product.product.unit;
               const status = getStockStatus(
@@ -831,7 +937,7 @@ export function CounterSalePanel({
             orderPulse ? 'pv-order-panel--pulse' : ''
           }`}
         >
-          <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">
               <span className="font-medium text-slate-700">Celular</span>
               <input
@@ -1036,52 +1142,122 @@ export function CounterSalePanel({
               placeholder="Sin cebolla, recoger después…"
             />
           </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Fecha de la venta</span>
-            <input
-              type="date"
-              className="pv-input mt-1"
-              value={soldOn}
-              max={todayMexicoYmd()}
-              onChange={(e) => setSoldOn(e.target.value || todayMexicoYmd())}
-            />
-            {soldOn !== todayMexicoYmd() ? (
-              <span className="mt-1 block text-xs text-amber-700">
-                Se registrará con esta fecha (caja y utilidades).
-              </span>
-            ) : (
-              <span className="mt-1 block text-xs text-slate-500">
-                Por defecto hoy; cámbiala si registras un día anterior.
-              </span>
-            )}
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">Cobro</span>
-            <select
-              className="pv-input mt-1"
-              value={paymentMethod}
-              onChange={(e) => {
-                const next = e.target.value as PosPaymentMethod;
-                setPaymentMethod(next);
-                if (next !== 'cash') {
-                  setAmountReceived('');
-                  setExactAmount(false);
-                }
-              }}
-            >
-              {POS_PAYMENT_METHODS.map((method) => (
-                <option key={method} value={method}>
-                  {PAYMENT_METHOD_LABELS[method]}
-                </option>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Cobro</span>
+              <select
+                className="pv-input mt-1"
+                value={splitMode ? paymentSplits[0]?.method : paymentMethod}
+                onChange={(e) => {
+                  const next = e.target.value as PosPaymentMethod;
+                  if (splitMode && isSplitPaymentMethod(next)) {
+                    updateSplitMethod(0, next);
+                    return;
+                  }
+                  setPaymentMethod(next);
+                  if (next === 'on_account') {
+                    setPaymentSplits([]);
+                    setAmountReceived('');
+                    setExactAmount(false);
+                  } else if (next !== 'cash') {
+                    setAmountReceived('');
+                    setExactAmount(false);
+                  }
+                }}
+              >
+                {(splitMode
+                  ? SPLIT_PAYMENT_METHODS.filter(
+                      (method) =>
+                        method === paymentSplits[0]?.method ||
+                        !paymentSplits.slice(1).some((row) => row.method === method),
+                    )
+                  : POS_PAYMENT_METHODS
+                ).map((method) => (
+                  <option key={method} value={method}>
+                    {PAYMENT_METHOD_LABELS[method]}
+                  </option>
+                ))}
+              </select>
+              {paymentMethod === 'on_account' && !splitMode ? (
+                <span className="mt-1 block text-xs text-amber-700">
+                  Queda como por pagar. No entra a caja hasta que se cobre.
+                </span>
+              ) : null}
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">Fecha</span>
+              <input
+                type="date"
+                className="pv-input mt-1"
+                value={soldOn}
+                max={todayMexicoYmd()}
+                onChange={(e) => setSoldOn(e.target.value || todayMexicoYmd())}
+              />
+              {soldOn !== todayMexicoYmd() ? (
+                <span className="mt-1 block text-xs text-amber-700">Se registra en este día.</span>
+              ) : null}
+            </label>
+          </div>
+          {splitMode ? (
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-xs font-medium text-slate-600">Monto por método</p>
+              {paymentSplits.map((row, index) => (
+                <div key={`${row.method}-${index}`} className="flex items-center gap-2">
+                  {index === 0 ? (
+                    <span className="w-28 shrink-0 text-sm text-slate-700">
+                      {PAYMENT_METHOD_LABELS[row.method]}
+                    </span>
+                  ) : (
+                    <select
+                      className="pv-input w-28 shrink-0 py-1 text-sm"
+                      value={row.method}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (isSplitPaymentMethod(next)) updateSplitMethod(index, next);
+                      }}
+                    >
+                      {SPLIT_PAYMENT_METHODS.filter(
+                        (method) =>
+                          method === row.method ||
+                          !paymentSplits.some((other) => other.method === method),
+                      ).map((method) => (
+                        <option key={method} value={method}>
+                          {PAYMENT_METHOD_LABELS[method]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <DecimalInput
+                    className="pv-input flex-1 py-1"
+                    value={row.amount}
+                    onChange={(value) => updateSplitAmount(index, value)}
+                    groupThousands
+                  />
+                  {index > 0 ? (
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs text-slate-400 hover:text-rose-600"
+                      onClick={() => removeSplit(index)}
+                    >
+                      Quitar
+                    </button>
+                  ) : (
+                    <span className="w-10 shrink-0" />
+                  )}
+                </div>
               ))}
-            </select>
-            {paymentMethod === 'on_account' ? (
-              <span className="mt-1 block text-xs text-amber-700">
-                Queda como por pagar. No entra a caja hasta que se cobre.
-              </span>
-            ) : null}
-          </label>
-          {paymentMethod === 'cash' ? (
+              {splitRemaining !== 0 ? (
+                <p className={`text-xs ${splitRemaining > 0 ? 'text-amber-700' : 'text-rose-700'}`}>
+                  {splitRemaining > 0
+                    ? `Faltan ${formatMoney(splitRemaining)}`
+                    : `Sobra ${formatMoney(Math.abs(splitRemaining))}`}
+                </p>
+              ) : (
+                <p className="text-xs text-emerald-700">Los montos cubren el total.</p>
+              )}
+            </div>
+          ) : null}
+          {cashDue > 0 ? (
             <div className="space-y-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3">
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
@@ -1100,17 +1276,18 @@ export function CounterSalePanel({
                     setExactAmount(false);
                     setAmountReceived(value);
                   }}
-                  placeholder={payableTotal > 0 ? String(payableTotal) : '0'}
+                  placeholder={cashDue > 0 ? String(cashDue) : '0'}
                   disabled={exactAmount}
+                  groupThousands
                 />
               </label>
               {cashShort ? (
                 <p className="text-xs text-rose-700">
-                  Faltan {formatMoney(Math.round((payableTotal - receivedAmount) * 100) / 100)}.
+                  Faltan {formatMoney(Math.round((cashDue - receivedAmount) * 100) / 100)} en efectivo.
                 </p>
               ) : null}
               {exactAmount || changeDue === 0 ? (
-                <p className="text-xs text-slate-500">El cliente paga el total, sin cambio.</p>
+                <p className="text-xs text-slate-500">El cliente paga el efectivo, sin cambio.</p>
               ) : changeDue != null ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Cambio</span>
@@ -1120,6 +1297,19 @@ export function CounterSalePanel({
                 <p className="text-xs text-slate-500">Escribe el billete o monto recibido.</p>
               )}
             </div>
+          ) : null}
+          {paymentMethod !== 'on_account' || splitMode ? (
+            <button
+              type="button"
+              className="text-left text-sm font-medium text-emerald-800 hover:underline disabled:text-slate-400 disabled:no-underline"
+              disabled={
+                paymentSplits.length >= SPLIT_PAYMENT_METHODS.length ||
+                (splitMode && nextSplitMethod(paymentSplits.map((row) => row.method)) == null)
+              }
+              onClick={addPaymentSplit}
+            >
+              Agregar otro método de pago
+            </button>
           ) : null}
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
@@ -1196,7 +1386,8 @@ export function CounterSalePanel({
               disabled={
                 saving ||
                 cart.length === 0 ||
-                (paymentMethod === 'cash' && (cashShort || !amountReceived.trim()))
+                (cashDue > 0 && (cashShort || !amountReceived.trim())) ||
+                (splitMode && splitRemaining !== 0)
               }
               onClick={submitSale}
             >
