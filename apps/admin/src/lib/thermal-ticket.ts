@@ -5,6 +5,7 @@ import {
   formatMoney,
   formatProductQuantity,
   isWalkInPhone,
+  parsePaymentSplits,
   type PaymentMethod,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -26,6 +27,7 @@ export interface ThermalReceiptData {
   customerName: string;
   customerPhone?: string | null;
   paymentMethod?: string | null;
+  paymentSplits?: unknown;
   total: number;
   /** Cash tendered by the customer (POS only). */
   amountReceived?: number | null;
@@ -53,7 +55,13 @@ export function formatSoldAt(soldAt?: string | null) {
   });
 }
 
-export function paymentLabel(method?: string | null) {
+export function paymentLabel(method?: string | null, splits?: unknown) {
+  const parsed = parsePaymentSplits(splits);
+  if (parsed.length >= 2) {
+    return parsed
+      .map((split) => `${PAYMENT_METHOD_LABELS[split.method]} ${formatMoney(split.amount)}`)
+      .join(' + ');
+  }
   if (!method) return null;
   return PAYMENT_METHOD_LABELS[method as PaymentMethod] ?? method;
 }
@@ -156,7 +164,7 @@ export async function encodeEscPos(data: ThermalReceiptData): Promise<Uint8Array
   const out: number[] = [];
   const storeName = data.storeName?.trim() || BRAND_NAME;
   const showPhone = Boolean(data.customerPhone) && !isWalkInPhone(data.customerPhone ?? '');
-  const method = paymentLabel(data.paymentMethod);
+  const method = paymentLabel(data.paymentMethod, data.paymentSplits);
   const soldAt = formatSoldAt(data.soldAt);
 
   // BLE/USB often drops the first byte of a job. A NUL+LF keeps ESC a from printing as "a".
@@ -201,7 +209,8 @@ export async function encodeEscPos(data: ThermalReceiptData): Promise<Uint8Array
     pushLine(out, columns('Forma de pago', method));
   }
   if (
-    data.paymentMethod === 'cash' &&
+    (data.paymentMethod === 'cash' ||
+      parsePaymentSplits(data.paymentSplits).some((split) => split.method === 'cash')) &&
     data.amountReceived != null &&
     Number.isFinite(Number(data.amountReceived))
   ) {

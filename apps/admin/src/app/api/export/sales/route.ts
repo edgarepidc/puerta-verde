@@ -12,7 +12,7 @@ import {
 } from '@/lib/mexico-date';
 
 const ORDER_SELECT =
-  'id, order_number, customer_name, customer_phone, fulfillment_type, payment_method, payment_status, source, total, created_at';
+  'id, order_number, customer_name, customer_phone, fulfillment_type, payment_method, payment_splits, payment_status, source, total, created_at';
 
 function sheetFromRows(rows: object[]): XLSX.WorkSheet {
   if (rows.length === 0) return XLSX.utils.aoa_to_sheet([['Sin ventas en el periodo']]);

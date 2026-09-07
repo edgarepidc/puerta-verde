@@ -4,6 +4,7 @@ import {
   mexicoYmdFromIso,
   todayMexicoYmd,
 } from './order-status';
+import { formatPaymentSplitsLabel, parsePaymentSplits } from './payment-splits';
 
 const MEXICO_TZ = 'America/Mexico_City';
 
@@ -47,6 +48,7 @@ export interface SalesExportOrder {
   customer_phone: string;
   fulfillment_type: string;
   payment_method?: string | null;
+  payment_splits?: unknown;
   payment_status: string;
   source?: string | null;
   total: number | string;
@@ -116,6 +118,12 @@ function roundQty(value: number | string): number {
   return Number(Number(value).toFixed(3));
 }
 
+function paymentExportLabel(order: SalesExportOrder): string {
+  const splits = parsePaymentSplits(order.payment_splits);
+  if (splits.length >= 2) return formatPaymentSplitsLabel(splits);
+  return PAYMENT_METHOD_LABELS[order.payment_method ?? ''] ?? order.payment_method ?? '';
+}
+
 function formatMexicoTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -155,7 +163,7 @@ export function buildSalesExportTables(
       Teléfono: order.customer_phone,
       Entrega: FULFILLMENT_LABELS[order.fulfillment_type] ?? order.fulfillment_type,
       Origen: SOURCE_LABELS[order.source ?? ''] ?? order.source ?? '',
-      Pago: PAYMENT_METHOD_LABELS[order.payment_method ?? ''] ?? order.payment_method ?? '',
+      Pago: paymentExportLabel(order),
       'Estado de pago': PAYMENT_STATUS_LABELS[order.payment_status] ?? order.payment_status,
       Total: round2(order.total),
     })),

@@ -101,7 +101,7 @@ export async function fetchMoneyPosition(
         supabase
           .from('orders')
           .select(
-            'status, payment_status, payment_method, subtotal, discount_amount, delivery_fee, total',
+            'status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee, total',
           )
           .eq('branch_id', branchId)
           .eq('payment_status', 'paid')

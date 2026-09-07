@@ -756,6 +756,7 @@ export function OrdersBoard({
                   payload.payment_status ??
                   (paymentMethod === 'on_account' ? 'pending' : 'paid'),
                 payment_method: payload.payment_method ?? paymentMethod,
+                payment_splits: null,
               }
             : order,
         ),
@@ -854,6 +855,7 @@ export function OrdersBoard({
             total: Number(order.total),
             payment_status: order.payment_status,
             payment_method: order.payment_method,
+            payment_splits: order.payment_splits,
             source: 'pos',
             delivery_notes: '[mostrador]',
             created_at: order.created_at,

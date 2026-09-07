@@ -15,6 +15,7 @@ const ORDER_BOARD_SELECT = `
   total,
   payment_status,
   payment_method,
+  payment_splits,
   source,
   delivery_notes,
   created_at,
@@ -37,6 +38,7 @@ export interface OrderBoardRow {
   total: number;
   payment_status: string;
   payment_method?: string | null;
+  payment_splits?: unknown;
   source?: string | null;
   delivery_notes?: string | null;
   created_at: string;
@@ -112,6 +114,7 @@ export async function loadOrdersBoard(
       total: Number(order.total),
       payment_status: order.payment_status,
       payment_method: order.payment_method,
+      payment_splits: order.payment_splits,
       source: order.source,
       delivery_notes: order.delivery_notes,
       created_at: order.created_at,

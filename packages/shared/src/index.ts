@@ -1,3 +1,5 @@
+import { formatPaymentSplitsLabel, parsePaymentSplits } from './payment-splits';
+
 export const BRAND_NAME = 'Puerta Verde';
 
 export {
@@ -102,8 +104,11 @@ export function paymentMethodLabel(method: string | null | undefined): string {
 export function orderPaymentLabel(order: {
   payment_status?: string | null;
   payment_method?: string | null;
+  payment_splits?: unknown;
 }): string {
   if (isUnpaidOrder(order)) return PAYMENT_METHOD_LABELS.on_account;
+  const splits = parsePaymentSplits(order.payment_splits);
+  if (splits.length >= 2) return formatPaymentSplitsLabel(splits);
   if (order.payment_method && isPaymentMethod(order.payment_method)) {
     return `Pagado (${PAYMENT_METHOD_LABELS[order.payment_method]})`;
   }
@@ -363,6 +368,18 @@ export {
   type MoneyPositionSource,
   type MoneyPositionView,
 } from './money-position';
+export {
+  SPLIT_PAYMENT_METHODS,
+  isSplitPaymentMethod,
+  parsePaymentSplits,
+  primaryPaymentMethod,
+  paymentSplitsSum,
+  validatePaymentSplits,
+  formatPaymentSplitsLabel,
+  orderPaymentAmounts,
+  type SplitPaymentMethod,
+  type PaymentSplit,
+} from './payment-splits';
 export {
   COST_IMPORT_TEMPLATE_CSV,
   mapCostImportHeaders,

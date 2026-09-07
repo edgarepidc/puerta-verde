@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 
 import {
   isPosPaymentMethod,
+  parsePaymentSplits,
+  primaryPaymentMethod,
   resolvePosCustomer,
   validateGuestCheckout,
+  validatePaymentSplits,
   withUnavailableProductNames,
   type GuestCheckoutInput,
   type PaymentMethod,
@@ -106,6 +109,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Omit<GuestCheckoutInput, 'items'> & {
       paymentMethod?: PaymentMethod;
+      paymentSplits?: unknown;
       markDelivered?: boolean;
       sendWhatsApp?: boolean;
       /** Calendar day YYYY-MM-DD (Mexico City). Defaults to today. */
@@ -134,6 +138,13 @@ export async function POST(request: Request) {
     const paymentMethod = body.paymentMethod ?? 'cash';
     if (!isPosPaymentMethod(paymentMethod)) {
       return NextResponse.json({ error: 'Método de pago no válido' }, { status: 400 });
+    }
+    const requestedSplits = parsePaymentSplits(body.paymentSplits);
+    if (requestedSplits.length >= 2 && paymentMethod === 'on_account') {
+      return NextResponse.json(
+        { error: 'Un pedido por pagar no se puede mezclar con otro método.' },
+        { status: 400 },
+      );
     }
     const onAccount = paymentMethod === 'on_account';
 
@@ -229,9 +240,30 @@ export async function POST(request: Request) {
       }
     }
 
+    const { data: pricedOrder, error: pricedError } = await supabase
+      .from('orders')
+      .select('total')
+      .eq('id', row.order_id)
+      .single();
+    if (pricedError) {
+      return NextResponse.json({ error: pricedError.message }, { status: 400 });
+    }
+    const orderTotal = Number(pricedOrder?.total ?? row.total);
+    let storedSplits: typeof requestedSplits | null = null;
+    let storedMethod = paymentMethod;
+    if (!onAccount && requestedSplits.length >= 2) {
+      const splitError = validatePaymentSplits(requestedSplits, orderTotal);
+      if (splitError) {
+        return NextResponse.json({ error: splitError }, { status: 400 });
+      }
+      storedSplits = requestedSplits;
+      storedMethod = primaryPaymentMethod(requestedSplits) ?? paymentMethod;
+    }
+
     const updates = {
       payment_status: onAccount ? ('pending' as const) : ('paid' as const),
-      payment_method: paymentMethod,
+      payment_method: storedMethod,
+      payment_splits: storedSplits,
       paid_at: onAccount ? null : soldOn.iso,
       paid_by: onAccount ? null : auth.userId,
       source: 'pos' as const,
@@ -250,7 +282,8 @@ export async function POST(request: Request) {
         .from('orders')
         .update({
           payment_status: updates.payment_status,
-          payment_method: paymentMethod,
+          payment_method: storedMethod,
+          payment_splits: storedSplits,
           paid_at: updates.paid_at,
           paid_by: updates.paid_by,
           created_at: soldOn.iso,
@@ -274,6 +307,7 @@ export async function POST(request: Request) {
           total,
           payment_status,
           payment_method,
+          payment_splits,
           tracking_token,
           created_at
         `)

@@ -55,12 +55,14 @@ export async function PATCH(request: Request) {
       ? {
           payment_status: 'pending' as const,
           payment_method: 'on_account' as const,
+          payment_splits: null,
           paid_at: null,
           paid_by: null,
         }
       : {
           payment_status: 'paid' as const,
           payment_method: paymentMethod,
+          payment_splits: null,
           paid_at: currentlyPaid ? (current.paid_at ?? now) : now,
           paid_by: currentlyPaid ? (current.paid_by ?? auth.userId) : auth.userId,
         };

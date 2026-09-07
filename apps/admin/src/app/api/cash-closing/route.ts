@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { orderPaymentAmounts } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   const [{ data: orders }, { data: closing }] = await Promise.all([
     supabase
       .from('orders')
-      .select('total, payment_method, payment_status, paid_at, delivery_notes')
+      .select('total, payment_method, payment_splits, payment_status, paid_at, delivery_notes, source')
       .eq('branch_id', auth.branchId)
       .eq('payment_status', 'paid')
       .gte('paid_at', startOfDay)
@@ -51,16 +52,17 @@ export async function GET(request: Request) {
   let webCount = 0;
 
   for (const order of orders ?? []) {
-    const method = (order.payment_method ?? 'cash') as keyof typeof totals;
-    const amount = Number(order.total);
-    if (!(method in totals)) continue;
-    totals[method] += amount;
-    if (isPosOrder(order)) {
-      pos[method] += amount;
-      posCount += 1;
-    } else {
-      web[method] += amount;
-      webCount += 1;
+    const pieces = orderPaymentAmounts(order);
+    if (pieces.length === 0) continue;
+    const isPos = isPosOrder(order);
+    if (isPos) posCount += 1;
+    else webCount += 1;
+    for (const piece of pieces) {
+      const method = piece.method as keyof typeof totals;
+      if (!(method in totals)) continue;
+      totals[method] += piece.amount;
+      if (isPos) pos[method] += piece.amount;
+      else web[method] += piece.amount;
     }
   }
 
@@ -101,7 +103,7 @@ export async function POST(request: Request) {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('total, payment_method')
+    .select('total, payment_method, payment_splits')
     .eq('branch_id', auth.branchId)
     .eq('payment_status', 'paid')
     .gte('paid_at', startOfDay)
@@ -109,11 +111,13 @@ export async function POST(request: Request) {
 
   const totals = { cash: 0, card_terminal: 0, transfer: 0, online: 0 };
   for (const order of orders ?? []) {
-    const method = order.payment_method;
-    if (method === 'cash' || method === 'card_terminal' || method === 'transfer' || method === 'online') {
-      totals[method] += Number(order.total);
-    } else if (!method) {
-      totals.cash += Number(order.total);
+    for (const piece of orderPaymentAmounts(order)) {
+      const method = piece.method;
+      if (method === 'cash' || method === 'card_terminal' || method === 'transfer' || method === 'online') {
+        totals[method] += piece.amount;
+      } else if (!method) {
+        totals.cash += piece.amount;
+      }
     }
   }
 
