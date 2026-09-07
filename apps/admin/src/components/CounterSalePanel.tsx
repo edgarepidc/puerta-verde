@@ -68,6 +68,14 @@ interface CartItem {
   pieces: string;
 }
 
+interface LineEditorDraft {
+  productId: string;
+  saleMode: 'kg' | 'piece';
+  quantity: string;
+  pieces: string;
+  unitPrice: string;
+}
+
 interface ReceiptItem {
   product_name: string;
   unit?: ProductUnit | string;
@@ -194,7 +202,11 @@ export function CounterSalePanel({
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartListRef = useRef<HTMLUListElement | null>(null);
   const cartPanelRef = useRef<HTMLElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const lineModalRef = useRef<HTMLElement | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [lineDraft, setLineDraft] = useState<LineEditorDraft | null>(null);
+  const [lineError, setLineError] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState<string | null>(null);
@@ -309,6 +321,30 @@ export function CounterSalePanel({
   }, []);
 
   useEffect(() => {
+    if (!lineDraft) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeLineEditor();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [Boolean(lineDraft)]);
+
+  useEffect(() => {
+    if (!lineDraft) return;
+    const handle = window.setTimeout(() => {
+      const input = lineModalRef.current?.querySelector(
+        '[data-line-qty]',
+      ) as HTMLInputElement | null;
+      input?.focus();
+      input?.select();
+    }, 40);
+    return () => window.clearTimeout(handle);
+  }, [lineDraft?.productId]);
+
+  useEffect(() => {
     if (!highlightId || flashToken === 0) return;
     const id = highlightId;
     const handle = window.setTimeout(() => {
@@ -320,14 +356,6 @@ export function CounterSalePanel({
         void row.offsetWidth;
         row.classList.add('pv-cart-item--flash');
         row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-
-      const input = cartListRef.current?.querySelector(
-        `[data-cart-focus="${id}"]`,
-      ) as HTMLInputElement | null;
-      if (input) {
-        input.focus();
-        input.select();
       }
     }, 30);
     return () => window.clearTimeout(handle);
@@ -417,6 +445,8 @@ export function CounterSalePanel({
     setSoldOn(todayMexicoYmd());
     setSendWhatsApp(true);
     setCart([]);
+    setLineDraft(null);
+    setLineError(null);
     setCouponCode('');
     setCouponDiscount(0);
     setCouponApplied(null);
@@ -452,42 +482,126 @@ export function CounterSalePanel({
     setCouponApplied(null);
   }
 
-  function addProduct(product: CounterProduct) {
+  function openLineEditor(product: CounterProduct) {
     const unit = product.product.unit;
-    const catalogPrice = decimalFromNumber(Number(product.price), false);
     const weigh = Boolean(product.product.weigh_at_fulfillment) && unit === 'kg';
-    setCart((current) => {
-      const existing = current.find((item) => item.branchProductId === product.id);
-      if (existing) {
-        if (existing.saleMode === 'piece') {
-          const nextPieces = Number(
-            (parseDecimal(existing.pieces || '1') + 1).toFixed(0),
-          );
-          return current.map((item) =>
-            item.branchProductId === product.id
-              ? { ...item, pieces: String(Math.max(1, nextPieces)) }
-              : item,
-          );
-        }
-        const next = Number(
-          (parseDecimal(existing.quantity) + getQuantityStep(unit)).toFixed(3),
-        );
-        return current.map((item) =>
-          item.branchProductId === product.id ? { ...item, quantity: String(next) } : item,
-        );
+    const existing = cart.find((item) => item.branchProductId === product.id);
+    setLineError(null);
+    if (existing) {
+      setLineDraft({
+        productId: product.id,
+        saleMode: existing.saleMode,
+        quantity: existing.quantity,
+        pieces: existing.pieces,
+        unitPrice: existing.unitPrice,
+      });
+      return;
+    }
+    setLineDraft({
+      productId: product.id,
+      saleMode: weigh ? 'piece' : 'kg',
+      quantity: weigh ? '' : String(getDefaultQuantity(unit)),
+      pieces: weigh ? '1' : '',
+      unitPrice: decimalFromNumber(Number(product.price), false),
+    });
+  }
+
+  function closeLineEditor() {
+    setLineDraft(null);
+    setLineError(null);
+  }
+
+  function confirmLineEditor() {
+    if (!lineDraft) return;
+    const product = productById.get(lineDraft.productId);
+    if (!product) {
+      closeLineEditor();
+      return;
+    }
+    const qty = parseDecimal(lineDraft.quantity);
+    const price = parseDecimal(lineDraft.unitPrice, Number(product.price));
+    if (!(price >= 0)) {
+      setLineError('Precio no válido.');
+      return;
+    }
+    if (lineDraft.saleMode === 'piece') {
+      const pieces = parseDecimal(lineDraft.pieces);
+      if (!(pieces > 0)) {
+        setLineError(`Indica las piezas de ${product.product.name}.`);
+        return;
       }
-      return [
-        ...current,
-        {
-          branchProductId: product.id,
-          quantity: weigh ? '' : String(getDefaultQuantity(unit)),
-          unitPrice: catalogPrice,
-          saleMode: weigh ? 'piece' : 'kg',
-          pieces: weigh ? '1' : '',
-        },
-      ];
+      if (!(qty > 0)) {
+        setLineError(`Captura el peso en kg de ${product.product.name}.`);
+        return;
+      }
+      const pieceStock = Number(product.piece_stock ?? 0);
+      if (pieceStock > 0 && pieces > pieceStock) {
+        setLineError(`Solo quedan ${pieceStock} pieza(s) de ${product.product.name}.`);
+        return;
+      }
+    } else if (!(qty > 0)) {
+      setLineError(`Cantidad inválida para ${product.product.name}.`);
+      return;
+    }
+
+    const nextItem: CartItem = {
+      branchProductId: product.id,
+      quantity: String(qty),
+      unitPrice: decimalFromNumber(price, false),
+      saleMode: lineDraft.saleMode,
+      pieces: lineDraft.saleMode === 'piece' ? lineDraft.pieces : '',
+    };
+    setCart((current) => {
+      const exists = current.some((item) => item.branchProductId === product.id);
+      if (exists) {
+        return current.map((item) => (item.branchProductId === product.id ? nextItem : item));
+      }
+      return [...current, nextItem];
     });
     flashCartItem(product.id);
+    // Close on the next tick so the confirm click cannot hit a catalog "Agregar" underneath.
+    window.setTimeout(() => {
+      closeLineEditor();
+      setSearch('');
+      searchRef.current?.focus();
+    }, 50);
+  }
+
+  function addProduct(product: CounterProduct) {
+    openLineEditor(product);
+  }
+
+  function bumpDraftQty(delta: number) {
+    setLineDraft((current) => {
+      if (!current || current.saleMode === 'piece') return current;
+      const product = productById.get(current.productId);
+      const step = getQuantityStep(product?.product.unit ?? 'kg');
+      const next = Number((parseDecimal(current.quantity) + delta * step).toFixed(3));
+      return { ...current, quantity: next > 0 ? String(next) : '' };
+    });
+  }
+
+  function commitDraftQty() {
+    setLineDraft((current) => {
+      if (!current) return current;
+      const qty = parseDecimal(current.quantity);
+      if (current.saleMode === 'piece') {
+        return { ...current, quantity: qty > 0 ? String(qty) : '' };
+      }
+      return { ...current, quantity: qty > 0 ? String(qty) : String(getDefaultQuantity()) };
+    });
+  }
+
+  function commitDraftPrice() {
+    setLineDraft((current) => {
+      if (!current) return current;
+      const product = productById.get(current.productId);
+      const price = parseDecimal(current.unitPrice, Number(product?.price ?? 0));
+      if (!(price >= 0)) {
+        return { ...current, unitPrice: decimalFromNumber(Number(product?.price ?? 0), false) };
+      }
+      return { ...current, unitPrice: decimalFromNumber(price, false) };
+    });
   }
 
   function setSaleMode(productId: string, saleMode: 'kg' | 'piece') {
@@ -851,7 +965,10 @@ export function CounterSalePanel({
         </div>
         <ActionChip
           icon={<span className="inline-flex rotate-180"><ChevronDownIcon /></span>}
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            closeLineEditor();
+            setOpen(false);
+          }}
         >
           Cerrar
         </ActionChip>
@@ -862,6 +979,7 @@ export function CounterSalePanel({
       <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
         <div className="space-y-3">
           <input
+            ref={searchRef}
             type="search"
             className="pv-input"
             placeholder="Buscar fruta, verdura..."
@@ -966,7 +1084,7 @@ export function CounterSalePanel({
               <p className="mt-2 text-sm text-slate-500">Agrega productos del catálogo.</p>
             ) : (
               <>
-              {usbScaleEnabled && cart.some((item) => item.saleMode === 'piece') ? (
+              {usbScaleEnabled && !lineDraft && cart.some((item) => item.saleMode === 'piece') ? (
                 <div className="mt-2">
                   <ScalePanel
                     onWeight={(kg) => {
@@ -1000,7 +1118,13 @@ export function CounterSalePanel({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="font-medium text-slate-800">{product.product.name}</span>
+                          <button
+                            type="button"
+                            className="text-left font-medium text-slate-800 hover:underline"
+                            onClick={() => openLineEditor(product)}
+                          >
+                            {product.product.name}
+                          </button>
                           {weigh && pieceStock > 0 ? (
                             <p className="text-[11px] text-slate-500">
                               {pieceStock} pza · {formatDecimal(Number(product.stock))} kg
@@ -1408,6 +1532,227 @@ export function CounterSalePanel({
         </aside>
       </div>
     </section>
+      {lineDraft ? (() => {
+        const product = productById.get(lineDraft.productId);
+        if (!product) return null;
+        const unit = product.product.unit;
+        const weigh = Boolean(product.product.weigh_at_fulfillment) && unit === 'kg';
+        const pieceStock = Number(product.piece_stock ?? 0);
+        const updating = cart.some((item) => item.branchProductId === product.id);
+        const lineTotal =
+          parseDecimal(lineDraft.unitPrice, Number(product.price)) *
+          parseDecimal(lineDraft.quantity);
+        return (
+          <div
+            className="pv-modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeLineEditor();
+            }}
+          >
+            <section
+              ref={lineModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="counter-line-modal-title"
+              className="pv-glass-card w-full max-w-sm p-5 shadow-xl"
+              onMouseDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+                  event.preventDefault();
+                  confirmLineEditor();
+                }
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 id="counter-line-modal-title" className="text-lg font-semibold text-slate-900">
+                    {product.product.name}
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Lista {formatMoney(Number(product.price))} / {PRODUCT_UNIT_LABELS[unit]}
+                    {weigh && pieceStock > 0
+                      ? ` · ${pieceStock} pza · ${formatDecimal(Number(product.stock))} kg`
+                      : ''}
+                  </p>
+                </div>
+                <ActionChip
+                  icon={
+                    <span className="inline-flex rotate-180">
+                      <ChevronDownIcon />
+                    </span>
+                  }
+                  onClick={closeLineEditor}
+                >
+                  Cerrar
+                </ActionChip>
+              </div>
+
+              {weigh ? (
+                <div className="mt-4 flex gap-1">
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                      lineDraft.saleMode === 'piece'
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 text-slate-600'
+                    }`}
+                    onClick={() =>
+                      setLineDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              saleMode: 'piece',
+                              pieces:
+                                current.pieces && parseDecimal(current.pieces) > 0
+                                  ? current.pieces
+                                  : '1',
+                            }
+                          : current,
+                      )
+                    }
+                  >
+                    Por pieza
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                      lineDraft.saleMode === 'kg'
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 text-slate-600'
+                    }`}
+                    onClick={() =>
+                      setLineDraft((current) =>
+                        current ? { ...current, saleMode: 'kg', pieces: '' } : current,
+                      )
+                    }
+                  >
+                    Por kg
+                  </button>
+                </div>
+              ) : null}
+
+              {usbScaleEnabled && lineDraft.saleMode === 'piece' ? (
+                <div className="mt-3">
+                  <ScalePanel
+                    onWeight={(kg) => {
+                      setLineDraft((current) =>
+                        current
+                          ? { ...current, quantity: String(Number(kg.toFixed(3))) }
+                          : current,
+                      );
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                {lineDraft.saleMode === 'piece' ? (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <span className="font-medium">Pza</span>
+                      <DecimalInput
+                        className="pv-input w-16 py-2 text-center"
+                        value={lineDraft.pieces}
+                        onChange={(value) =>
+                          setLineDraft((current) =>
+                            current ? { ...current, pieces: value } : current,
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <span className="font-medium">Kg</span>
+                      <DecimalInput
+                        data-line-qty
+                        className="pv-input w-24 py-2 text-center"
+                        value={lineDraft.quantity}
+                        onChange={(value) =>
+                          setLineDraft((current) =>
+                            current ? { ...current, quantity: value } : current,
+                          )
+                        }
+                        onBlur={commitDraftQty}
+                        placeholder="0"
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="h-10 w-10 rounded-full border border-slate-200 text-lg"
+                      onClick={() => bumpDraftQty(-1)}
+                    >
+                      −
+                    </button>
+                    <DecimalInput
+                      data-line-qty
+                      className="pv-input w-24 py-2 text-center"
+                      value={lineDraft.quantity}
+                      onChange={(value) =>
+                        setLineDraft((current) =>
+                          current ? { ...current, quantity: value } : current,
+                        )
+                      }
+                      onBlur={commitDraftQty}
+                    />
+                    <button
+                      type="button"
+                      className="h-10 w-10 rounded-full border border-slate-200 text-lg"
+                      onClick={() => bumpDraftQty(1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                {canEditPrice ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <span className="font-medium">$/</span>
+                    <DecimalInput
+                      className="pv-input w-24 py-2 text-center"
+                      value={lineDraft.unitPrice}
+                      onChange={(value) =>
+                        setLineDraft((current) =>
+                          current ? { ...current, unitPrice: value } : current,
+                        )
+                      }
+                      onBlur={commitDraftPrice}
+                      aria-label={`Precio por ${PRODUCT_UNIT_LABELS[unit]}`}
+                    />
+                  </label>
+                ) : (
+                  <span className="text-sm text-slate-500">
+                    {formatMoney(Number(product.price))} / {PRODUCT_UNIT_LABELS[unit]}
+                  </span>
+                )}
+              </div>
+
+              {lineDraft.saleMode === 'piece' && !(parseDecimal(lineDraft.quantity) > 0) ? (
+                <p className="mt-2 text-xs text-amber-700">Captura el peso en kg.</p>
+              ) : null}
+              {canEditPrice &&
+              Math.abs(
+                parseDecimal(lineDraft.unitPrice, Number(product.price)) - Number(product.price),
+              ) > 0.0005 ? (
+                <p className="mt-2 text-xs text-amber-700">
+                  Lista: {formatMoney(Number(product.price))} / {PRODUCT_UNIT_LABELS[unit]}
+                </p>
+              ) : null}
+              {lineError ? <p className="mt-2 text-sm text-rose-700">{lineError}</p> : null}
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-900">
+                  {formatMoney(lineTotal)}
+                </span>
+                <ActionChip tone="emerald" emoji="🛒" onClick={confirmLineEditor}>
+                  {updating ? 'Actualizar' : 'Agregar al pedido'}
+                </ActionChip>
+              </div>
+            </section>
+          </div>
+        );
+      })() : null}
       {boardFilters ? (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>
       ) : null}
