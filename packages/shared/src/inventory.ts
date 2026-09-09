@@ -81,6 +81,20 @@ export function isLowStock(input: {
 /** Matches `branch_products.stock numeric(10, 3)`. */
 export const STOCK_QTY_DECIMALS = 3;
 
+export function roundStockQty(value: number): number {
+  return Number(Number(value).toFixed(STOCK_QTY_DECIMALS));
+}
+
+/** What should remain after weighing merma against a physical count. */
+export function remainingAfterWaste(counted: number, waste: number): number {
+  return roundStockQty(Number(counted) - Number(waste));
+}
+
+/** Quantity to send when merma is weighed on its own (what you are throwing away). */
+export function quantityForWeighedWaste(waste: number): number {
+  return roundStockQty(waste);
+}
+
 /**
  * Quantity to send to `record_inventory_movement` from a physical count.
  * Count 0 means write off whatever is left (not the 2-decimal display).
@@ -95,6 +109,6 @@ export function quantityForStockCount(input: {
   if (counted === 0) {
     return input.kind === 'waste' ? system : -system;
   }
-  const delta = Number((counted - system).toFixed(STOCK_QTY_DECIMALS));
+  const delta = roundStockQty(counted - system);
   return input.kind === 'waste' ? Math.abs(delta) : delta;
 }

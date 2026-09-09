@@ -101,7 +101,7 @@ export function StockMovementHistory({
 
         {rows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-            Aún no hay mermas ni ajustes. Ábrelo desde el producto y anota el conteo.
+            Aún no hay mermas ni ajustes. Ábrelo desde el producto: anota lo que tiras o ajusta al conteo.
           </p>
         ) : (
           <div className="space-y-2">

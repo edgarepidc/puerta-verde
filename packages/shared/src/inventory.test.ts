@@ -8,6 +8,9 @@ import {
   isLowStock,
   LOW_STOCK_THRESHOLD,
   quantityForStockCount,
+  quantityForWeighedWaste,
+  remainingAfterWaste,
+  roundStockQty,
 } from './inventory';
 
 test('chile detection by name or category', () => {
@@ -54,4 +57,16 @@ test('quantityForStockCount merma uses three decimal places', () => {
     quantityForStockCount({ system: 6.137, counted: 1, kind: 'waste' }),
     5.137,
   );
+});
+
+test('remainingAfterWaste subtracts weighed merma from the physical count', () => {
+  assert.equal(remainingAfterWaste(12.08, 0.8), 11.28);
+  assert.equal(remainingAfterWaste(6.137, 0), 6.137);
+  assert.equal(remainingAfterWaste(1, 1), 0);
+});
+
+test('quantityForWeighedWaste keeps three decimal places', () => {
+  assert.equal(quantityForWeighedWaste(0.8), 0.8);
+  assert.equal(quantityForWeighedWaste(1.2346), 1.235);
+  assert.equal(roundStockQty(12.08 - 0.8), 11.28);
 });
