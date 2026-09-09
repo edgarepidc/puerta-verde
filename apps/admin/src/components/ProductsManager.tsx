@@ -1062,59 +1062,50 @@ export function ProductsManager({
                   </ActionChip>
                 </summary>
                 <div className="mt-4 space-y-3">
-                  <div className="flex flex-wrap gap-3">
-                    <label className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
-                      <span className="font-medium text-slate-700">Conteo físico</span>
+                  <div className="flex w-full min-w-0 items-end gap-2">
+                    <label className="block w-[5.5rem] shrink-0 text-sm">
+                      <span className="font-medium text-slate-700">Conteo</span>
                       <DecimalInput
-                        className="pv-input mt-1"
+                        className="pv-input mt-1 px-2 py-1.5"
                         value={countedText}
                         onChange={setCountedText}
-                        placeholder="Lo que hay ahora"
+                        placeholder="0"
                       />
-                      <span className="mt-1 block text-xs text-slate-500">
-                        Si volviste a pesar todo
-                      </span>
                     </label>
-                    <label className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
+                    <label className="block w-[5.5rem] shrink-0 text-sm">
                       <span className="font-medium text-slate-700">A tirar</span>
                       <DecimalInput
-                        className="pv-input mt-1"
+                        className="pv-input mt-1 px-2 py-1.5"
                         value={wasteText}
                         onChange={setWasteText}
                         placeholder="0"
                       />
-                      <span className="mt-1 block text-xs text-slate-500">
-                        Lo que pesaste para tirar
-                      </span>
                     </label>
-                    <div className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
+                    <div className="block w-[5.5rem] shrink-0 text-sm">
                       <span className="font-medium text-slate-700">Queda</span>
                       <input
                         readOnly
                         tabIndex={-1}
                         aria-live="polite"
                         aria-label={`Queda ${formatStockQty(stockRemaining)} ${stockUnit}`}
-                        className={`pv-input mt-1 ${
+                        className={`pv-input mt-1 px-2 py-1.5 ${
                           stockRemaining < 0
                             ? 'bg-rose-50 text-rose-800'
                             : 'bg-emerald-50 font-medium text-emerald-900'
                         }`}
                         value={countedText.trim() ? formatStockQty(stockRemaining) : ''}
                       />
-                      <span className="mt-1 block text-xs text-slate-500">
-                        Conteo − merma
-                      </span>
                     </div>
+                    <label className="block min-w-0 flex-1 text-sm">
+                      <span className="font-medium text-slate-700">Nota</span>
+                      <input
+                        className="pv-input mt-1 px-2 py-1.5"
+                        value={stockNotes}
+                        onChange={(e) => setStockNotes(e.target.value)}
+                        placeholder="Ej. maduro"
+                      />
+                    </label>
                   </div>
-                  <label className="block text-sm">
-                    <span className="font-medium text-slate-700">Nota (opcional)</span>
-                    <input
-                      className="pv-input mt-1"
-                      value={stockNotes}
-                      onChange={(e) => setStockNotes(e.target.value)}
-                      placeholder="Ej. maduro"
-                    />
-                  </label>
                   {hasWasteQty && stockRemaining >= 0 && stockCountDelta === 0 ? (
                     <p className="text-sm text-rose-800">
                       Se tiran {formatStockQty(stockWaste)} {stockUnit} · quedan{' '}
