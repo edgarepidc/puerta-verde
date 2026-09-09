@@ -390,13 +390,11 @@ export function ForecastManager({
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
               <label className="flex items-center gap-1.5 font-semibold text-slate-700">
                 Seleccionar
-                <input
-                  type="number"
-                  min={0}
-                  max={printRows.length}
+                <DecimalInput
+                  integer
                   className="pv-input w-16 py-1 text-center text-sm"
                   value={printSelectCount}
-                  onChange={(e) => setPrintSelectCount(e.target.value)}
+                  onChange={setPrintSelectCount}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();

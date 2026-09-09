@@ -266,6 +266,17 @@
   -webkit-backdrop-filter: blur(4px);
 }
 
+/* Virtual decimal pad (iPad) — keep focused fields above the pad */
+body.pv-numpad-open {
+  padding-bottom: calc(15.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+body.pv-numpad-open .pv-modal-overlay {
+  align-items: flex-start;
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16.5rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Promo banner */
 .pv-promo-banner {
   border-radius: 1.25rem;

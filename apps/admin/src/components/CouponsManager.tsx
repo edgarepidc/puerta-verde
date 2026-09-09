@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import {
   COUPON_DISCOUNT_TYPE_LABELS,
+  INTEGER_FIELD_PROPS,
   formatMoney,
   type CouponDiscountType,
 } from '@puertaverde/shared';
@@ -248,7 +249,7 @@ export function CouponsManager({
               <span className="font-medium text-slate-700">Máx. usos</span>
               <input
                 className="pv-input mt-1"
-                inputMode="numeric"
+                {...INTEGER_FIELD_PROPS}
                 value={form.maxUses}
                 onChange={(e) => setForm((current) => ({ ...current, maxUses: e.target.value }))}
                 placeholder="Sin límite"
