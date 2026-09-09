@@ -12,6 +12,9 @@ import {
   getDefaultLowStockThreshold,
   isLowStock,
   quantityForStockCount,
+  quantityForWeighedWaste,
+  remainingAfterWaste,
+  roundStockQty,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -209,6 +212,7 @@ export function ProductsManager({
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [stockRow, setStockRow] = useState<ProductRow | null>(null);
   const [countedText, setCountedText] = useState('');
+  const [wasteText, setWasteText] = useState('');
   const [stockNotes, setStockNotes] = useState('');
   const [stockError, setStockError] = useState<string | null>(null);
   const [stockSaving, setStockSaving] = useState(false);
@@ -251,6 +255,14 @@ export function ProductsManager({
       }
     });
   }, [products, search, categoryFilter, sortKey, sortDir]);
+
+  const stockUnit = stockRow ? PRODUCT_UNIT_LABELS[stockRow.product.unit] : '';
+  const stockSystem = stockRow ? Number(stockRow.stock) : 0;
+  const stockCounted = parseDecimal(countedText, stockSystem);
+  const stockWaste = parseDecimal(wasteText, 0);
+  const stockRemaining = remainingAfterWaste(stockCounted, stockWaste);
+  const stockCountDelta = roundStockQty(stockCounted - stockSystem);
+  const hasWasteQty = Boolean(wasteText.trim()) && stockWaste > 0;
 
   function toggleSort(column: SortKey) {
     if (sortKey === column) {
@@ -301,6 +313,7 @@ export function ProductsManager({
     setShowForm(true);
     setStockRow(row);
     setCountedText(formatStockQty(Number(row.stock)));
+    setWasteText('');
     setStockNotes('');
     setStockError(null);
   }
@@ -506,6 +519,7 @@ export function ProductsManager({
   function closeStock() {
     setStockRow(null);
     setCountedText('');
+    setWasteText('');
     setStockNotes('');
     setStockError(null);
     setStockSaving(false);
@@ -513,21 +527,45 @@ export function ProductsManager({
 
   async function submitStock(kind: 'waste' | 'adjustment') {
     if (!stockRow || !canAdjustInventory) return;
+    const unit = PRODUCT_UNIT_LABELS[stockRow.product.unit];
     const system = Number(stockRow.stock);
     const counted = parseDecimal(countedText);
+    const waste = parseDecimal(wasteText);
     if (!Number.isFinite(counted) || counted < 0) {
       setStockError('Indica un conteo válido (0 o más).');
       return;
     }
-    const delta = Number((counted - system).toFixed(3));
-    if (delta === 0) {
-      setStockError('El conteo es igual al stock del sistema.');
-      return;
+    const countDelta = roundStockQty(counted - system);
+
+    if (kind === 'waste') {
+      if (!wasteText.trim() || !Number.isFinite(waste) || waste <= 0) {
+        setStockError('Indica cuánto vas a tirar.');
+        return;
+      }
+      if (remainingAfterWaste(counted, waste) < 0) {
+        setStockError('La merma no puede ser mayor al conteo físico.');
+        return;
+      }
+      if (countDelta !== 0) {
+        setStockError(
+          'Para registrar merma deja el conteo como el stock del sistema, o ajústalo primero. En “A tirar” anota lo que pesaste para tirar.',
+        );
+        return;
+      }
+    } else {
+      if (wasteText.trim() && waste > 0) {
+        setStockError(
+          'El ajuste deja el stock en el conteo físico y no resta merma. Vacía “A tirar” o registra la merma primero.',
+        );
+        return;
+      }
+      if (countDelta === 0) {
+        setStockError('El conteo es igual al stock del sistema. Si vas a tirar producto, anótalo en “A tirar”.');
+        return;
+      }
     }
-    if (kind === 'waste' && delta >= 0) {
-      setStockError('La merma solo baja stock. Si hay de más, usa ajustar al conteo.');
-      return;
-    }
+
+    const remaining = remainingAfterWaste(counted, waste);
     setStockSaving(true);
     setStockError(null);
     try {
@@ -537,11 +575,14 @@ export function ProductsManager({
         body: JSON.stringify({
           branchProductId: stockRow.id,
           movementType: kind,
-          quantity: quantityForStockCount({ system, counted, kind }),
+          quantity:
+            kind === 'waste'
+              ? quantityForWeighedWaste(waste)
+              : quantityForStockCount({ system, counted, kind }),
           notes:
             stockNotes.trim() ||
             (kind === 'waste'
-              ? `Merma desde catálogo (sistema ${formatStockQty(system)} → conteo ${formatStockQty(counted)})`
+              ? `Merma ${formatStockQty(waste)} ${unit} (conteo ${formatStockQty(counted)} → queda ${formatStockQty(remaining)})`
               : `Ajuste desde catálogo (sistema ${formatStockQty(system)} → conteo ${formatStockQty(counted)})`),
         }),
       });
@@ -560,6 +601,7 @@ export function ProductsManager({
           setStockRow(updated);
           setEditingRow(updated);
           setCountedText(formatStockQty(Number(updated.stock)));
+          setWasteText('');
         }
       }
       if (inventoryRes.ok) {
@@ -986,7 +1028,7 @@ export function ProductsManager({
             </details>
 
             {editingRow && canAdjustInventory && stockRow ? (
-              <details className="group mt-3 min-w-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/60 p-3">
+              <details className="group mt-3 min-w-0 w-full rounded-xl border border-slate-200 bg-white/60 p-3">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
                   <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-slate-800">
                     <span
@@ -1020,8 +1062,8 @@ export function ProductsManager({
                   </ActionChip>
                 </summary>
                 <div className="mt-4 space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-sm">
+                  <div className="flex flex-wrap gap-3">
+                    <label className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
                       <span className="font-medium text-slate-700">Conteo físico</span>
                       <DecimalInput
                         className="pv-input mt-1"
@@ -1029,49 +1071,100 @@ export function ProductsManager({
                         onChange={setCountedText}
                         placeholder="Lo que hay ahora"
                       />
+                      <span className="mt-1 block text-xs text-slate-500">
+                        Si volviste a pesar todo
+                      </span>
                     </label>
-                    <label className="block text-sm">
-                      <span className="font-medium text-slate-700">Nota (opcional)</span>
-                      <input
+                    <label className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
+                      <span className="font-medium text-slate-700">A tirar</span>
+                      <DecimalInput
                         className="pv-input mt-1"
-                        value={stockNotes}
-                        onChange={(e) => setStockNotes(e.target.value)}
-                        placeholder="Ej. merma por madurez"
+                        value={wasteText}
+                        onChange={setWasteText}
+                        placeholder="0"
                       />
+                      <span className="mt-1 block text-xs text-slate-500">
+                        Lo que pesaste para tirar
+                      </span>
                     </label>
+                    <div className="block min-w-[8rem] flex-1 basis-[8rem] text-sm">
+                      <span className="font-medium text-slate-700">Queda</span>
+                      <input
+                        readOnly
+                        tabIndex={-1}
+                        aria-live="polite"
+                        aria-label={`Queda ${formatStockQty(stockRemaining)} ${stockUnit}`}
+                        className={`pv-input mt-1 ${
+                          stockRemaining < 0
+                            ? 'bg-rose-50 text-rose-800'
+                            : 'bg-emerald-50 font-medium text-emerald-900'
+                        }`}
+                        value={countedText.trim() ? formatStockQty(stockRemaining) : ''}
+                      />
+                      <span className="mt-1 block text-xs text-slate-500">
+                        Conteo − merma
+                      </span>
+                    </div>
                   </div>
-                  {(() => {
-                    const system = Number(stockRow.stock);
-                    const counted = parseDecimal(countedText, system);
-                    const delta = Number((counted - system).toFixed(3));
-                    if (!countedText.trim() || delta === 0) return null;
-                    return (
-                      <p className={`text-sm ${delta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
-                        Diferencia: {delta > 0 ? '+' : ''}
-                        {formatStockQty(delta)} {PRODUCT_UNIT_LABELS[stockRow.product.unit]}
-                      </p>
-                    );
-                  })()}
+                  <label className="block text-sm">
+                    <span className="font-medium text-slate-700">Nota (opcional)</span>
+                    <input
+                      className="pv-input mt-1"
+                      value={stockNotes}
+                      onChange={(e) => setStockNotes(e.target.value)}
+                      placeholder="Ej. maduro"
+                    />
+                  </label>
+                  {hasWasteQty && stockRemaining >= 0 && stockCountDelta === 0 ? (
+                    <p className="text-sm text-rose-800">
+                      Se tiran {formatStockQty(stockWaste)} {stockUnit} · quedan{' '}
+                      {formatStockQty(stockRemaining)} {stockUnit}
+                    </p>
+                  ) : null}
+                  {hasWasteQty && stockRemaining < 0 ? (
+                    <p className="text-sm text-red-600">
+                      La merma no puede ser mayor al conteo físico.
+                    </p>
+                  ) : null}
+                  {countedText.trim() && stockCountDelta !== 0 ? (
+                    <p className={`text-sm ${stockCountDelta < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
+                      Diferencia vs sistema: {stockCountDelta > 0 ? '+' : ''}
+                      {formatStockQty(stockCountDelta)} {stockUnit}
+                      {hasWasteQty
+                        ? '. Ajusta al conteo o deja el conteo como está para registrar merma.'
+                        : ''}
+                    </p>
+                  ) : null}
                   {stockError ? <p className="text-sm text-red-600">{stockError}</p> : null}
-                  <div className="flex flex-wrap gap-3">
-                    <ActionChip
-                      size="lg"
-                      tone="rose"
-                      emoji="🍂"
-                      disabled={stockSaving}
-                      onClick={() => void submitStock('waste')}
-                    >
-                      {stockSaving ? 'Guardando…' : 'Registrar merma'}
-                    </ActionChip>
-                    <ActionChip
-                      size="lg"
-                      tone="sky"
-                      emoji="⚖️"
-                      disabled={stockSaving}
-                      onClick={() => void submitStock('adjustment')}
-                    >
-                      {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
-                    </ActionChip>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <ActionChip
+                        size="lg"
+                        tone="rose"
+                        emoji="🍂"
+                        disabled={stockSaving || !hasWasteQty || stockRemaining < 0}
+                        onClick={() => void submitStock('waste')}
+                      >
+                        {stockSaving ? 'Guardando…' : 'Registrar merma'}
+                      </ActionChip>
+                      <p className="max-w-[16rem] text-xs text-slate-500">
+                        Resta lo que tiras. El stock queda en el resultado.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <ActionChip
+                        size="lg"
+                        tone="sky"
+                        emoji="⚖️"
+                        disabled={stockSaving || stockCountDelta === 0 || hasWasteQty}
+                        onClick={() => void submitStock('adjustment')}
+                      >
+                        {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
+                      </ActionChip>
+                      <p className="max-w-[16rem] text-xs text-slate-500">
+                        Si pesaste toda la mercancía, el stock pasa a ser el conteo.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </details>
