@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 
 import {
   applyDiscount,
+  DECIMAL_FIELD_PROPS,
+  INTEGER_FIELD_PROPS,
   estimatedKgForPieces,
   formatMoney,
   formatProductQuantity,
@@ -1167,22 +1169,14 @@ export function Storefront({
                 −
               </button>
               <input
-                type="number"
-                min={1}
-                step={
-                  pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct)
-                    ? 1
-                    : getQuantityStep(pickerProduct.product.unit as ProductUnit)
-                }
-                max={
-                  pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct)
-                    ? maxPiecesFromStock(Number(pickerProduct.stock))
-                    : Number(pickerProduct.stock)
-                }
+                {...((pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct)) ||
+                (pickerProduct.product.unit !== 'kg' && pickerProduct.product.unit !== 'liter')
+                  ? INTEGER_FIELD_PROPS
+                  : DECIMAL_FIELD_PROPS)}
                 className="pv-input text-center text-base font-semibold tabular-nums"
                 value={Number.isFinite(pickerQty) && pickerQty > 0 ? pickerQty : ''}
                 onChange={(e) => {
-                  const raw = e.target.value;
+                  const raw = e.target.value.replace(',', '.');
                   if (raw === '') {
                     setPickerQty(0);
                     return;
@@ -1190,7 +1184,6 @@ export function Storefront({
                   const next = Number(raw);
                   setPickerQty(Number.isFinite(next) ? roundToDecimals(next) : 0);
                 }}
-                inputMode="decimal"
               />
               <button
                 type="button"

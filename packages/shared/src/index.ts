@@ -1,5 +1,7 @@
 import { formatPaymentSplitsLabel, parsePaymentSplits } from './payment-splits';
 
+export { DECIMAL_FIELD_PROPS, INTEGER_FIELD_PROPS } from './mobile-input';
+
 export const BRAND_NAME = 'Puerta Verde';
 
 export {
