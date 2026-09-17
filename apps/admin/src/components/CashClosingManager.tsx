@@ -73,6 +73,7 @@ interface Withdrawal {
   withdrawal_date: string;
   withdrawn_at: string;
   notes: string | null;
+  destination?: 'cash' | 'account' | null;
 }
 
 export function CashClosingManager({ canManage = true }: { canManage?: boolean }) {
@@ -93,7 +94,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   const [withdrawalNotes, setWithdrawalNotes] = useState('');
   const [savingWithdrawal, setSavingWithdrawal] = useState(false);
   const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
-  const [openRetiros, setOpenRetiros] = useState(false);
+  const [openRetiros, setOpenRetiros] = useState(true);
 
   async function load(date?: string) {
     setLoading(true);
@@ -123,7 +124,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     }
   }
 
-  async function saveWithdrawal() {
+  async function saveWithdrawal(destination: 'cash' | 'account') {
     const amount = Number(withdrawalAmount);
     if (!amount || amount <= 0) {
       setWithdrawalError('Ingresa un monto válido');
@@ -135,7 +136,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       const response = await fetch('/api/cash-withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, notes: withdrawalNotes, date: selectedDate }),
+        body: JSON.stringify({
+          amount,
+          notes: withdrawalNotes,
+          date: selectedDate,
+          destination,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar');
@@ -206,6 +212,13 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     { label: 'Mostrador', emoji: '🛒', iconClass: 'bg-emerald-100', value: summary?.channels?.pos },
     { label: 'Tienda web', emoji: '🌐', iconClass: 'bg-sky-100', value: summary?.channels?.web },
   ];
+
+  const toAccountTotal = withdrawals
+    .filter((w) => w.destination !== 'cash')
+    .reduce((sum, w) => sum + Number(w.amount), 0);
+  const toCashTotal = withdrawals
+    .filter((w) => w.destination === 'cash')
+    .reduce((sum, w) => sum + Number(w.amount), 0);
 
   const isToday = selectedDate === todayYmd;
 
@@ -416,19 +429,28 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         onToggle={(event) => setOpenRetiros(event.currentTarget.open)}
       >
         <FoldableSummary
-          title="Retiros de efectivo"
+          title="Movimientos de efectivo"
           hint={
             withdrawals.length > 0
-              ? `${withdrawals.length} retiro${withdrawals.length === 1 ? '' : 's'} · ${formatMoney(withdrawals.reduce((s, w) => s + Number(w.amount), 0))}`
-              : 'Mueve efectivo a la cuenta bancaria'
+              ? `${withdrawals.length} movimiento${withdrawals.length === 1 ? '' : 's'}`
+              : 'De caja a la cuenta, o de la cuenta a caja para la central'
           }
           emoji="💸"
           iconClass="bg-violet-100"
           actions={
             withdrawals.length > 0 ? (
-              <ActionChip as="span" emoji="💜" tone="slate" elevated={false}>
-                {formatMoney(withdrawals.reduce((s, w) => s + Number(w.amount), 0))}
-              </ActionChip>
+              <>
+                {toAccountTotal > 0 ? (
+                  <ActionChip as="span" emoji="💜" tone="slate" elevated={false}>
+                    A cuenta {formatMoney(toAccountTotal)}
+                  </ActionChip>
+                ) : null}
+                {toCashTotal > 0 ? (
+                  <ActionChip as="span" emoji="💵" tone="emerald" elevated={false}>
+                    A efectivo {formatMoney(toCashTotal)}
+                  </ActionChip>
+                ) : null}
+              </>
             ) : undefined
           }
         />
@@ -436,7 +458,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           {canManage ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
-                Monto a retirar
+                Monto
                 <DecimalInput
                   placeholder="0"
                   className="pv-input mt-2"
@@ -449,7 +471,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
                 <input
                   type="text"
                   className="pv-input mt-2"
-                  placeholder="Ej. depósito bancario"
+                  placeholder="Ej. depósito o central"
                   value={withdrawalNotes}
                   onChange={(e) => setWithdrawalNotes(e.target.value)}
                 />
@@ -458,39 +480,61 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           ) : null}
           {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
           {canManage ? (
-            <ActionChip
-              size="lg"
-              emoji="💸"
-              tone="slate"
-              disabled={savingWithdrawal || !withdrawalAmount}
-              onClick={saveWithdrawal}
-            >
-              {savingWithdrawal ? 'Guardando…' : 'Registrar retiro'}
-            </ActionChip>
+            <div className="flex flex-wrap gap-3">
+              <ActionChip
+                size="lg"
+                emoji="💸"
+                tone="slate"
+                disabled={savingWithdrawal || !withdrawalAmount}
+                onClick={() => void saveWithdrawal('account')}
+              >
+                {savingWithdrawal ? 'Guardando…' : 'Registrar retiro'}
+              </ActionChip>
+              <ActionChip
+                size="lg"
+                emoji="💵"
+                tone="emerald"
+                disabled={savingWithdrawal || !withdrawalAmount}
+                onClick={() => void saveWithdrawal('cash')}
+              >
+                {savingWithdrawal ? 'Guardando…' : 'Traer a efectivo'}
+              </ActionChip>
+            </div>
+          ) : null}
+          {canManage ? (
+            <p className="text-xs text-slate-500">
+              Retiro: caja → cuenta. Traer: cuenta → caja, para comprar en la central.
+            </p>
           ) : null}
           {withdrawals.length > 0 ? (
             <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white">
-              {withdrawals.map((w) => (
+              {withdrawals.map((w) => {
+                const toCash = w.destination === 'cash';
+                return (
                 <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                   <div className="min-w-0">
                     <p className="font-semibold tabular-nums text-slate-900">{formatMoney(Number(w.amount))}</p>
-                    {w.notes ? <p className="text-xs text-slate-500">{w.notes}</p> : null}
+                    <p className="text-xs text-slate-500">
+                      {toCash ? 'Cuenta → efectivo' : 'Efectivo → cuenta'}
+                      {w.notes ? ` · ${w.notes}` : ''}
+                    </p>
                   </div>
                   {canManage ? (
                     <button
                       type="button"
                       className="shrink-0 text-xs text-slate-400 hover:text-red-600"
                       onClick={() => void deleteWithdrawal(w.id)}
-                      title="Eliminar retiro"
+                      title="Eliminar movimiento"
                     >
                       ✕
                     </button>
                   ) : null}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           ) : (
-            <p className="text-sm text-slate-400">Sin retiros registrados hoy.</p>
+            <p className="text-sm text-slate-400">Sin movimientos registrados hoy.</p>
           )}
         </div>
       </details>

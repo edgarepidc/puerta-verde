@@ -5,6 +5,7 @@ import {
   addCollectedTicket,
   addPocketInflow,
   addPocketOutflow,
+  applyCashPocketTransfer,
   isCollectedTicket,
   pocketTotal,
   resolveMoneyPosition,
@@ -91,6 +92,17 @@ test('addPocketInflow returns money to the matching pocket', () => {
 
 test('pocketTotal is caja plus cuenta', () => {
   assert.equal(pocketTotal({ cash: 2605, account: 4362 }), 6967);
+});
+
+test('applyCashPocketTransfer moves money between pockets without changing Tienes', () => {
+  const position = { cash: 1000, account: 5000 };
+  applyCashPocketTransfer(position, 'cash', 800);
+  assert.equal(position.cash, 1800);
+  assert.equal(position.account, 4200);
+  assert.equal(pocketTotal(position), 6000);
+  applyCashPocketTransfer(position, 'account', 800);
+  assert.equal(position.cash, 1000);
+  assert.equal(position.account, 5000);
 });
 
 test('ticketCollectedAmount is subtotal minus discount plus delivery', () => {

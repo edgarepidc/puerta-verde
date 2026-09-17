@@ -1,6 +1,7 @@
 import {
   addCollectedTicket,
   addPocketOutflow,
+  applyCashPocketTransfer,
   applyOperatingCostsToPockets,
   calendarMonthStart,
   parseMoneyPocket,
@@ -79,6 +80,7 @@ export async function fetchMoneyPosition(
   const flows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   const ticketFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   const pausedFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  let transfers: Array<{ amount: number; destination: string | null }> = [];
 
   if (snapshot && !closesThisPeriod) {
     const monthStart = calendarMonthStart(snapshot.asOfDate);
@@ -96,7 +98,7 @@ export async function fetchMoneyPosition(
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
     const saleEnd = mexicoYmdBoundsIso(to).end;
 
-    const [orders, purchases, expenses, incomes] = await Promise.all([
+    const [orders, purchases, expenses, incomes, transferRows] = await Promise.all([
       fetchPaged((rangeFrom, rangeTo) =>
         supabase
           .from('orders')
@@ -137,7 +139,19 @@ export async function fetchMoneyPosition(
           .lte('entry_date', to)
           .range(rangeFrom, rangeTo),
       ),
+      fetchPaged<{ amount: number; destination: string | null }>((rangeFrom, rangeTo) =>
+        // Table is not in generated types yet.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('cash_withdrawals')
+          .select('amount, destination')
+          .eq('branch_id', branchId)
+          .gte('withdrawal_date', movementStart)
+          .lte('withdrawal_date', to)
+          .range(rangeFrom, rangeTo),
+      ),
     ]);
+    transfers = transferRows;
 
     for (const order of orders) {
       addCollectedTicket(flows, order);
@@ -179,11 +193,22 @@ export async function fetchMoneyPosition(
     flows: roundedFlows,
   });
 
+  const pockets = { cash: resolved.cash, account: resolved.account };
+  for (const row of transfers) {
+    applyCashPocketTransfer(
+      pockets,
+      parseMoneyPocket(row.destination, 'account'),
+      Number(row.amount ?? 0),
+    );
+  }
+
   const ticketInCash = roundMoney(ticketFlows.cashIn);
   const ticketInAccount = roundMoney(ticketFlows.accountIn);
 
   return {
     ...resolved,
+    cash: pockets.cash,
+    account: pockets.account,
     asOfDate: to,
     notes: snapshot && snapshot.asOfDate >= to ? (snapshotRow?.notes ?? null) : null,
     openingTotal: snapshot ? pocketTotal(snapshot) : 0,
