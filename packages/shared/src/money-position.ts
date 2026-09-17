@@ -29,6 +29,25 @@ export function addPocketInflow(flows: MoneyPositionFlows, pocket: MoneyPocket, 
   else flows.cashIn += amount;
 }
 
+/**
+ * Move money between caja and cuenta. Net Tienes stays the same.
+ * `destination` is the pocket that receives the money.
+ */
+export function applyCashPocketTransfer(
+  position: { cash: number; account: number },
+  destination: MoneyPocket,
+  amount: number,
+): void {
+  if (!(amount > 0)) return;
+  if (destination === 'cash') {
+    position.account = roundMoney(position.account - amount);
+    position.cash = roundMoney(position.cash + amount);
+    return;
+  }
+  position.cash = roundMoney(position.cash - amount);
+  position.account = roundMoney(position.account + amount);
+}
+
 export function pocketTotal(position: { cash: number; account: number }): number {
   return roundMoney(position.cash + position.account);
 }

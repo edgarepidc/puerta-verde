@@ -357,6 +357,7 @@ export {
   MONEY_POCKET_LABELS,
   addPocketOutflow,
   addPocketInflow,
+  applyCashPocketTransfer,
   addCollectedTicket,
   ticketCollectedAmount,
   ticketMoneyPocket,

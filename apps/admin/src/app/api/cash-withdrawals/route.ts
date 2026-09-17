@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('cash_withdrawals')
-    .select('id, amount, withdrawal_date, withdrawn_at, notes')
+    .select('id, amount, withdrawal_date, withdrawn_at, notes, destination')
     .eq('branch_id', auth.branchId)
     .eq('withdrawal_date', date)
     .order('withdrawn_at', { ascending: false });
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     amount?: unknown;
     notes?: unknown;
     date?: unknown;
+    destination?: unknown;
   };
 
   const amount = Number(body.amount);
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Monto inválido' }, { status: 400 });
   }
 
+  const destination = body.destination === 'cash' ? 'cash' : 'account';
   const rawDate = typeof body.date === 'string' ? body.date.trim() : '';
   const withdrawalDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayMexicoYmd();
   const notes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
@@ -64,9 +66,10 @@ export async function POST(request: Request) {
       amount,
       withdrawal_date: withdrawalDate,
       notes,
+      destination,
       created_by: auth.userId,
     })
-    .select('id, amount, withdrawal_date, withdrawn_at, notes')
+    .select('id, amount, withdrawal_date, withdrawn_at, notes, destination')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
