@@ -46,7 +46,7 @@ import {
   type OrderBoardItemPreview,
   type OrderBoardRow,
 } from '@/lib/orders-board';
-import { printThermalReceipt } from '@/lib/thermal-printer';
+import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import type { ThermalReceiptData } from '@/lib/thermal-ticket';
 
 function roundMoney(amount: number): number {
@@ -1486,7 +1486,7 @@ export function OrdersBoard({
                           connectIfNeeded: true,
                         });
                       } catch (err) {
-                        setPrintError(err instanceof Error ? err.message : 'No se pudo imprimir el ticket.');
+                        setPrintError(describePrinterError(err));
                       }
                     }}
                   >

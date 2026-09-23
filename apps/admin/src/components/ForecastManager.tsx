@@ -15,7 +15,7 @@ import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
 import { LowStockBanner } from '@/components/LowStockBanner';
 import { ThermalPrinterChip } from '@/components/ThermalPrinterChip';
 import { useThermalPrinter } from '@/components/ThermalPrinterBar';
-import { getThermalPrinterStatus, printThermalShoppingList } from '@/lib/thermal-printer';
+import { describePrinterError, getThermalPrinterStatus, printThermalShoppingList } from '@/lib/thermal-printer';
 import type { ShoppingListItem } from '@/lib/thermal-ticket';
 
 interface ForecastRow {
@@ -291,7 +291,7 @@ export function ForecastManager({
         { connectIfNeeded: getThermalPrinterStatus() !== 'ready' },
       );
     } catch (err) {
-      setPrintError(err instanceof Error ? err.message : 'No se pudo imprimir.');
+      setPrintError(describePrinterError(err));
     } finally {
       setPrintBusy(false);
     }
@@ -304,7 +304,7 @@ export function ForecastManager({
       if (items.length === 0) throw new Error('Marca al menos un producto con cantidad a comprar.');
       printBrowserList({ storeName: 'Puerta Verde', horizonDays, items });
     } catch (err) {
-      setPrintError(err instanceof Error ? err.message : 'No se pudo imprimir.');
+      setPrintError(describePrinterError(err));
     }
   }
 

@@ -38,7 +38,7 @@ import {
 } from '@/components/ThermalReceipt';
 
 import { todayMexicoYmd } from '@/lib/mexico-date';
-import { printThermalReceipt } from '@/lib/thermal-printer';
+import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import { TICKET_FOOTER } from '@/lib/thermal-ticket';
 
 export interface CounterProduct {
@@ -812,11 +812,7 @@ export function CounterSalePanel({
         try {
           await printThermalReceipt(ticket, { connectIfNeeded: true });
         } catch (err) {
-          setPrintError(
-            err instanceof Error
-              ? err.message
-              : 'No se pudo imprimir. Conecta la impresora y pulsa Imprimir ticket.',
-          );
+          setPrintError(describePrinterError(err));
         }
       }
       setCart([]);
@@ -873,9 +869,7 @@ export function CounterSalePanel({
               try {
                 await printThermalReceipt(preview, { connectIfNeeded: true });
               } catch (err) {
-                setPrintError(
-                  err instanceof Error ? err.message : 'No se pudo imprimir el ticket.',
-                );
+                setPrintError(describePrinterError(err));
               }
             }}
           >
