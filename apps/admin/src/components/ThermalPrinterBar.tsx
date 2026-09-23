@@ -120,8 +120,8 @@ export function ThermalPrinterBar() {
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        Enchufa el cable USB y pulsa <strong>USB</strong> o <strong>Imprimir</strong>. En Chrome
-        elige el dispositivo USB de la térmica, no Save as PDF.
+        Con cable pulsa <strong>USB</strong>. Sin cable, <strong>Bluetooth</strong> y elige la
+        térmica en Chrome.
       </p>
       {busy ? <p className="mt-1 text-xs text-slate-500">Enviando a la impresora…</p> : null}
       {info ? <p className="mt-1 text-xs text-emerald-700">{info}</p> : null}
