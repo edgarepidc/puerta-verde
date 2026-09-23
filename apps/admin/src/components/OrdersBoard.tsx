@@ -46,7 +46,7 @@ import {
   type OrderBoardItemPreview,
   type OrderBoardRow,
 } from '@/lib/orders-board';
-import { connectThermalPrinter, describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
+import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import type { ThermalReceiptData } from '@/lib/thermal-ticket';
 
 function roundMoney(amount: number): number {
@@ -1477,30 +1477,13 @@ export function OrdersBoard({
               {!detailEditing && normalizeOrderStatus(selected.status) === 'delivered' ? (
                 <>
                   <ActionChip
-                    emoji="🖨️"
-                    disabled={detailLoading || detailSaving}
-                    onClick={async () => {
-                      setPrintError(null);
-                      try {
-                        await printThermalReceipt(ticketFromOrder(selected, detailItems), {
-                          connectIfNeeded: true,
-                        });
-                      } catch (err) {
-                        setPrintError(describePrinterError(err));
-                      }
-                    }}
-                  >
-                    Imprimir
-                  </ActionChip>
-                  <ActionChip
                     emoji="🔌"
                     disabled={detailLoading || detailSaving}
                     onClick={async () => {
                       setPrintError(null);
                       try {
-                        await connectThermalPrinter('usb');
                         await printThermalReceipt(ticketFromOrder(selected, detailItems), {
-                          connectIfNeeded: false,
+                          kind: 'usb',
                         });
                       } catch (err) {
                         setPrintError(describePrinterError(err));
@@ -1515,9 +1498,8 @@ export function OrdersBoard({
                     onClick={async () => {
                       setPrintError(null);
                       try {
-                        await connectThermalPrinter('ble');
                         await printThermalReceipt(ticketFromOrder(selected, detailItems), {
-                          connectIfNeeded: false,
+                          kind: 'ble',
                         });
                       } catch (err) {
                         setPrintError(describePrinterError(err));

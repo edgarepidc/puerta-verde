@@ -38,7 +38,7 @@ import {
 } from '@/components/ThermalReceipt';
 
 import { todayMexicoYmd } from '@/lib/mexico-date';
-import { connectThermalPrinter, describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
+import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import { TICKET_FOOTER } from '@/lib/thermal-ticket';
 
 export interface CounterProduct {
@@ -863,25 +863,11 @@ export function CounterSalePanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionChip
-            emoji="🖨️"
-            onClick={async () => {
-              setPrintError(null);
-              try {
-                await printThermalReceipt(preview, { connectIfNeeded: true });
-              } catch (err) {
-                setPrintError(describePrinterError(err));
-              }
-            }}
-          >
-            Imprimir ticket
-          </ActionChip>
-          <ActionChip
             emoji="🔌"
             onClick={async () => {
               setPrintError(null);
               try {
-                await connectThermalPrinter('usb');
-                await printThermalReceipt(preview, { connectIfNeeded: false });
+                await printThermalReceipt(preview, { kind: 'usb' });
               } catch (err) {
                 setPrintError(describePrinterError(err));
               }
@@ -894,8 +880,7 @@ export function CounterSalePanel({
             onClick={async () => {
               setPrintError(null);
               try {
-                await connectThermalPrinter('ble');
-                await printThermalReceipt(preview, { connectIfNeeded: false });
+                await printThermalReceipt(preview, { kind: 'ble' });
               } catch (err) {
                 setPrintError(describePrinterError(err));
               }
@@ -919,11 +904,9 @@ export function CounterSalePanel({
           </ActionChip>
         </div>
         {printError ? (
-          <p className="text-xs text-rose-700">
-            {printError} Con cable pulsa USB; si no, Bluetooth y elige la térmica.
-          </p>
+          <p className="text-xs text-rose-700">{printError}</p>
         ) : (
-          <p className="text-xs text-slate-500">Con cable: USB. Sin cable: Bluetooth.</p>
+          <p className="text-xs text-slate-500">USB si va por cable. Bluetooth si no.</p>
         )}
       </section>
       {boardFilters ? (

@@ -2,6 +2,7 @@ import {
   encodeEscPos,
   encodeEscPosShoppingList,
   encodeEscPosTest,
+  printReceiptViaWindows,
   type ShoppingListTicketData,
   type ThermalReceiptData,
 } from '@/lib/thermal-ticket';
@@ -115,6 +116,9 @@ export function describePrinterError(error: unknown): string {
     )
   ) {
     return PRINTER_NOT_REACHABLE;
+  }
+  if (/access denied|USBDevice/i.test(message)) {
+    return 'Windows está usando el USB. En la ventana de imprimir elige la térmica; si no la ves, pulsa Ver más.';
   }
   if (/user cancelled|user canceled|chooser/i.test(message)) {
     return 'No se eligió ninguna impresora.';
@@ -683,6 +687,20 @@ export async function connectThermalPrinter(kind: ThermalPrinterKind) {
   }
 }
 
+export function isUsbAccessDenied(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /access denied|USBDevice|usando el USB/i.test(message);
+}
+
+async function fallbackWindowsPrint(data: ThermalReceiptData) {
+  printReceiptViaWindows(data);
+  setStatus(
+    'disconnected',
+    null,
+    'Windows tiene el USB. En la ventana elige la térmica; si no la ves, pulsa Ver más.',
+  );
+}
+
 function isChooserCancel(error: unknown) {
   return (
     (error instanceof DOMException && error.name === 'NotFoundError') ||
@@ -737,18 +755,38 @@ async function ensureConnected(connectIfNeeded: boolean) {
 
 export async function printThermalReceipt(
   data: ThermalReceiptData,
-  options?: { connectIfNeeded?: boolean },
+  options?: { connectIfNeeded?: boolean; kind?: ThermalPrinterKind },
 ) {
   return withPrinterLock(async () => {
-    if (!isHandleLive()) {
-      handle = null;
-      await reconnectThermalPrinter();
-    }
-    if (!isHandleLive() && options?.connectIfNeeded) {
-      if (isWindowsPc()) {
-        await tryConnectKind('usb');
-      } else {
-        await ensureConnected(true);
+    if (options?.kind) {
+      try {
+        await connectThermalPrinter(options.kind);
+      } catch (error) {
+        if (options.kind === 'usb' && isUsbAccessDenied(error)) {
+          fallbackWindowsPrint(data);
+          return;
+        }
+        throw error;
+      }
+    } else {
+      if (!isHandleLive()) {
+        handle = null;
+        await reconnectThermalPrinter();
+      }
+      if (!isHandleLive() && options?.connectIfNeeded) {
+        if (isWindowsPc()) {
+          try {
+            await tryConnectKind('usb');
+          } catch (error) {
+            if (isUsbAccessDenied(error)) {
+              fallbackWindowsPrint(data);
+              return;
+            }
+            throw error;
+          }
+        } else {
+          await ensureConnected(true);
+        }
       }
     }
     if (isHandleLive()) {
