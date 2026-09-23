@@ -2,6 +2,7 @@ import {
   encodeEscPos,
   encodeEscPosShoppingList,
   encodeEscPosTest,
+  printReceiptViaWindows,
   type ShoppingListTicketData,
   type ThermalReceiptData,
 } from '@/lib/thermal-ticket';
@@ -723,6 +724,26 @@ export async function printThermalReceipt(
   options?: { connectIfNeeded?: boolean },
 ) {
   return withPrinterLock(async () => {
+    if (!isHandleLive()) {
+      handle = null;
+      await reconnectThermalPrinter();
+    }
+    if (isHandleLive()) {
+      await writeBytes(await encodeEscPos(data));
+      setStatus('ready', null, `Ticket enviado por ${connectionLabel()}.`);
+      return;
+    }
+    // Chrome Web Bluetooth almost never reaches cheap 58 mm printers on Windows.
+    // The system print dialog can use the USB/POS-58 driver Windows already has.
+    if (isWindowsPc()) {
+      printReceiptViaWindows(data);
+      setStatus(
+        'disconnected',
+        null,
+        'Elige la térmica en la ventana de Windows (a veces se llama POS-58 o USB).',
+      );
+      return;
+    }
     await ensureConnected(Boolean(options?.connectIfNeeded));
     await writeBytes(await encodeEscPos(data));
     setStatus('ready', null, `Ticket enviado por ${connectionLabel()}.`);
