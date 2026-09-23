@@ -110,12 +110,19 @@ export function ThermalPrinterBar() {
         >
           USB
         </button>
+        <button
+          type="button"
+          disabled={busy}
+          className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 disabled:opacity-50"
+          onClick={() => run(() => connectThermalPrinter('serial'))}
+        >
+          COM
+        </button>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        Si en el Bluetooth del Mac ves <strong>BlueTooth Printer</strong> en azul, haz clic para
-        desconectarla: el Mac la está usando y Chrome no puede verla. Luego pulsa{' '}
-        <strong>Conectar Bluetooth</strong>. Con cable, usa <strong>USB</strong> (también desconéctala
-        del Bluetooth del Mac).
+        En una PC, si Windows ya conectó <strong>BlueTooth Printer</strong>, desconéctala o quítala en
+        Configuración → Bluetooth: si no, Chrome no puede usarla. Luego pulsa{' '}
+        <strong>Conectar Bluetooth</strong>. Con cable, usa <strong>USB</strong> o <strong>COM</strong>.
       </p>
       {busy ? <p className="mt-1 text-xs text-slate-500">Enviando a la impresora…</p> : null}
       {info ? <p className="mt-1 text-xs text-emerald-700">{info}</p> : null}

@@ -96,6 +96,28 @@ const BLE_SERVICES = [
   'e7810a71-73ac-4401-b5f5-6eb3e214570d',
 ];
 
+const OS_HOLDS_PRINTER =
+  'Windows ya tiene la impresora. En Configuración → Bluetooth, desconecta o quita BlueTooth Printer. Enciéndela y pulsa Bluetooth, o conéctala por USB.';
+
+export function describePrinterError(error: unknown): string {
+  if (error instanceof DOMException && error.name === 'NotFoundError') {
+    return 'No se eligió ninguna impresora.';
+  }
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (
+    (error instanceof DOMException && error.name === 'NetworkError') ||
+    /connection attempt failed|connection error|gatt server is disconnected|cannot perform gatt|not connected|unknown device|bluetooth adapter not available/i.test(
+      message,
+    )
+  ) {
+    return OS_HOLDS_PRINTER;
+  }
+  if (/user cancelled|user canceled|chooser/i.test(message)) {
+    return 'No se eligió ninguna impresora.';
+  }
+  return message.trim() || 'No se pudo conectar la impresora.';
+}
+
 let handle: Handle | null = null;
 let status: ThermalPrinterStatus = 'disconnected';
 let lastError: string | null = null;
@@ -237,7 +259,7 @@ function connectionLabel() {
   if (!handle) return '';
   if (handle.kind === 'ble') return 'Bluetooth';
   if (handle.kind === 'usb') return 'USB';
-  return 'puerto serie del Mac';
+  return 'COM';
 }
 
 function pumpReadable(port: SerialPortLike) {
@@ -296,7 +318,7 @@ async function closeHandle() {
 }
 
 async function writeSerial(port: SerialPortLike, data: Uint8Array) {
-  if (!port.writable) throw new Error('El puerto serie no está listo. Pulsa Conectar Bluetooth.');
+  if (!port.writable) throw new Error('El puerto COM no está listo. Pulsa COM o USB.');
   if (port.writable.locked) {
     throw new Error('La impresora está ocupada. Espera un segundo y vuelve a intentar.');
   }
@@ -307,7 +329,7 @@ async function writeSerial(port: SerialPortLike, data: Uint8Array) {
       await withTimeout(
         writer.ready.then(() => writer.write(chunk)),
         WRITE_TIMEOUT_MS,
-        'El puerto serie del Mac no entrega datos. Usa Conectar Bluetooth y elige la impresora, no cu.BlueToothPrinter.',
+        'El puerto COM no responde. Prueba USB o Bluetooth.',
       );
     }
     await withTimeout(writer.ready, WRITE_TIMEOUT_MS, 'La impresora no terminó de recibir el ticket.');
@@ -368,7 +390,7 @@ async function reconnectBle(device: BleDevice) {
 async function writeBleReliable(data: Uint8Array) {
   const device = handle?.kind === 'ble' ? handle.device : null;
   if (!device) {
-    throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
+    throw new Error('La impresora no está conectada. Pulsa Bluetooth, USB o COM.');
   }
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -377,7 +399,7 @@ async function writeBleReliable(data: Uint8Array) {
         await reconnectBle(device);
       }
       if (handle?.kind !== 'ble' || handle.device !== device) {
-        throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
+        throw new Error('La impresora no está conectada. Pulsa Bluetooth, USB o COM.');
       }
       await writeBle(handle.characteristic, data);
       return;
@@ -388,10 +410,10 @@ async function writeBleReliable(data: Uint8Array) {
     }
   }
   throw lastError instanceof Error && isGattDisconnectError(lastError)
-    ? new Error('Se perdió el Bluetooth. Pulsa Conectar Bluetooth y vuelve a imprimir.')
+    ? new Error('Se perdió el Bluetooth. Pulsa Bluetooth y vuelve a imprimir.')
     : lastError instanceof Error
       ? lastError
-      : new Error('Se perdió el Bluetooth. Pulsa Conectar Bluetooth y vuelve a imprimir.');
+      : new Error('Se perdió el Bluetooth. Pulsa Bluetooth y vuelve a imprimir.');
 }
 
 async function writeBytes(data: Uint8Array) {
@@ -401,7 +423,7 @@ async function writeBytes(data: Uint8Array) {
   }
   if (!handle || !isHandleLive()) {
     handle = null;
-    throw new Error('La impresora no está conectada. Pulsa Conectar Bluetooth.');
+    throw new Error('La impresora no está conectada. Pulsa Bluetooth, USB o COM.');
   }
   if (handle.kind === 'serial') {
     await writeSerial(handle.port, data);
@@ -423,25 +445,37 @@ async function findWritableCharacteristic(
   );
 }
 
-async function openBle(device: BleDevice) {
+async function connectGatt(device: BleDevice, attempts = 3) {
   if (!device.gatt) {
     throw new Error('Este dispositivo Bluetooth no se puede usar para imprimir desde Chrome.');
   }
-  // Chrome can keep gatt.connected=true after the printer dropped GATT.
-  // Disconnect first so we always get a fresh characteristic.
-  if (device.gatt.connected) {
+  let last: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      device.gatt.disconnect();
-    } catch {
-      // already down
+      // Chrome can keep gatt.connected=true after the printer dropped GATT.
+      if (device.gatt.connected) {
+        try {
+          device.gatt.disconnect();
+        } catch {
+          // already down
+        }
+        await delay(700);
+      }
+      return await withTimeout(
+        device.gatt.connect(),
+        WRITE_TIMEOUT_MS,
+        'Bluetooth no responde al conectar. Acerca la impresora y vuelve a intentar.',
+      );
+    } catch (error) {
+      last = error;
+      await delay(500 * (attempt + 1));
     }
-    await delay(400);
   }
-  const server = await withTimeout(
-    device.gatt.connect(),
-    WRITE_TIMEOUT_MS,
-    'Bluetooth no responde al conectar. Acerca la impresora y vuelve a intentar.',
-  );
+  throw new Error(describePrinterError(last));
+}
+
+async function openBle(device: BleDevice) {
+  const server = await connectGatt(device);
   await delay(250);
   let characteristic: BleCharacteristic | null = null;
 
@@ -476,7 +510,7 @@ async function openBle(device: BleDevice) {
   listenIfPossible(device, 'gattserverdisconnected', () => {
     if (handle?.kind === 'ble' && handle.device === device) {
       handle = null;
-      setStatus('disconnected', 'Se perdió el Bluetooth. Pulsa Conectar Bluetooth.', null);
+      setStatus('disconnected', 'Se perdió el Bluetooth. Pulsa Bluetooth.', null);
     }
   });
   handle = { kind: 'ble', device, characteristic };
@@ -506,7 +540,7 @@ async function openSerial(port: SerialPortLike) {
   setStatus(
     'ready',
     null,
-    'Puerto serie del Mac abierto. Si no imprime, usa Conectar Bluetooth: cu.BlueToothPrinter casi nunca llega a la térmica.',
+    'Puerto COM abierto. Si no imprime, prueba USB o Bluetooth.',
   );
 }
 
@@ -537,7 +571,7 @@ async function openUsb(device: UsbDeviceLike) {
 
   if (endpointNumber == null || interfaceNumber == null) {
     throw new Error(
-      'El Mac está usando la impresora. Quítala de Ajustes → Impresoras y conéctala por Bluetooth o USB aquí.',
+      'Windows está usando el USB. Cierra otros programas de la impresora y vuelve a pulsar USB, o usa Bluetooth / COM.',
     );
   }
 
@@ -560,17 +594,8 @@ export async function reconnectThermalPrinter() {
     }
 
     try {
-      const bluetooth = bluetoothNav();
-      if (bluetooth?.getDevices) {
-        const devices = await bluetooth.getDevices();
-        const remembered = devices.find((device) => device.gatt);
-        if (remembered) {
-          setStatus('connecting', null, null);
-          await openBle(remembered);
-          return;
-        }
-      }
-
+      // Do not auto-connect Bluetooth: a failed GATT attempt (Windows already
+      // holding BlueTooth Printer) often blocks the next click.
       const usb = usbNav();
       if (usb) {
         const devices = await usb.getDevices();
@@ -581,14 +606,20 @@ export async function reconnectThermalPrinter() {
         }
       }
 
+      const serial = serialNav();
+      if (serial) {
+        const ports = await serial.getPorts();
+        if (ports[0]) {
+          setStatus('connecting', null, null);
+          await openSerial(ports[0]);
+          return;
+        }
+      }
+
       setStatus('disconnected', null, null);
     } catch (error) {
       await closeHandle();
-      setStatus(
-        'disconnected',
-        error instanceof Error ? error.message : 'No se pudo reconectar la impresora.',
-        null,
-      );
+      setStatus('disconnected', describePrinterError(error), null);
     }
   })().finally(() => {
     connectTask = null;
@@ -635,15 +666,25 @@ export async function connectThermalPrinter(kind: ThermalPrinterKind) {
     const device = await usbNav()!.requestDevice({ filters: [] });
     await openUsb(device);
   } catch (error) {
-    const message =
-      error instanceof DOMException && error.name === 'NotFoundError'
-        ? 'No se eligió ninguna impresora.'
-        : error instanceof Error
-          ? error.message
-          : 'No se pudo conectar la impresora.';
+    const message = describePrinterError(error);
     await closeHandle();
     setStatus('disconnected', message, null);
     throw new Error(message);
+  }
+}
+
+async function tryRememberedBle() {
+  const bluetooth = bluetoothNav();
+  if (!bluetooth?.getDevices) return;
+  try {
+    const devices = await bluetooth.getDevices();
+    const remembered = devices.find((device) => device.gatt);
+    if (!remembered) return;
+    setStatus('connecting', null, null);
+    await openBle(remembered);
+  } catch {
+    await closeHandle();
+    setStatus('disconnected', null, null);
   }
 }
 
@@ -653,10 +694,15 @@ async function ensureConnected(connectIfNeeded: boolean) {
     await reconnectThermalPrinter();
   }
   if (!isHandleLive() && connectIfNeeded) {
+    await tryRememberedBle();
+  }
+  if (!isHandleLive() && connectIfNeeded) {
     await connectThermalPrinter('ble');
   }
   if (!isHandleLive()) {
-    throw new Error('Pulsa Conectar Bluetooth y elige la impresora (no el puerto cu.).');
+    throw new Error(
+      'Pulsa Bluetooth, USB o COM. Si Windows ya tiene la impresora, desconéctala en Configuración → Bluetooth.',
+    );
   }
 }
 
@@ -688,7 +734,7 @@ export async function printThermalTest(options?: { connectIfNeeded?: boolean }) 
     await writeBytes(encodeEscPosTest());
     const note =
       handle?.kind === 'serial'
-        ? 'Se envió al puerto serie del Mac. Si no salió papel, ese puerto no llega a la térmica: usa Conectar Bluetooth.'
+        ? 'Se envió al puerto COM. Si no salió papel, prueba USB o Bluetooth.'
         : `Prueba enviada por ${connectionLabel()}.`;
     setStatus('ready', null, note);
   });

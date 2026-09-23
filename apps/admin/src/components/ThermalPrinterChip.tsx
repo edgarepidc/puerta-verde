@@ -99,7 +99,8 @@ export function ThermalPrinterChip() {
                   : 'Impresora térmica'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Si el Mac tiene la impresora en azul en Bluetooth, desconéctala ahí primero.
+                En una PC, si Windows ya tiene BlueTooth Printer, desconéctala o quítala en
+                Configuración → Bluetooth. Luego pulsa Bluetooth, o USB / COM si va por cable.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -117,6 +118,14 @@ export function ThermalPrinterChip() {
                   onClick={() => run(() => connectThermalPrinter('usb'))}
                 >
                   USB
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-50"
+                  onClick={() => run(() => connectThermalPrinter('serial'))}
+                >
+                  COM
                 </button>
                 {status === 'ready' ? (
                   <button
