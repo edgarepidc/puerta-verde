@@ -99,8 +99,7 @@ export function ThermalPrinterChip() {
                   : 'Impresora térmica'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Enchufa el cable USB y pulsa USB o Imprimir. En Chrome elige el dispositivo USB de la
-                térmica, no Save as PDF.
+                Con cable pulsa USB. Sin cable, Bluetooth y elige la térmica en Chrome.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button

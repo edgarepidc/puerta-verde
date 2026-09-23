@@ -46,7 +46,7 @@ import {
   type OrderBoardItemPreview,
   type OrderBoardRow,
 } from '@/lib/orders-board';
-import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
+import { connectThermalPrinter, describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import type { ThermalReceiptData } from '@/lib/thermal-ticket';
 
 function roundMoney(amount: number): number {
@@ -1491,6 +1491,40 @@ export function OrdersBoard({
                     }}
                   >
                     Imprimir
+                  </ActionChip>
+                  <ActionChip
+                    emoji="🔌"
+                    disabled={detailLoading || detailSaving}
+                    onClick={async () => {
+                      setPrintError(null);
+                      try {
+                        await connectThermalPrinter('usb');
+                        await printThermalReceipt(ticketFromOrder(selected, detailItems), {
+                          connectIfNeeded: false,
+                        });
+                      } catch (err) {
+                        setPrintError(describePrinterError(err));
+                      }
+                    }}
+                  >
+                    USB
+                  </ActionChip>
+                  <ActionChip
+                    emoji="📶"
+                    disabled={detailLoading || detailSaving}
+                    onClick={async () => {
+                      setPrintError(null);
+                      try {
+                        await connectThermalPrinter('ble');
+                        await printThermalReceipt(ticketFromOrder(selected, detailItems), {
+                          connectIfNeeded: false,
+                        });
+                      } catch (err) {
+                        setPrintError(describePrinterError(err));
+                      }
+                    }}
+                  >
+                    Bluetooth
                   </ActionChip>
                   <a
                     href={whatsappTicketHref(

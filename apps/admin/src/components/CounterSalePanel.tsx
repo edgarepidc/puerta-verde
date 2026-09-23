@@ -38,7 +38,7 @@ import {
 } from '@/components/ThermalReceipt';
 
 import { todayMexicoYmd } from '@/lib/mexico-date';
-import { describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
+import { connectThermalPrinter, describePrinterError, printThermalReceipt } from '@/lib/thermal-printer';
 import { TICKET_FOOTER } from '@/lib/thermal-ticket';
 
 export interface CounterProduct {
@@ -875,6 +875,34 @@ export function CounterSalePanel({
           >
             Imprimir ticket
           </ActionChip>
+          <ActionChip
+            emoji="🔌"
+            onClick={async () => {
+              setPrintError(null);
+              try {
+                await connectThermalPrinter('usb');
+                await printThermalReceipt(preview, { connectIfNeeded: false });
+              } catch (err) {
+                setPrintError(describePrinterError(err));
+              }
+            }}
+          >
+            USB
+          </ActionChip>
+          <ActionChip
+            emoji="📶"
+            onClick={async () => {
+              setPrintError(null);
+              try {
+                await connectThermalPrinter('ble');
+                await printThermalReceipt(preview, { connectIfNeeded: false });
+              } catch (err) {
+                setPrintError(describePrinterError(err));
+              }
+            }}
+          >
+            Bluetooth
+          </ActionChip>
           <a
             className="rounded-full border border-slate-300 px-4 py-2 text-sm"
             href={whatsappTicketHref(receipt.order.customer_phone, receipt.ticketText)}
@@ -890,7 +918,13 @@ export function CounterSalePanel({
             Nueva venta
           </ActionChip>
         </div>
-        {printError ? <p className="text-xs text-rose-700">{printError}</p> : null}
+        {printError ? (
+          <p className="text-xs text-rose-700">
+            {printError} Con cable pulsa USB; si no, Bluetooth y elige la térmica.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">Con cable: USB. Sin cable: Bluetooth.</p>
+        )}
       </section>
       {boardFilters ? (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>

@@ -696,7 +696,7 @@ async function tryConnectKind(kind: ThermalPrinterKind) {
     return isHandleLive();
   } catch (error) {
     if (isChooserCancel(error)) return false;
-    return isHandleLive();
+    throw error;
   }
 }
 
@@ -747,8 +747,6 @@ export async function printThermalReceipt(
     if (!isHandleLive() && options?.connectIfNeeded) {
       if (isWindowsPc()) {
         await tryConnectKind('usb');
-        if (!isHandleLive()) await tryConnectKind('serial');
-        if (!isHandleLive()) await tryConnectKind('ble');
       } else {
         await ensureConnected(true);
       }
@@ -758,9 +756,7 @@ export async function printThermalReceipt(
       setStatus('ready', null, `Ticket enviado por ${connectionLabel()}.`);
       return;
     }
-    throw new Error(
-      'Enchufa el cable USB, pulsa Imprimir y en Chrome elige el dispositivo USB de la térmica. No aparece en Save as PDF ni OneNote.',
-    );
+    throw new Error('Pulsa USB (cable) o Bluetooth y elige la térmica en Chrome.');
   });
 }
 
