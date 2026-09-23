@@ -16,7 +16,7 @@ import { LowStockBanner } from '@/components/LowStockBanner';
 import { ThermalPrinterChip } from '@/components/ThermalPrinterChip';
 import { useThermalPrinter } from '@/components/ThermalPrinterBar';
 import { describePrinterError, getThermalPrinterStatus, printThermalShoppingList } from '@/lib/thermal-printer';
-import type { ShoppingListItem } from '@/lib/thermal-ticket';
+import { openPrintWindow, type ShoppingListItem } from '@/lib/thermal-ticket';
 
 interface ForecastRow {
   branch_product_id: string;
@@ -116,12 +116,8 @@ function printBrowserList(opts: {
   <p>${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })} · Horizonte ${opts.horizonDays} días</p>
   <table><thead><tr><th>Producto</th><th>Hay</th><th>Comprar</th></tr></thead>
   <tbody>${rows || '<tr><td colspan="3">Sin artículos</td></tr>'}</tbody></table>
-  <script>window.onload=()=>{window.print();}</script>
 </body></html>`;
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=720,height=900');
-  if (!win) throw new Error('Permite ventanas emergentes para imprimir.');
-  win.document.write(html);
-  win.document.close();
+  openPrintWindow(html, 'width=720,height=900');
 }
 
 function escapeHtml(value: string) {

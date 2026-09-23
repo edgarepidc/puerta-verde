@@ -390,10 +390,33 @@ export function printReceiptViaWindows(data: ThermalReceiptData) {
   <p class="thanks">¡Gracias por tu compra!</p>
   <p class="footer">${escapeHtml(TICKET_FOOTER)}</p>
 </article>
-<script>window.onload=function(){window.print();}</script>
 </body></html>`;
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=420,height=800');
+  openPrintWindow(html, 'width=420,height=800');
+}
+
+export function openPrintWindow(html: string, features = 'width=420,height=800') {
+  const win = window.open('', '_blank', features);
   if (!win) throw new Error('Permite ventanas emergentes para imprimir, o usa USB.');
+  win.document.open();
   win.document.write(html);
   win.document.close();
+  win.focus();
+  let printed = false;
+  const print = () => {
+    if (printed) return;
+    printed = true;
+    try {
+      win.print();
+    } catch {
+      // window closed
+    }
+  };
+  const img = win.document.querySelector('img');
+  if (img && !img.complete) {
+    img.addEventListener('load', print);
+    img.addEventListener('error', print);
+    win.setTimeout(print, 1200);
+  } else {
+    win.setTimeout(print, 200);
+  }
 }
