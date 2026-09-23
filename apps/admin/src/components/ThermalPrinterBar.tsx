@@ -88,9 +88,17 @@ export function ThermalPrinterBar() {
           type="button"
           disabled={busy}
           className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+          onClick={() => run(() => connectThermalPrinter('usb'))}
+        >
+          USB
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 disabled:opacity-50"
           onClick={() => run(() => connectThermalPrinter('ble'))}
         >
-          Conectar Bluetooth
+          Bluetooth
         </button>
         {status === 'ready' ? (
           <button
@@ -106,23 +114,14 @@ export function ThermalPrinterBar() {
           type="button"
           disabled={busy}
           className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 disabled:opacity-50"
-          onClick={() => run(() => connectThermalPrinter('usb'))}
-        >
-          USB
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 disabled:opacity-50"
           onClick={() => run(() => connectThermalPrinter('serial'))}
         >
           COM
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        En una PC, si Windows ya conectó <strong>BlueTooth Printer</strong>, desconéctala o quítala en
-        Configuración → Bluetooth: si no, Chrome no puede usarla. Luego pulsa{' '}
-        <strong>Conectar Bluetooth</strong>. Con cable, usa <strong>USB</strong> o <strong>COM</strong>.
+        No la busques en el Bluetooth de Windows. Enciende la térmica y pulsa <strong>USB</strong> si
+        va por cable, o <strong>Bluetooth</strong> y elígela en la ventana de Chrome.
       </p>
       {busy ? <p className="mt-1 text-xs text-slate-500">Enviando a la impresora…</p> : null}
       {info ? <p className="mt-1 text-xs text-emerald-700">{info}</p> : null}

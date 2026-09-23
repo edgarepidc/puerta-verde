@@ -99,25 +99,25 @@ export function ThermalPrinterChip() {
                   : 'Impresora térmica'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                En una PC, si Windows ya tiene BlueTooth Printer, desconéctala o quítala en
-                Configuración → Bluetooth. Luego pulsa Bluetooth, o USB / COM si va por cable.
+                No la busques en el Bluetooth de Windows. Enciende la térmica y pulsa USB si va por
+                cable, o Bluetooth y elígela en la ventana de Chrome.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={busy}
                   className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                  onClick={() => run(() => connectThermalPrinter('ble'))}
+                  onClick={() => run(() => connectThermalPrinter('usb'))}
                 >
-                  Bluetooth
+                  USB
                 </button>
                 <button
                   type="button"
                   disabled={busy}
                   className="rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700 disabled:opacity-50"
-                  onClick={() => run(() => connectThermalPrinter('usb'))}
+                  onClick={() => run(() => connectThermalPrinter('ble'))}
                 >
-                  USB
+                  Bluetooth
                 </button>
                 <button
                   type="button"
