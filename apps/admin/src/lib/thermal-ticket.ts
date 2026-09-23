@@ -325,3 +325,75 @@ export function encodeEscPosTest(): Uint8Array {
   out.push(GS, 0x56, 0x41, 0x10);
   return Uint8Array.from(out);
 }
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Windows PCs print through the system dialog (POS-58 / USB), not Chrome Web Bluetooth. */
+export function printReceiptViaWindows(data: ThermalReceiptData) {
+  const storeName = data.storeName?.trim() || BRAND_NAME;
+  const soldAt = formatSoldAt(data.soldAt);
+  const method = paymentLabel(data.paymentMethod, data.paymentSplits);
+  const showPhone = Boolean(data.customerPhone) && !isWalkInPhone(data.customerPhone ?? '');
+  const origin = window.location.origin;
+  const items = data.items
+    .map((item) => {
+      return `<li>
+        <span class="name">${escapeHtml(item.product_name)}</span>
+        <span class="row"><span>${escapeHtml(quantityLabel(item))}</span><span>${escapeHtml(formatMoney(Number(item.line_total)))}</span></span>
+      </li>`;
+    })
+    .join('');
+  const cash =
+    (data.paymentMethod === 'cash' ||
+      parsePaymentSplits(data.paymentSplits).some((split) => split.method === 'cash')) &&
+    data.amountReceived != null
+      ? `<p class="total"><span>Recibido</span><span>${escapeHtml(formatMoney(Number(data.amountReceived)))}</span></p>
+         <p class="total"><span>Cambio</span><span>${escapeHtml(formatMoney(Number(data.changeDue ?? 0)))}</span></p>`
+      : '';
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Ticket #${data.orderNumber}</title>
+<style>
+  @page { size: 58mm auto; margin: 0; }
+  html,body { margin: 0; padding: 0; }
+  body { width: 58mm; color: #000; font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.3; }
+  article { padding: 3mm 3mm 8mm; }
+  .head, .customer, .thanks, .footer { text-align: center; }
+  img { display: block; width: 26mm; height: auto; margin: 0 auto 8px; }
+  p { margin: 0; }
+  .rule { border-top: 1px dashed #000; margin: 6px 0; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li + li { margin-top: 5px; }
+  .name { display: block; font-weight: 700; }
+  .row, .total { display: flex; justify-content: space-between; gap: 8px; }
+  .total { font-weight: 700; font-size: 12px; }
+  .thanks { margin-top: 8px; }
+  .footer { margin-top: 6px; font-size: 10px; }
+</style></head><body><article>
+  <header class="head">
+    <img src="${origin}/brand/logo.png" alt="${escapeHtml(BRAND_NAME)}"/>
+    ${storeName !== BRAND_NAME ? `<p>${escapeHtml(storeName)}</p>` : ''}
+    <p>Ticket #${data.orderNumber}</p>
+    ${soldAt ? `<p>${escapeHtml(soldAt)}</p>` : ''}
+  </header>
+  <p class="customer">${escapeHtml(data.customerName)}${showPhone ? ` · ${escapeHtml(data.customerPhone ?? '')}` : ''}</p>
+  <div class="rule"></div>
+  <ul>${items || '<li>(sin partidas)</li>'}</ul>
+  <div class="rule"></div>
+  <p class="total"><span>TOTAL</span><span>${escapeHtml(formatMoney(Number(data.total)))}</span></p>
+  ${method ? `<p class="total"><span>Forma de pago</span><span>${escapeHtml(method)}</span></p>` : ''}
+  ${cash}
+  <p class="thanks">¡Gracias por tu compra!</p>
+  <p class="footer">${escapeHtml(TICKET_FOOTER)}</p>
+</article>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`;
+  const win = window.open('', '_blank', 'noopener,noreferrer,width=420,height=800');
+  if (!win) throw new Error('Permite ventanas emergentes para imprimir, o usa USB.');
+  win.document.write(html);
+  win.document.close();
+}
