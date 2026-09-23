@@ -152,48 +152,47 @@ function wrap(text: string, width = TICKET_WIDTH): string[] {
   return lines.length ? lines : [''];
 }
 
-export function buildReceiptText(data: ThermalReceiptData): string {
+export function buildReceiptText(data: ThermalReceiptData, width = TICKET_WIDTH): string {
   const storeName = data.storeName?.trim() || BRAND_NAME;
   const showPhone = Boolean(data.customerPhone) && !isWalkInPhone(data.customerPhone ?? '');
   const method = paymentLabel(data.paymentMethod, data.paymentSplits);
   const soldAt = formatSoldAt(data.soldAt);
   const lines: string[] = [];
-  const rule = '-'.repeat(TICKET_WIDTH);
+  const rule = '-'.repeat(width);
 
-  lines.push(padCenter(BRAND_NAME.toUpperCase()));
-  if (storeName !== BRAND_NAME) lines.push(padCenter(storeName));
-  lines.push(padCenter(`Ticket #${data.orderNumber}`));
-  if (soldAt) lines.push(padCenter(soldAt));
+  if (storeName !== BRAND_NAME) lines.push(padCenter(storeName, width));
+  lines.push(padCenter(`Ticket #${data.orderNumber}`, width));
+  if (soldAt) lines.push(padCenter(soldAt, width));
   lines.push('');
   const customer = showPhone ? `${data.customerName} - ${data.customerPhone}` : data.customerName;
-  for (const line of wrap(customer)) lines.push(padCenter(line));
+  for (const line of wrap(customer, width)) lines.push(padCenter(line, width));
   lines.push(rule);
 
   if (data.items.length === 0) {
     lines.push('(sin partidas)');
   } else {
     for (const item of data.items) {
-      for (const line of wrap(item.product_name)) lines.push(line);
-      lines.push(columns(`  ${quantityLabel(item)}`, formatMoney(Number(item.line_total))));
+      for (const line of wrap(item.product_name, width)) lines.push(line);
+      lines.push(columns(`  ${quantityLabel(item)}`, formatMoney(Number(item.line_total)), width));
     }
   }
 
   lines.push(rule);
-  lines.push(columns('TOTAL', formatMoney(Number(data.total))));
-  if (method) lines.push(columns('Forma de pago', method));
+  lines.push(columns('TOTAL', formatMoney(Number(data.total)), width));
+  if (method) lines.push(columns('Forma de pago', method, width));
   if (
     (data.paymentMethod === 'cash' ||
       parsePaymentSplits(data.paymentSplits).some((split) => split.method === 'cash')) &&
     data.amountReceived != null &&
     Number.isFinite(Number(data.amountReceived))
   ) {
-    lines.push(columns('Recibido', formatMoney(Number(data.amountReceived))));
-    lines.push(columns('Cambio', formatMoney(Number(data.changeDue ?? 0))));
+    lines.push(columns('Recibido', formatMoney(Number(data.amountReceived)), width));
+    lines.push(columns('Cambio', formatMoney(Number(data.changeDue ?? 0)), width));
   }
   lines.push('');
-  lines.push(padCenter('Gracias por tu compra!'));
+  lines.push(padCenter('Gracias por tu compra!', width));
   lines.push('');
-  for (const line of wrap(TICKET_FOOTER)) lines.push(padCenter(line));
+  for (const line of wrap(TICKET_FOOTER, width)) lines.push(padCenter(line, width));
   lines.push('', '', '');
   return lines.join('\n');
 }
@@ -380,17 +379,27 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-/** Windows PCs print 32-character text so POS-58 drivers do not clip prices or dump GPD junk. */
+/** Windows PCs print 30-character text plus a small logo so POS-58 keeps prices on the roll. */
 export function printReceiptViaWindows(data: ThermalReceiptData) {
-  const body = escapeHtml(buildReceiptText(data));
+  const width = 30;
+  const body = escapeHtml(buildReceiptText(data, width));
+  const origin = window.location.origin;
   const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Ticket #${data.orderNumber}</title>
 <style>
   @page { size: 58mm auto; margin: 0; }
   html, body { margin: 0; padding: 0; width: 58mm; background: #fff; color: #000; }
+  .logo {
+    display: block;
+    width: 22mm;
+    height: auto;
+    margin: 2mm auto 1mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   pre {
     margin: 0;
-    padding: 2mm 1.5mm 8mm;
-    width: 32ch;
+    padding: 0 1.5mm 8mm;
+    width: ${width}ch;
     max-width: 58mm;
     box-sizing: border-box;
     font-family: "Consolas", "Courier New", monospace;
@@ -400,7 +409,10 @@ export function printReceiptViaWindows(data: ThermalReceiptData) {
     white-space: pre;
     overflow: hidden;
   }
-</style></head><body><pre>${body}</pre></body></html>`;
+</style></head><body>
+  <img class="logo" src="${origin}/brand/logo.png" alt="Puerta Verde"/>
+  <pre>${body}</pre>
+</body></html>`;
   openPrintWindow(html, 'width=280,height=700');
 }
 
