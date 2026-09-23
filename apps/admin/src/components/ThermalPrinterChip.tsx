@@ -99,8 +99,8 @@ export function ThermalPrinterChip() {
                   : 'Impresora térmica'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                En una PC, Imprimir abre la ventana de Windows: elige la térmica (POS-58 o USB).
-                Bluetooth de Chrome casi no funciona en Windows.
+                Enchufa el cable USB y pulsa USB o Imprimir. En Chrome elige el dispositivo USB de la
+                térmica, no Save as PDF.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button

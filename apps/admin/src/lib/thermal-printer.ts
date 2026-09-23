@@ -2,7 +2,6 @@ import {
   encodeEscPos,
   encodeEscPosShoppingList,
   encodeEscPosTest,
-  printReceiptViaWindows,
   type ShoppingListTicketData,
   type ThermalReceiptData,
 } from '@/lib/thermal-ticket';
@@ -684,6 +683,23 @@ export async function connectThermalPrinter(kind: ThermalPrinterKind) {
   }
 }
 
+function isChooserCancel(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === 'NotFoundError') ||
+    /no se eligió/i.test(describePrinterError(error))
+  );
+}
+
+async function tryConnectKind(kind: ThermalPrinterKind) {
+  try {
+    await connectThermalPrinter(kind);
+    return isHandleLive();
+  } catch (error) {
+    if (isChooserCancel(error)) return false;
+    return isHandleLive();
+  }
+}
+
 async function tryRememberedBle() {
   // Windows often keeps a permission without the printer advertising, then GATT fails.
   if (isWindowsPc()) return;
@@ -728,25 +744,23 @@ export async function printThermalReceipt(
       handle = null;
       await reconnectThermalPrinter();
     }
+    if (!isHandleLive() && options?.connectIfNeeded) {
+      if (isWindowsPc()) {
+        await tryConnectKind('usb');
+        if (!isHandleLive()) await tryConnectKind('serial');
+        if (!isHandleLive()) await tryConnectKind('ble');
+      } else {
+        await ensureConnected(true);
+      }
+    }
     if (isHandleLive()) {
       await writeBytes(await encodeEscPos(data));
       setStatus('ready', null, `Ticket enviado por ${connectionLabel()}.`);
       return;
     }
-    // Chrome Web Bluetooth almost never reaches cheap 58 mm printers on Windows.
-    // The system print dialog can use the USB/POS-58 driver Windows already has.
-    if (isWindowsPc()) {
-      printReceiptViaWindows(data);
-      setStatus(
-        'disconnected',
-        null,
-        'Elige la térmica en la ventana de Windows (a veces se llama POS-58 o USB).',
-      );
-      return;
-    }
-    await ensureConnected(Boolean(options?.connectIfNeeded));
-    await writeBytes(await encodeEscPos(data));
-    setStatus('ready', null, `Ticket enviado por ${connectionLabel()}.`);
+    throw new Error(
+      'Enchufa el cable USB, pulsa Imprimir y en Chrome elige el dispositivo USB de la térmica. No aparece en Save as PDF ni OneNote.',
+    );
   });
 }
 
