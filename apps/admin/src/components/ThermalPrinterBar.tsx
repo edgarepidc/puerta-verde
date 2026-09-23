@@ -120,8 +120,8 @@ export function ThermalPrinterBar() {
         </button>
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        En una PC, <strong>Imprimir</strong> abre la ventana de Windows: elige la térmica (POS-58 o
-        USB). Bluetooth de Chrome casi no funciona en Windows.
+        Enchufa el cable USB y pulsa <strong>USB</strong> o <strong>Imprimir</strong>. En Chrome
+        elige el dispositivo USB de la térmica, no Save as PDF.
       </p>
       {busy ? <p className="mt-1 text-xs text-slate-500">Enviando a la impresora…</p> : null}
       {info ? <p className="mt-1 text-xs text-emerald-700">{info}</p> : null}
