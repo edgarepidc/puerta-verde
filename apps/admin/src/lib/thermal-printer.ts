@@ -96,8 +96,12 @@ const BLE_SERVICES = [
   'e7810a71-73ac-4401-b5f5-6eb3e214570d',
 ];
 
-const OS_HOLDS_PRINTER =
-  'Windows ya tiene la impresora. En Configuración → Bluetooth, desconecta o quita BlueTooth Printer. Enciéndela y pulsa Bluetooth, o conéctala por USB.';
+const PRINTER_NOT_REACHABLE =
+  'La impresora no respondió. Enciéndela, acércala a la PC y pulsa USB si va por cable. Si es Bluetooth, pulsa Bluetooth y elige la térmica en la ventana de Chrome (no aparece en el Bluetooth de Windows).';
+
+export function isWindowsPc() {
+  return typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
+}
 
 export function describePrinterError(error: unknown): string {
   if (error instanceof DOMException && error.name === 'NotFoundError') {
@@ -110,7 +114,7 @@ export function describePrinterError(error: unknown): string {
       message,
     )
   ) {
-    return OS_HOLDS_PRINTER;
+    return PRINTER_NOT_REACHABLE;
   }
   if (/user cancelled|user canceled|chooser/i.test(message)) {
     return 'No se eligió ninguna impresora.';
@@ -643,18 +647,24 @@ export async function connectThermalPrinter(kind: ThermalPrinterKind) {
     await closeHandle();
     if (kind === 'ble') {
       const bluetooth = bluetoothNav()!;
-      const device = await bluetooth.requestDevice({
-        filters: [
-          { namePrefix: 'BlueTooth' },
-          { namePrefix: 'Bluetooth' },
-          { namePrefix: 'Printer' },
-          { namePrefix: 'POS' },
-          { namePrefix: 'MTP' },
-          { namePrefix: 'BT' },
-          { namePrefix: 'XP' },
-        ],
-        optionalServices: BLE_SERVICES,
-      });
+      const device = await bluetooth.requestDevice(
+        isWindowsPc()
+          ? { acceptAllDevices: true, optionalServices: BLE_SERVICES }
+          : {
+              filters: [
+                { namePrefix: 'BlueTooth' },
+                { namePrefix: 'Bluetooth' },
+                { namePrefix: 'Printer' },
+                { namePrefix: 'POS' },
+                { namePrefix: 'MTP' },
+                { namePrefix: 'BT' },
+                { namePrefix: 'XP' },
+                { namePrefix: 'RPP' },
+                { namePrefix: 'Gprinter' },
+              ],
+              optionalServices: BLE_SERVICES,
+            },
+      );
       await openBle(device);
       return;
     }
@@ -674,6 +684,8 @@ export async function connectThermalPrinter(kind: ThermalPrinterKind) {
 }
 
 async function tryRememberedBle() {
+  // Windows often keeps a permission without the printer advertising, then GATT fails.
+  if (isWindowsPc()) return;
   const bluetooth = bluetoothNav();
   if (!bluetooth?.getDevices) return;
   try {
@@ -701,7 +713,7 @@ async function ensureConnected(connectIfNeeded: boolean) {
   }
   if (!isHandleLive()) {
     throw new Error(
-      'Pulsa Bluetooth, USB o COM. Si Windows ya tiene la impresora, desconéctala en Configuración → Bluetooth.',
+      'Pulsa USB (cable) o Bluetooth. La térmica no se conecta desde el Bluetooth de Windows: elígela en la ventana de Chrome.',
     );
   }
 }
