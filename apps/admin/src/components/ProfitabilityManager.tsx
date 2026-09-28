@@ -137,6 +137,16 @@ const emptyCost: OperatingCostInput = {
   chargeDay: 1,
 };
 
+const OPERATING_COST_CATEGORY_BAR: Record<
+  OperatingCostCategory,
+  { emoji: string; color: string }
+> = {
+  rent: { emoji: '🏠', color: 'bg-slate-400' },
+  payroll: { emoji: '👥', color: 'bg-violet-400' },
+  fixed: { emoji: '💡', color: 'bg-emerald-500' },
+  variable: { emoji: '🛍️', color: 'bg-orange-400' },
+};
+
 function CostCategoryField({
   value,
   onChange,
@@ -830,31 +840,35 @@ export function ProfitabilityManager({
 
   const costBreakdown = useMemo(() => {
     const purchases = purchasesTotal;
-    const fixed = Number(summary?.fixed_costs ?? 0);
     const visit = Number(summary?.visit_expenses ?? 0);
-    const variableTotal = Number(summary?.variable_costs ?? 0);
-    const configuredVariable = Math.max(variableTotal - visit, 0);
-    const total = purchases + fixed + configuredVariable + visit;
+    const listed = costs.filter((row) => costAppliesToRange(row.terms, from, to));
+    const categorySegs = groupOperatingCostsByCategory(listed, costCategoryOf)
+      .map((group) => {
+        const amount = group.items.reduce((sum, row) => sum + chargedCostAmount(row, from, to), 0);
+        const style = OPERATING_COST_CATEGORY_BAR[group.category];
+        return {
+          key: group.category,
+          label: group.label,
+          emoji: style.emoji,
+          amount,
+          color: style.color,
+        };
+      })
+      .filter((seg) => seg.amount > 0);
     const segments = [
       { key: 'purchases', label: 'Compras', emoji: '🛒', amount: purchases, color: 'bg-amber-400' },
-      { key: 'fixed', label: 'Renta y nómina', emoji: '🏠', amount: fixed, color: 'bg-slate-400' },
-      {
-        key: 'variable',
-        label: 'Otros gastos',
-        emoji: '🛍️',
-        amount: configuredVariable,
-        color: 'bg-orange-400',
-      },
+      ...categorySegs,
       { key: 'visit', label: 'Gastos de visita', emoji: '🛻', amount: visit, color: 'bg-sky-400' },
-    ].filter((s) => s.amount > 0);
+    ].filter((seg) => seg.amount > 0);
+    const total = segments.reduce((sum, seg) => sum + seg.amount, 0);
     return {
       total,
-      segments: segments.map((s) => ({
-        ...s,
-        percent: total > 0 ? (s.amount / total) * 100 : 0,
+      segments: segments.map((seg) => ({
+        ...seg,
+        percent: total > 0 ? (seg.amount / total) * 100 : 0,
       })),
     };
-  }, [summary, purchasesTotal]);
+  }, [summary, purchasesTotal, costs, from, to]);
 
   async function applyTrends(payload: {
     series?: TrendPoint[];
@@ -1586,7 +1600,7 @@ export function ProfitabilityManager({
       >
         <FoldableSummary
           title="Gastos del mes"
-          hint="Compras, renta y visita. El costo de lo vendido está arriba."
+          hint="Compras, local y visita. El costo de lo vendido está arriba."
           emoji="🧾"
           iconClass="bg-amber-100"
         />
@@ -1622,41 +1636,22 @@ export function ProfitabilityManager({
               ))}
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3">
-              {(['purchases', 'fixed', 'visit'] as const).map((key) => {
-                const seg = costBreakdown.segments.find((s) => s.key === key) ?? {
-                  key,
-                  label: key === 'purchases' ? 'Compras' : key === 'fixed' ? 'Renta y nómina' : 'Gastos de visita',
-                  emoji: key === 'purchases' ? '🛒' : key === 'fixed' ? '🏠' : '🛻',
-                  amount: 0,
-                  color: key === 'purchases' ? 'bg-amber-400' : key === 'fixed' ? 'bg-slate-400' : 'bg-sky-400',
-                  percent: 0,
-                };
-                return (
-                  <div key={key} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
-                    <p className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${seg.color}`} aria-hidden />
-                        <span aria-hidden>{seg.emoji}</span>
-                        {seg.label}
-                      </span>
-                      <span className="shrink-0 text-sm font-bold normal-case tracking-normal text-slate-900">
-                        {formatMoney(seg.amount)}
-                      </span>
-                    </p>
-                  </div>
-                );
-              })}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {costBreakdown.segments.map((seg) => (
+                <div key={seg.key} className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                  <p className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${seg.color}`} aria-hidden />
+                      <span aria-hidden>{seg.emoji}</span>
+                      <span className="truncate">{seg.label}</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-bold normal-case tracking-normal text-slate-900">
+                      {formatMoney(seg.amount)}
+                    </span>
+                  </p>
+                </div>
+              ))}
             </div>
-
-            {costBreakdown.segments.some((s) => s.key === 'variable') && (
-              <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="inline-block h-2 w-2 rounded-full bg-orange-400" aria-hidden />
-                + Otros gastos{' '}
-                {formatMoney(costBreakdown.segments.find((s) => s.key === 'variable')!.amount)} (
-                {costBreakdown.segments.find((s) => s.key === 'variable')!.percent.toFixed(0)}%)
-              </p>
-            )}
           </div>
         ) : null}
 
