@@ -237,6 +237,17 @@ export {
 } from './promotions';
 
 export {
+  CLEARANCE_PACK_DEFAULT_TITLE,
+  CLEARANCE_PACK_DRAFT_KEY,
+  validateAssembleClearancePack,
+  formatClearancePackPromoBody,
+  buildVisitStoreBroadcastMessage,
+  type AssembleClearancePackInput,
+  type ClearancePackDraftItem,
+  type ClearancePackItemInput,
+} from './clearance-packs';
+
+export {
   COUPON_DISCOUNT_TYPES,
   COUPON_DISCOUNT_TYPE_LABELS,
   normalizeCouponCode,

@@ -31,6 +31,7 @@ import { ForecastManager } from '@/components/ForecastManager';
 import { LowStockThresholdsManager } from '@/components/LowStockThresholdsManager';
 import { MarketComparePanel } from '@/components/MarketComparePanel';
 import { StockMovementHistory, type StockMovementRow } from '@/components/StockMovementHistory';
+import { writeClearancePackDraft } from '@/lib/clearance-pack-draft';
 import { uploadProductMedia } from '@/lib/upload-image';
 
 interface Category {
@@ -1128,6 +1129,33 @@ export function ProductsManager({
                   ) : null}
                   {stockError ? <p className="text-sm text-red-600">{stockError}</p> : null}
                   <div className="flex flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <ActionChip
+                        size="lg"
+                        tone="amber"
+                        emoji="🧺"
+                        disabled={stockSaving}
+                        onClick={() => {
+                          const waste = parseDecimal(wasteText);
+                          if (hasWasteQty && waste > 0 && stockRemaining >= 0 && stockCountDelta === 0) {
+                            writeClearancePackDraft([
+                              {
+                                branchProductId: stockRow.id,
+                                name: stockRow.product.name,
+                                unit: stockRow.product.unit,
+                                quantity: waste,
+                              },
+                            ]);
+                          }
+                          window.location.assign('/?paquete=1');
+                        }}
+                      >
+                        En vez de tirar, armar paquete
+                      </ActionChip>
+                      <p className="max-w-[16rem] text-xs text-slate-500">
+                        Convierte lo que pesaste en bolsas a precio fijo, en Caja.
+                      </p>
+                    </div>
                     <div className="space-y-1">
                       <ActionChip
                         size="lg"

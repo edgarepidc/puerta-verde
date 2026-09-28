@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
+import { buildVisitStoreBroadcastMessage } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
-import { sendTextMessage } from '@puertaverde/whatsapp';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
+import { broadcastTextToOptInCustomers } from '@/lib/whatsapp-broadcast';
 
 function buildPromoBroadcastMessage(input: {
   title: string;
@@ -39,7 +40,7 @@ export async function POST(
 
   const { data: promo, error } = await supabase
     .from('promotions')
-    .select('id, title, body, discount_percent, branch_id, is_active')
+    .select('id, title, body, discount_percent, kind, branch_id, is_active')
     .eq('id', id)
     .maybeSingle();
 
@@ -51,66 +52,37 @@ export async function POST(
     return NextResponse.json({ error: 'Promoción de otra sucursal' }, { status: 403 });
   }
 
-  const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!whatsappToken || !phoneNumberId) {
-    return NextResponse.json(
-      { error: 'WhatsApp no está configurado. Agrega las variables de entorno primero.' },
-      { status: 400 },
-    );
-  }
-
-  const { data: customers } = await supabase
-    .from('customers')
-    .select('phone')
-    .eq('organization_id', auth.organizationId)
-    .eq('whatsapp_opt_in', true)
-    .limit(100);
-
-  const phones = [...new Set((customers ?? []).map((row: { phone: string }) => row.phone))];
-  if (phones.length === 0) {
-    return NextResponse.json(
-      { error: 'No hay clientes suscritos a WhatsApp para enviar la promo.' },
-      { status: 400 },
-    );
-  }
+  const { data: pack } = await supabase
+    .from('clearance_packs')
+    .select('id')
+    .eq('promotion_id', promo.id)
+    .maybeSingle();
 
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app';
-  const message = buildPromoBroadcastMessage({
-    title: promo.title,
-    body: promo.body,
-    discountPercent: promo.discount_percent ? Number(promo.discount_percent) : null,
-    storeUrl: `${webUrl}/${auth.branchSlug}`,
+  const message = pack
+    ? buildVisitStoreBroadcastMessage({
+        title: promo.title,
+        body: promo.body,
+        branchName: auth.branchName,
+      })
+    : buildPromoBroadcastMessage({
+        title: promo.title,
+        body: promo.body,
+        discountPercent: promo.discount_percent ? Number(promo.discount_percent) : null,
+        storeUrl: `${webUrl}/${auth.branchSlug}`,
+      });
+
+  const result = await broadcastTextToOptInCustomers({
+    organizationId: auth.organizationId,
+    body: message,
+    templateKey: 'promo_broadcast',
   });
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const phone of phones) {
-    const result = await sendTextMessage(
-      { phoneNumberId, accessToken: whatsappToken },
-      { to: phone, body: message },
-    );
-
-    await supabase.from('whatsapp_message_logs').insert({
-      organization_id: auth.organizationId,
-      recipient_phone: phone,
-      template_key: 'promo_broadcast',
-      body: message,
-      external_message_id: result.messageId ?? null,
-      status: result.ok ? 'sent' : 'failed',
-      error_message: result.error ?? null,
-      direction: 'outbound',
-    });
-
-    if (result.ok) sent += 1;
-    else failed += 1;
+  if ('error' in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
   return NextResponse.json({
     ok: true,
-    audience: phones.length,
-    sent,
-    failed,
+    ...result,
   });
 }

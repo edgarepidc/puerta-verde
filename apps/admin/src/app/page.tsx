@@ -47,7 +47,7 @@ export default async function AdminHomePage({
     supabase
       .from('branch_products')
       .select(
-        'id, price, stock, piece_stock, min_stock, product:products ( id, name, unit, sku, image_url, weigh_at_fulfillment )',
+        'id, price, stock, piece_stock, min_stock, product:products ( id, name, unit, sku, image_url, weigh_at_fulfillment, pos_only )',
       )
       .eq('branch_id', staff.branchId)
       .eq('is_available', true)
@@ -55,6 +55,17 @@ export default async function AdminHomePage({
   ]);
 
   const usbScaleEnabled = parseBranchSettingsFlags(branchSettingsRow?.settings).usbScaleEnabled;
+  const canAdjustInventory = staffHasPermission(staff, 'inventory.adjust', permissionMatrix);
+
+  const packQuery = await supabase
+    .from('clearance_packs')
+    .select('id, title, price, quantity_remaining, branch_product_id, status')
+    .eq('branch_id', staff.branchId)
+    .eq('status', 'active')
+    .gt('quantity_remaining', 0)
+    .order('assembled_at', { ascending: false })
+    .limit(5);
+  const packRows = packQuery.error ? [] : packQuery.data;
 
   let products: unknown = productsQuery.data;
   if (productsQuery.error) {
@@ -64,6 +75,16 @@ export default async function AdminHomePage({
         .from('branch_products')
         .select(
           'id, price, stock, min_stock, product:products ( id, name, unit, sku, image_url, weigh_at_fulfillment )',
+        )
+        .eq('branch_id', staff.branchId)
+        .eq('is_available', true)
+        .order('created_at', { ascending: true });
+      products = fallback.data;
+    } else if (/pos_only/i.test(msg)) {
+      const fallback = await supabase
+        .from('branch_products')
+        .select(
+          'id, price, stock, piece_stock, min_stock, product:products ( id, name, unit, sku, image_url, weigh_at_fulfillment )',
         )
         .eq('branch_id', staff.branchId)
         .eq('is_available', true)
@@ -93,6 +114,14 @@ export default async function AdminHomePage({
         canEditOrders={canEditOrders}
         canDeleteOrders={canDeleteOrders}
         canEditPayment={canEditPayment}
+        canAdjustInventory={canAdjustInventory}
+        initialPacks={(packRows ?? []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          price: Number(row.price),
+          quantity_remaining: Number(row.quantity_remaining),
+          branch_product_id: row.branch_product_id,
+        }))}
         products={(products ?? []) as Array<{
           id: string;
           price: number;
@@ -105,6 +134,7 @@ export default async function AdminHomePage({
             sku?: string | null;
             image_url?: string | null;
             weigh_at_fulfillment?: boolean;
+            pos_only?: boolean;
           };
         }>}
       />
