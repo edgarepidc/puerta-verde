@@ -658,6 +658,11 @@ export function ProfitabilityManager({
   const [incomeAmountText, setIncomeAmountText] = useState('');
   const [incomeDate, setIncomeDate] = useState(() => todayMexicoYmd());
   const [incomeNotes, setIncomeNotes] = useState('');
+  const [visitConcept, setVisitConcept] = useState('');
+  const [visitAmountText, setVisitAmountText] = useState('');
+  const [visitDate, setVisitDate] = useState(() => todayMexicoYmd());
+  const [visitNotes, setVisitNotes] = useState('');
+  const [visitPaidFrom, setVisitPaidFrom] = useState<MoneyPocket>('cash');
   const [saving, setSaving] = useState(false);
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -666,7 +671,8 @@ export function ProfitabilityManager({
   const [openGastosUtilidad, setOpenGastosUtilidad] = useState(false);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
-  const [openMovimientos, setOpenMovimientos] = useState(false);
+  const [openGastosLista, setOpenGastosLista] = useState(false);
+  const [openIngresos, setOpenIngresos] = useState(false);
   const [series, setSeries] = useState<TrendPoint[]>([]);
   const [chartsStatus, setChartsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
@@ -905,6 +911,7 @@ export function ProfitabilityManager({
       setCostForm(emptyCost);
       setCostAmountText('');
       setOpenGastosUtilidad(true);
+      setOpenGastosLista(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -959,7 +966,7 @@ export function ProfitabilityManager({
       setIncomeAmountText('');
       setIncomeNotes('');
       setOpenGastosUtilidad(true);
-      setOpenMovimientos(true);
+      setOpenIngresos(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -993,6 +1000,36 @@ export function ProfitabilityManager({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
       setEditIncome(null);
+      await loadPeriod(from, to);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addVisit() {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          concept: visitConcept,
+          amount: parseDecimal(visitAmountText),
+          expenseDate: visitDate,
+          notes: visitNotes || null,
+          paidFrom: visitPaidFrom,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
+      setVisitConcept('');
+      setVisitAmountText('');
+      setVisitNotes('');
+      setOpenGastosUtilidad(true);
+      setOpenGastosLista(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -1133,49 +1170,62 @@ export function ProfitabilityManager({
       !costAppliesToRange(row.terms, from, to) &&
       costPausedAtPeriodStart(row.terms, from, addMexicoDays(from, -1)),
   );
-  const chargedThisPeriod = listedCosts.reduce(
-    (sum, row) =>
-      sum +
-      operatingCostAmountForRange(
-        {
-          costType: row.cost_type,
-          period: row.period,
-          amount: Number(row.amount),
-          chargeDay: normalizeChargeDay(row.charge_day),
-          terms: row.terms,
-        },
-        from,
-        to,
-      ),
-    0,
-  );
+  const chargedThisPeriod =
+    listedCosts.reduce(
+      (sum, row) =>
+        sum +
+        operatingCostAmountForRange(
+          {
+            costType: row.cost_type,
+            period: row.period,
+            amount: Number(row.amount),
+            chargeDay: normalizeChargeDay(row.charge_day),
+            terms: row.terms,
+          },
+          from,
+          to,
+        ),
+      0,
+    ) + Number(summary?.visit_expenses ?? 0);
+  const gastosSubtitle = OPERATING_COST_CATEGORIES.flatMap((category) => {
+    const group = listedCostGroups.find((row) => row.category === category);
+    let amount = group
+      ? group.items.reduce((sum, row) => sum + Number(row.amount), 0)
+      : 0;
+    if (category === 'variable') amount += Number(summary?.visit_expenses ?? 0);
+    if (!(amount > 0.009)) return [];
+    return [`${OPERATING_COST_CATEGORY_LABELS[category]} ${formatMoney(amount)}`];
+  });
   const otherIncomeTotal = Number(summary?.other_income ?? 0);
   const visitTotal = Number(summary?.visit_expenses ?? 0);
-  const periodMovements = useMemo(() => {
-    const visits = visitExpenses.map((row) => ({
-      key: `visit-${row.id}`,
-      kind: 'visit' as const,
-      id: row.id,
-      date: row.expense_date,
-      concept: row.concept,
-      notes: row.notes,
-      amount: Number(row.amount),
-      paidFrom: parseMoneyPocket(row.paid_from),
-    }));
-    const incomeRows = incomes.map((row) => ({
-      key: `income-${row.id}`,
-      kind: 'income' as const,
-      id: row.id,
-      date: row.entry_date,
-      concept: row.concept,
-      notes: row.notes,
-      amount: Number(row.amount),
-      entryType: row.entry_type,
-    }));
-    return [...visits, ...incomeRows].sort((a, b) => b.date.localeCompare(a.date));
-  }, [visitExpenses, incomes]);
-  const visitMovements = periodMovements.filter((row) => row.kind === 'visit');
-  const incomeMovements = periodMovements.filter((row) => row.kind === 'income');
+  const visitMovements = useMemo(
+    () =>
+      [...visitExpenses]
+        .map((row) => ({
+          id: row.id,
+          date: row.expense_date,
+          concept: row.concept,
+          notes: row.notes,
+          amount: Number(row.amount),
+          paidFrom: parseMoneyPocket(row.paid_from),
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [visitExpenses],
+  );
+  const incomeMovements = useMemo(
+    () =>
+      [...incomes]
+        .map((row) => ({
+          id: row.id,
+          date: row.entry_date,
+          concept: row.concept,
+          notes: row.notes,
+          amount: Number(row.amount),
+          entryType: row.entry_type,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [incomes],
+  );
 
   return (
     <div className="space-y-6">
@@ -1407,52 +1457,200 @@ export function ProfitabilityManager({
 
         <details
           className="group/sub rounded-xl border border-slate-100"
-          open={openMovimientos}
-          onToggle={(event) => setOpenMovimientos(event.currentTarget.open)}
+          open={openGastosLista}
+          onToggle={(event) => setOpenGastosLista(event.currentTarget.open)}
         >
           <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
             <div className="flex min-w-0 items-start gap-3">
               <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
                 aria-hidden
               >
-                📒
+                🏠
               </div>
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Visita y aportaciones</p>
+                <p className="text-base font-semibold text-slate-900">Gastos</p>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  {periodMovements.length} registro{periodMovements.length === 1 ? '' : 's'}
-                  {visitTotal > 0 ? ` · visita ${formatMoney(visitTotal)}` : ''}
-                  {contributionsTotal + otherIncomeTotal > 0
-                    ? ` · aportes ${formatMoney(contributionsTotal + otherIncomeTotal)}`
-                    : ''}
+                  {listedCosts.length + visitMovements.length} en la lista
+                  {chargedThisPeriod > 0 ? ` · ${formatMoney(chargedThisPeriod)} este periodo` : ''}
                 </p>
+                {gastosSubtitle.length ? (
+                  <p className="mt-0.5 text-xs text-slate-400">{gastosSubtitle.join(' · ')}</p>
+                ) : null}
               </div>
             </div>
             <NestedFoldChip />
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Gasolina, diablero y caseta de la visita. Entran en Gastos variables.
-              Las compras de mercancía van en Compras. Aquí también anotas aportaciones u otros
-              ingresos.
+              Cada gasto del local se suma el día que eliges, completo. La visita (gasolina,
+              diablero, caseta) entra en Gastos variables. Quitar de la lista lo oculta de este mes
+              en adelante; en los meses anteriores se queda.
             </p>
-            {visitMovements.length > 0 ? (
-              <details className="group/vis border-t border-slate-100">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 marker:content-none [&::-webkit-details-marker]:hidden">
-                  <p className="text-sm font-medium text-slate-800">
-                    Gastos de visita
-                    <span className="ml-2 text-xs font-normal text-slate-500">
-                      {visitMovements.length} · {formatMoney(visitTotal)}
-                    </span>
+            {listedCosts.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-slate-500">
+                Sin renta, nómina ni gastos fijos en este periodo.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {listedCostGroups.map((group) => {
+                  const groupTotal = group.items.reduce((sum, row) => sum + Number(row.amount), 0);
+                  return (
+                    <li key={group.category}>
+                      <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{group.label}</p>
+                          <p className="text-xs text-slate-500">{group.hint}</p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                          {formatMoney(groupTotal)}
+                        </p>
+                      </div>
+                      <ul className="divide-y divide-slate-50">
+                        {group.items.map((row) => {
+                  const editing = editCost?.id === row.id;
+                  const chargeDay = normalizeChargeDay(row.charge_day);
+                  const charged = chargedCostAmount(row, from, to);
+                  return (
+                    <li key={row.id} className="px-4 py-2.5">
+                      {editing && editCost ? (
+                        <div className="space-y-2">
+                          <CostCategoryField
+                            value={editCost.category}
+                            onChange={(category) =>
+                              setEditCost((d) =>
+                                d
+                                  ? {
+                                      ...d,
+                                      category,
+                                      costType: costTypeFromCategory(category),
+                                    }
+                                  : d,
+                              )
+                            }
+                          />
+                          <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
+                          <input
+                            className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                            value={editCost.name}
+                            onChange={(e) =>
+                              setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
+                            }
+                          />
+                          <DecimalInput
+                            className="pv-input min-w-0"
+                            groupThousands
+                            value={editCost.amount}
+                            onChange={(value) =>
+                              setEditCost((d) => (d ? { ...d, amount: value } : d))
+                            }
+                          />
+                          <ChargeDayField
+                            value={editCost.chargeDay}
+                            onChange={(day) =>
+                              setEditCost((d) => (d ? { ...d, chargeDay: day } : d))
+                            }
+                            monthYmd={from}
+                          />
+                          <MoneyPocketField
+                            label="Sale de"
+                            value={editCost.paidFrom}
+                            onChange={(value) =>
+                              setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
+                            }
+                          />
+                          <div className="col-span-2 flex flex-wrap gap-2">
+                            <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
+                              {saving ? 'Guardando…' : 'Guardar'}
+                            </ActionChip>
+                            <ActionChip elevated={false} onClick={() => setEditCost(null)}>
+                              Cancelar
+                            </ActionChip>
+                          </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900">{row.name}</p>
+                            <p className="text-sm text-slate-500">
+                              {formatChargeDayLabel(chargeDay)} ·{' '}
+                              {MONEY_POCKET_LABELS[parseMoneyPocket(row.paid_from, 'account')]}
+                              {charged > 0 ? ' · ya contó aquí' : ' · todavía no se suma'}
+                            </p>
+                          </div>
+                          <p className="text-base font-bold tabular-nums text-slate-900">
+                            {formatMoney(Number(row.amount))}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <ActionChip
+                              elevated={false}
+                              emoji="✏️"
+                              onClick={() =>
+                                setEditCost({
+                                  id: row.id,
+                                  name: row.name,
+                                  amount: formatDecimal(Number(row.amount)),
+                                  costType: row.cost_type,
+                                  category: costCategoryOf(row),
+                                  period: row.period,
+                                  paidFrom: parseMoneyPocket(row.paid_from, 'account'),
+                                  chargeDay,
+                                })
+                              }
+                            >
+                              Editar
+                            </ActionChip>
+                            <ActionChip
+                              elevated={false}
+                              emoji="📤"
+                              onClick={() => void toggleCost(row)}
+                            >
+                              Quitar de la lista
+                            </ActionChip>
+                            <ActionChip
+                              elevated={false}
+                              tone="rose"
+                              emoji="🗑️"
+                              onClick={() => void removeCost(row.id)}
+                            >
+                              Eliminar
+                            </ActionChip>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <div className="border-t border-slate-100">
+              <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Gastos de visita</p>
+                  <p className="text-xs text-slate-500">
+                    {OPERATING_COST_CATEGORY_HINTS.variable}
                   </p>
-                  <NestedFoldChip group="vis" />
-                </summary>
-                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                </div>
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                  {formatMoney(visitTotal)}
+                </p>
+              </div>
+              {visitMovements.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-slate-500">
+                  Sin gastos de visita en este periodo.
+                </p>
+              ) : (
+                <ul className="divide-y divide-slate-50">
                   {visitMovements.map((row) => {
                     const editing = editVisit?.id === row.id;
                     return (
-                      <li key={row.key} className="px-4 py-2.5 text-sm">
+                      <li key={row.id} className="px-4 py-2.5 text-sm">
                         {editing && editVisit ? (
                           <div className="grid grid-cols-2 gap-2">
                             <input
@@ -1549,14 +1747,161 @@ export function ProfitabilityManager({
                     );
                   })}
                 </ul>
+              )}
+              <div className="border-t border-slate-50 bg-white/70 p-4">
+                <p className="text-xs text-slate-500">Gasolina, diablero o caseta de una visita.</p>
+                <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
+                  <input
+                    placeholder="Concepto"
+                    className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                    value={visitConcept}
+                    onChange={(e) => setVisitConcept(e.target.value)}
+                  />
+                  <DecimalInput
+                    placeholder="Monto"
+                    className="pv-input min-w-0"
+                    groupThousands
+                    value={visitAmountText}
+                    onChange={setVisitAmountText}
+                  />
+                  <input
+                    type="date"
+                    max={today}
+                    className="pv-input min-w-0"
+                    value={visitDate}
+                    onChange={(e) => setVisitDate(e.target.value)}
+                  />
+                  <MoneyPocketField
+                    label="Sale de"
+                    value={visitPaidFrom}
+                    onChange={setVisitPaidFrom}
+                  />
+                  <div className="col-span-2 flex justify-end lg:col-span-1">
+                    <ActionChip emoji="🛻" disabled={saving} onClick={() => void addVisit()}>
+                      Agregar visita
+                    </ActionChip>
+                  </div>
+                </div>
+                <input
+                  placeholder="Nota (opcional)"
+                  className="pv-input mt-2 w-full text-sm"
+                  value={visitNotes}
+                  onChange={(e) => setVisitNotes(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {removedHereCosts.length > 0 ? (
+              <details className="border-t border-slate-100">
+                <summary className="cursor-pointer px-4 py-3 text-sm text-slate-500">
+                  {removedHereCosts.length === 1
+                    ? '1 gasto quitado de este mes'
+                    : `${removedHereCosts.length} gastos quitados de este mes`}
+                </summary>
+                <ul className="divide-y divide-slate-100 border-t border-slate-50">
+                  {removedHereCosts.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-700">{row.name}</p>
+                        <p className="text-sm text-slate-500">
+                          No se suma de aquí en adelante. En meses anteriores se queda.
+                        </p>
+                      </div>
+                      <p className="text-base font-bold tabular-nums text-slate-700">
+                        {formatMoney(Number(row.amount))}
+                      </p>
+                      <ActionChip
+                        elevated={false}
+                        emoji="📥"
+                        onClick={() => void toggleCost(row)}
+                      >
+                        Volver a la lista
+                      </ActionChip>
+                    </li>
+                  ))}
+                </ul>
               </details>
             ) : null}
-            {incomeMovements.length === 0 && visitMovements.length === 0 ? (
+
+            <div className="border-t border-slate-100 bg-slate-50/80 p-4">
+              <CostCategoryField
+                value={parseOperatingCostCategory(costForm.category, 'payroll')}
+                onChange={(category) =>
+                  setCostForm((f) => ({
+                    ...f,
+                    category,
+                    costType: costTypeFromCategory(category),
+                  }))
+                }
+              />
+              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
+                <input
+                  placeholder="Nombre"
+                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
+                  value={costForm.name}
+                  onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
+                />
+                <DecimalInput
+                  placeholder="Monto"
+                  className="pv-input min-w-0"
+                  groupThousands
+                  value={costAmountText}
+                  onChange={setCostAmountText}
+                />
+                <ChargeDayField
+                  value={costForm.chargeDay ?? 1}
+                  onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
+                  monthYmd={from}
+                />
+                <MoneyPocketField
+                  label="Sale de"
+                  value={costForm.paidFrom ?? 'account'}
+                  onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
+                />
+                <div className="col-span-2 flex justify-end lg:col-span-1">
+                  <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
+                    Agregar costo
+                  </ActionChip>
+                </div>
+              </div>
+            </div>
+        </div>
+        </details>
+
+        <details
+          className="group/sub rounded-xl border border-slate-100"
+          open={openIngresos}
+          onToggle={(event) => setOpenIngresos(event.currentTarget.open)}
+        >
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-start gap-3">
+              <div
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
+                aria-hidden
+              >
+                💰
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-900">Otros ingresos</p>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {incomeMovements.length} registro{incomeMovements.length === 1 ? '' : 's'}
+                  {contributionsTotal + otherIncomeTotal > 0
+                    ? ` · ${formatMoney(contributionsTotal + otherIncomeTotal)}`
+                    : ''}
+                </p>
+              </div>
+            </div>
+            <NestedFoldChip />
+          </summary>
+          <div className="border-t border-slate-100">
+            <p className="px-4 pt-3 text-sm text-slate-500">
+              Aportaciones y reembolsos. Entran a Tienes. Los gastos de visita están en Gastos.
+            </p>
+            {incomeMovements.length === 0 ? (
               <p className="px-4 py-4 text-sm text-slate-500">
-                Sin gastos de visita ni aportaciones en este periodo.
-              </p>
-            ) : incomeMovements.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-slate-500">
                 Sin aportaciones ni otros ingresos en este periodo.
               </p>
             ) : (
@@ -1564,7 +1909,7 @@ export function ProfitabilityManager({
                 {incomeMovements.map((row) => {
                   const editing = editIncome?.id === row.id;
                   return (
-                    <li key={row.key} className="px-4 py-2.5 text-sm">
+                    <li key={row.id} className="px-4 py-2.5 text-sm">
                       {editing && editIncome ? (
                         <div className="grid grid-cols-2 gap-2">
                           <div className="col-span-2 flex flex-wrap gap-2">
@@ -1719,262 +2064,6 @@ export function ProfitabilityManager({
           </div>
         </details>
 
-        <details className="group/sub rounded-xl border border-slate-100">
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <div className="flex min-w-0 items-start gap-3">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xl"
-                aria-hidden
-              >
-                🏠
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Gastos del local</p>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  {listedCosts.length} en la lista
-                  {chargedThisPeriod > 0 ? ` · ${formatMoney(chargedThisPeriod)} este periodo` : ''}
-                </p>
-                {listedCostGroups.length ? (
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {listedCostGroups
-                      .map(
-                        (group) =>
-                          `${group.label} ${formatMoney(
-                            group.items.reduce((sum, row) => sum + Number(row.amount), 0),
-                          )}`,
-                      )
-                      .join(' · ')}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <NestedFoldChip />
-          </summary>
-          <div className="border-t border-slate-100">
-            <p className="px-4 pt-3 text-sm text-slate-500">
-              Cada gasto se suma el día que eliges, completo. Así Tienes baja cuando sale el
-              dinero. Quitar de la lista lo oculta de este mes en adelante; en los meses anteriores
-              se queda. Si el mes no llega a ese día, se suma el último.
-            </p>
-            {listedCosts.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-slate-500">Sin gastos de este tipo en este periodo.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {listedCostGroups.map((group) => {
-                  const groupTotal = group.items.reduce((sum, row) => sum + Number(row.amount), 0);
-                  return (
-                    <li key={group.category}>
-                      <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800">{group.label}</p>
-                          <p className="text-xs text-slate-500">{group.hint}</p>
-                        </div>
-                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
-                          {formatMoney(groupTotal)}
-                        </p>
-                      </div>
-                      <ul className="divide-y divide-slate-50">
-                        {group.items.map((row) => {
-                  const editing = editCost?.id === row.id;
-                  const chargeDay = normalizeChargeDay(row.charge_day);
-                  const charged = chargedCostAmount(row, from, to);
-                  return (
-                    <li key={row.id} className="px-4 py-2.5">
-                      {editing && editCost ? (
-                        <div className="space-y-2">
-                          <CostCategoryField
-                            value={editCost.category}
-                            onChange={(category) =>
-                              setEditCost((d) =>
-                                d
-                                  ? {
-                                      ...d,
-                                      category,
-                                      costType: costTypeFromCategory(category),
-                                    }
-                                  : d,
-                              )
-                            }
-                          />
-                          <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
-                          <input
-                            className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                            value={editCost.name}
-                            onChange={(e) =>
-                              setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
-                            }
-                          />
-                          <DecimalInput
-                            className="pv-input min-w-0"
-                            groupThousands
-                            value={editCost.amount}
-                            onChange={(value) =>
-                              setEditCost((d) => (d ? { ...d, amount: value } : d))
-                            }
-                          />
-                          <ChargeDayField
-                            value={editCost.chargeDay}
-                            onChange={(day) =>
-                              setEditCost((d) => (d ? { ...d, chargeDay: day } : d))
-                            }
-                            monthYmd={from}
-                          />
-                          <MoneyPocketField
-                            label="Sale de"
-                            value={editCost.paidFrom}
-                            onChange={(value) =>
-                              setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
-                            }
-                          />
-                          <div className="col-span-2 flex flex-wrap gap-2">
-                            <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
-                              {saving ? 'Guardando…' : 'Guardar'}
-                            </ActionChip>
-                            <ActionChip elevated={false} onClick={() => setEditCost(null)}>
-                              Cancelar
-                            </ActionChip>
-                          </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium text-slate-900">{row.name}</p>
-                            <p className="text-sm text-slate-500">
-                              {formatChargeDayLabel(chargeDay)} ·{' '}
-                              {MONEY_POCKET_LABELS[parseMoneyPocket(row.paid_from, 'account')]}
-                              {charged > 0 ? ' · ya contó aquí' : ' · todavía no se suma'}
-                            </p>
-                          </div>
-                          <p className="text-base font-bold tabular-nums text-slate-900">
-                            {formatMoney(Number(row.amount))}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            <ActionChip
-                              elevated={false}
-                              emoji="✏️"
-                              onClick={() =>
-                                setEditCost({
-                                  id: row.id,
-                                  name: row.name,
-                                  amount: formatDecimal(Number(row.amount)),
-                                  costType: row.cost_type,
-                                  category: costCategoryOf(row),
-                                  period: row.period,
-                                  paidFrom: parseMoneyPocket(row.paid_from, 'account'),
-                                  chargeDay,
-                                })
-                              }
-                            >
-                              Editar
-                            </ActionChip>
-                            <ActionChip
-                              elevated={false}
-                              emoji="📤"
-                              onClick={() => void toggleCost(row)}
-                            >
-                              Quitar de la lista
-                            </ActionChip>
-                            <ActionChip
-                              elevated={false}
-                              tone="rose"
-                              emoji="🗑️"
-                              onClick={() => void removeCost(row.id)}
-                            >
-                              Eliminar
-                            </ActionChip>
-                          </div>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {removedHereCosts.length > 0 ? (
-              <details className="border-t border-slate-100">
-                <summary className="cursor-pointer px-4 py-3 text-sm text-slate-500">
-                  {removedHereCosts.length === 1
-                    ? '1 gasto quitado de este mes'
-                    : `${removedHereCosts.length} gastos quitados de este mes`}
-                </summary>
-                <ul className="divide-y divide-slate-100 border-t border-slate-50">
-                  {removedHereCosts.map((row) => (
-                    <li
-                      key={row.id}
-                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-700">{row.name}</p>
-                        <p className="text-sm text-slate-500">
-                          No se suma de aquí en adelante. En meses anteriores se queda.
-                        </p>
-                      </div>
-                      <p className="text-base font-bold tabular-nums text-slate-700">
-                        {formatMoney(Number(row.amount))}
-                      </p>
-                      <ActionChip
-                        elevated={false}
-                        emoji="📥"
-                        onClick={() => void toggleCost(row)}
-                      >
-                        Volver a la lista
-                      </ActionChip>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-
-            <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-              <CostCategoryField
-                value={parseOperatingCostCategory(costForm.category, 'payroll')}
-                onChange={(category) =>
-                  setCostForm((f) => ({
-                    ...f,
-                    category,
-                    costType: costTypeFromCategory(category),
-                  }))
-                }
-              />
-              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
-                <input
-                  placeholder="Nombre"
-                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                  value={costForm.name}
-                  onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
-                />
-                <DecimalInput
-                  placeholder="Monto"
-                  className="pv-input min-w-0"
-                  groupThousands
-                  value={costAmountText}
-                  onChange={setCostAmountText}
-                />
-                <ChargeDayField
-                  value={costForm.chargeDay ?? 1}
-                  onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
-                  monthYmd={from}
-                />
-                <MoneyPocketField
-                  label="Sale de"
-                  value={costForm.paidFrom ?? 'account'}
-                  onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
-                />
-                <div className="col-span-2 flex justify-end lg:col-span-1">
-                  <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
-                    Agregar costo
-                  </ActionChip>
-                </div>
-              </div>
-            </div>
-        </div>
-        </details>
       </details>
 
       <details
