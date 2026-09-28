@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { orderPaymentAmounts } from '@puertaverde/shared';
+import { cashCloseValidationError, parseOptionalMoney } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
-import { todayMexicoYmd } from '@/lib/mexico-date';
-
-function emptyMethodTotals() {
-  return { cash: 0, card_terminal: 0, transfer: 0, online: 0 };
-}
-
-function isPosOrder(order: {
-  source?: string | null;
-  delivery_notes?: string | null;
-}) {
-  if (order.source === 'pos') return true;
-  return (order.delivery_notes ?? '').startsWith('[mostrador]');
-}
+import { loadCashDay } from '@/lib/cash-day';
+import { isValidYmd, todayMexicoYmd } from '@/lib/mexico-date';
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -24,59 +13,12 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const rawDate = searchParams.get('date')?.trim() ?? '';
-  const supabase = createAdminClient();
-  const closingDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayMexicoYmd();
-  const startOfDay = `${closingDate}T00:00:00-06:00`;
-  const endOfDay = `${closingDate}T23:59:59-06:00`;
-
-  const [{ data: orders }, { data: closing }] = await Promise.all([
-    supabase
-      .from('orders')
-      .select('total, payment_method, payment_splits, payment_status, paid_at, delivery_notes, source')
-      .eq('branch_id', auth.branchId)
-      .eq('payment_status', 'paid')
-      .gte('paid_at', startOfDay)
-      .lte('paid_at', endOfDay),
-    supabase
-      .from('daily_cash_closings')
-      .select('*')
-      .eq('branch_id', auth.branchId)
-      .eq('closing_date', closingDate)
-      .maybeSingle(),
-  ]);
-
-  const totals = emptyMethodTotals();
-  const pos = emptyMethodTotals();
-  const web = emptyMethodTotals();
-  let posCount = 0;
-  let webCount = 0;
-
-  for (const order of orders ?? []) {
-    const pieces = orderPaymentAmounts(order);
-    if (pieces.length === 0) continue;
-    const isPos = isPosOrder(order);
-    if (isPos) posCount += 1;
-    else webCount += 1;
-    for (const piece of pieces) {
-      const method = piece.method as keyof typeof totals;
-      if (!(method in totals)) continue;
-      totals[method] += piece.amount;
-      if (isPos) pos[method] += piece.amount;
-      else web[method] += piece.amount;
-    }
-  }
+  const closingDate = isValidYmd(rawDate) ? rawDate : todayMexicoYmd();
+  const summary = await loadCashDay(auth.branchId, closingDate);
 
   return NextResponse.json({
-    closingDate,
+    ...summary,
     branchName: auth.branchName,
-    totals,
-    channels: {
-      pos: { ...pos, orderCount: posCount, total: Object.values(pos).reduce((a, b) => a + b, 0) },
-      web: { ...web, orderCount: webCount, total: Object.values(web).reduce((a, b) => a + b, 0) },
-    },
-    orderCount: orders?.length ?? 0,
-    grandTotal: Object.values(totals).reduce((sum, value) => sum + value, 0),
-    closing: closing ?? null,
   });
 }
 
@@ -92,47 +34,48 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as {
+    date?: string;
     notes?: string;
     openingFloat?: number | null;
     countedCash?: number | null;
   };
-  const supabase = createAdminClient();
-  const closingDate = todayMexicoYmd();
-  const startOfDay = `${closingDate}T00:00:00-06:00`;
-  const endOfDay = `${closingDate}T23:59:59-06:00`;
 
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('total, payment_method, payment_splits')
-    .eq('branch_id', auth.branchId)
-    .eq('payment_status', 'paid')
-    .gte('paid_at', startOfDay)
-    .lte('paid_at', endOfDay);
-
-  const totals = { cash: 0, card_terminal: 0, transfer: 0, online: 0 };
-  for (const order of orders ?? []) {
-    for (const piece of orderPaymentAmounts(order)) {
-      const method = piece.method;
-      if (method === 'cash' || method === 'card_terminal' || method === 'transfer' || method === 'online') {
-        totals[method] += piece.amount;
-      } else if (!method) {
-        totals.cash += piece.amount;
-      }
-    }
+  const today = todayMexicoYmd();
+  const requested = typeof body.date === 'string' ? body.date.trim() : today;
+  if (!isValidYmd(requested)) {
+    return NextResponse.json({ error: 'Fecha de cierre no válida' }, { status: 400 });
+  }
+  if (requested > today) {
+    return NextResponse.json({ error: 'No se puede cerrar un día futuro' }, { status: 400 });
   }
 
+  const summary = await loadCashDay(auth.branchId, requested);
+  const notes = body.notes?.trim() || null;
+  const countedCash = parseOptionalMoney(body.countedCash);
+  const openingFloat = parseOptionalMoney(body.openingFloat);
+  const validation = cashCloseValidationError({
+    countedCash: body.countedCash,
+    openingFloat: body.openingFloat,
+    cashSales: summary.totals.cash,
+    notes,
+  });
+  if (validation) {
+    return NextResponse.json({ error: validation }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('daily_cash_closings')
     .upsert(
       {
         branch_id: auth.branchId,
-        closing_date: closingDate,
-        cash_total: totals.cash,
-        card_terminal_total: totals.card_terminal,
-        transfer_total: totals.transfer,
-        notes: body.notes?.trim() || null,
-        opening_float: body.openingFloat ?? null,
-        counted_cash: body.countedCash ?? null,
+        closing_date: requested,
+        cash_total: summary.totals.cash,
+        card_terminal_total: summary.totals.card_terminal,
+        transfer_total: summary.totals.transfer,
+        notes,
+        opening_float: openingFloat,
+        counted_cash: countedCash,
         closed_by: auth.userId,
       },
       { onConflict: 'branch_id,closing_date' },
@@ -144,5 +87,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, closing: data, totals });
+  return NextResponse.json({ ok: true, closing: data, totals: summary.totals });
 }

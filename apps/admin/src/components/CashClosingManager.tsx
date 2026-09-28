@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from 'react';
 
-import { PAYMENT_METHOD_LABELS, formatMoney, todayMexicoYmd } from '@puertaverde/shared';
+import {
+  PAYMENT_METHOD_LABELS,
+  cashCloseValidationError,
+  expectedCashOnHand,
+  formatMoney,
+  todayMexicoYmd,
+} from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput } from '@/components/DecimalInput';
+import { formatMexicoSpokenDay, formatMexicoWeekday, yesterdayMexicoYmd } from '@/lib/mexico-date';
 
 interface ChannelTotals {
   cash: number;
@@ -30,42 +37,10 @@ interface CashSummary {
     counted_cash?: number | null;
     created_at: string;
   } | null;
+  suggestedOpeningFloat?: number | null;
 }
 
 const METHOD_KEYS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
-
-function parseClosingDate(value: string): Date | null {
-  const iso = /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null;
-  const date = iso ? new Date(`${iso}T12:00:00`) : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatSpokenDay(value: string): string {
-  const date = parseClosingDate(value);
-  if (!date) return value;
-  const month = date
-    .toLocaleDateString('es-MX', { month: 'short' })
-    .replace('.', '')
-    .toLowerCase();
-  const yy = String(date.getFullYear()).slice(-2);
-  return `${date.getDate()} ${month} ${yy}`;
-}
-
-function formatWeekday(value: string): string {
-  const date = parseClosingDate(value);
-  if (!date) return '';
-  return date.toLocaleDateString('es-MX', { weekday: 'long' }).toLowerCase();
-}
-
-function yesterdayMexicoYmd(): string {
-  const today = todayMexicoYmd();
-  const d = new Date(`${today}T12:00:00-06:00`);
-  d.setDate(d.getDate() - 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 interface Withdrawal {
   id: string;
@@ -110,7 +85,11 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       setSummary(payload);
       setNotes(payload.closing?.notes ?? '');
       setOpeningFloat(
-        payload.closing?.opening_float != null ? String(payload.closing.opening_float) : '',
+        payload.closing?.opening_float != null
+          ? String(payload.closing.opening_float)
+          : payload.suggestedOpeningFloat != null
+            ? String(payload.suggestedOpeningFloat)
+            : '',
       );
       setCountedCash(
         payload.closing?.counted_cash != null ? String(payload.closing.counted_cash) : '',
@@ -178,6 +157,16 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       setError('No tienes permiso para cerrar caja');
       return;
     }
+    const validation = cashCloseValidationError({
+      countedCash: countedCash === '' ? '' : Number(countedCash),
+      openingFloat: openingFloat === '' ? '' : Number(openingFloat),
+      cashSales: Number(summary?.totals.cash ?? 0),
+      notes,
+    });
+    if (validation) {
+      setError(validation);
+      return;
+    }
     setClosing(true);
     setError(null);
     try {
@@ -185,6 +174,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          date: selectedDate,
           notes,
           openingFloat: openingFloat === '' ? null : Number(openingFloat),
           countedCash: countedCash === '' ? null : Number(countedCash),
@@ -204,9 +194,19 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     Number(summary?.totals.card_terminal ?? 0) +
     Number(summary?.totals.transfer ?? 0) +
     Number(summary?.totals.online ?? 0);
-  const expectedCash = Number(openingFloat || 0) + Number(summary?.totals.cash ?? 0);
-  const cashDiff =
-    countedCash === '' ? null : Number(countedCash) - expectedCash;
+  const expectedCash = expectedCashOnHand(
+    openingFloat === '' ? 0 : Number(openingFloat),
+    Number(summary?.totals.cash ?? 0),
+  );
+  const cashDiff = countedCash === '' ? null : Number(countedCash) - expectedCash;
+  const closeBlocked = Boolean(
+    cashCloseValidationError({
+      countedCash: countedCash === '' ? '' : Number(countedCash),
+      openingFloat: openingFloat === '' ? '' : Number(openingFloat),
+      cashSales: Number(summary?.totals.cash ?? 0),
+      notes,
+    }),
+  );
 
   const channelCards = [
     { label: 'Mostrador', emoji: '🛒', iconClass: 'bg-emerald-100', value: summary?.channels?.pos },
@@ -279,9 +279,9 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               Día
             </p>
             <p className="mt-0.5 text-xl font-bold leading-snug text-slate-900">
-              {formatSpokenDay(summary.closingDate)}
+              {formatMexicoSpokenDay(summary.closingDate)}
             </p>
-            <p className="text-xs text-slate-500">{formatWeekday(summary.closingDate)}</p>
+            <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
           </div>
         </div>
         <div className="pv-glass-card flex gap-3 p-4">
@@ -350,7 +350,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           title="Cerrar caja"
           hint={
             summary.closing
-              ? `Cerrado hoy · ${summary.branchName}`
+              ? `Cerrado · ${summary.branchName}`
               : `Fondo, conteo y notas · ${summary.branchName}`
           }
           emoji="🧾"
@@ -358,7 +358,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           actions={
             summary.closing ? (
               <ActionChip as="span" emoji="✅" elevated={false}>
-                Cerrado hoy
+                Cerrado
               </ActionChip>
             ) : undefined
           }
@@ -405,16 +405,21 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               value={notes}
               disabled={!canManage || Boolean(summary.closing)}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej. faltante de $20 en caja chica"
+              placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
             />
           </label>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {canManage && !summary.closing ? (
+            <p className="text-xs text-slate-500">
+              El conteo es obligatorio. Si no cuadra, anota por qué.
+            </p>
+          ) : null}
           {canManage ? (
             <ActionChip
               size="lg"
               emoji="💰"
               tone={summary.closing ? 'slate' : 'emerald'}
-              disabled={closing || Boolean(summary.closing)}
+              disabled={closing || Boolean(summary.closing) || closeBlocked}
               onClick={closeDay}
             >
               {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}

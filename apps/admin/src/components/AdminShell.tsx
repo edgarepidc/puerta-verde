@@ -1,15 +1,20 @@
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { redirect } from 'next/navigation';
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { AdminNav } from '@/components/AdminNav';
 import { BranchSwitcher } from '@/components/BranchSwitcher';
 import { LogoutButton } from '@/components/LogoutButton';
-import { getStaffSession } from '@/lib/auth';
-import { mexicoDayGreeting } from '@/lib/mexico-date';
+import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
+import { mexicoDayGreeting, yesterdayMexicoYmd } from '@/lib/mexico-date';
 import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
+
+const PendingCashCloseGate = dynamic(() =>
+  import('@/components/PendingCashCloseGate').then((mod) => ({ default: mod.PendingCashCloseGate })),
+);
 
 function StorefrontIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -48,14 +53,25 @@ export async function AdminShell({
   const storeUrl =
     process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app';
 
-  const [branches, orgResult] = await Promise.all([
+  const yesterday = yesterdayMexicoYmd();
+  const admin = createAdminClient();
+  const [branches, orgResult, pendingClosing, permissionMatrix] = await Promise.all([
     listBranchesForUser(staff.userId),
-    createAdminClient()
+    admin
       .from('organizations')
       .select('subscription_status, subscription_plan, trial_ends_at')
       .eq('id', staff.organizationId)
       .single(),
+    admin
+      .from('daily_cash_closings')
+      .select('id')
+      .eq('branch_id', staff.branchId)
+      .eq('closing_date', yesterday)
+      .maybeSingle(),
+    loadPermissionMatrix(staff.organizationId),
   ]);
+  const needsYesterdayClose = !pendingClosing.error && !pendingClosing.data;
+  const canCloseCaja = staffHasPermission(staff, 'cash.closing', permissionMatrix);
 
   const org = orgResult.data;
   const subscriptionOk = org
@@ -69,6 +85,9 @@ export async function AdminShell({
   return (
     <>
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
+      {needsYesterdayClose ? (
+        <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} />
+      ) : null}
       <main className="relative flex min-h-screen flex-col">
         <header className="pv-glass-header relative z-40">
           <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-3 py-2 sm:px-4 md:gap-4">
