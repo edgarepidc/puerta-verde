@@ -94,7 +94,7 @@ export function profitSummaryLines(
     `Utilidad bruta: ${formatMoney(summary?.gross_profit ?? 0)}`,
     `Margen bruto: ${summary?.gross_margin_percent ?? 0}%`,
     `Costos operativos: ${formatMoney(summary?.operating_costs_total ?? 0)}`,
-    `Gastos de visita: ${formatMoney(summary?.visit_expenses ?? 0)}`,
+    `Gastos variables: ${formatMoney(summary?.variable_costs ?? 0)}`,
     `Otros ingresos: ${formatMoney(summary?.other_income ?? 0)}`,
     `Aportaciones: ${formatMoney(summary?.contributions ?? 0)}`,
     `Utilidad estimada: ${formatMoney(summary?.estimated_net_profit ?? 0)}`,

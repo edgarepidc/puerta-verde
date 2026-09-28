@@ -458,23 +458,17 @@ function ProfitBuildUp({
       delta: -fixed,
       running,
     });
-  }
-  running -= visit;
-  steps.push({
-    key: 'visit',
-    label: '− Gastos de visita',
-    hint: 'Gasolina, diablero, caseta…',
-    delta: -visit,
-    running,
-  });
-  if (!categoryLines.length && other > 0) {
-    running -= other;
-    steps.push({
-      key: 'other',
-      label: '− Otros gastos',
-      delta: -other,
-      running,
-    });
+    const variableTotal = other + visit;
+    if (variableTotal > 0) {
+      running -= variableTotal;
+      steps.push({
+        key: 'variable',
+        label: '− Gastos variables',
+        hint: OPERATING_COST_CATEGORY_HINTS.variable,
+        delta: -variableTotal,
+        running,
+      });
+    }
   }
   if (waste > 0) {
     running -= waste;
@@ -669,10 +663,9 @@ export function ProfitabilityManager({
   const [error, setError] = useState<string | null>(null);
   const [showAllMargins, setShowAllMargins] = useState(false);
   const [openVentas, setOpenVentas] = useState(false);
-  const [openUtilidad, setOpenUtilidad] = useState(false);
+  const [openGastosUtilidad, setOpenGastosUtilidad] = useState(false);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
-  const [openGastos, setOpenGastos] = useState(false);
   const [openMovimientos, setOpenMovimientos] = useState(false);
   const [series, setSeries] = useState<TrendPoint[]>([]);
   const [chartsStatus, setChartsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -755,10 +748,25 @@ export function ProfitabilityManager({
         };
       })
       .filter((seg) => seg.amount > 0);
+    if (visit > 0) {
+      const variableIdx = categorySegs.findIndex((seg) => seg.key === 'variable');
+      if (variableIdx >= 0) {
+        const current = categorySegs[variableIdx]!;
+        categorySegs[variableIdx] = { ...current, amount: current.amount + visit };
+      } else {
+        const style = OPERATING_COST_CATEGORY_BAR.variable;
+        categorySegs.push({
+          key: 'variable',
+          label: OPERATING_COST_CATEGORY_LABELS.variable,
+          emoji: style.emoji,
+          amount: visit,
+          color: style.color,
+        });
+      }
+    }
     const segments = [
       { key: 'purchases', label: 'Compras', emoji: '🛒', amount: purchases, color: 'bg-amber-400' },
       ...categorySegs,
-      { key: 'visit', label: 'Gastos de visita', emoji: '🛻', amount: visit, color: 'bg-sky-400' },
     ].filter((seg) => seg.amount > 0);
     const total = segments.reduce((sum, seg) => sum + seg.amount, 0);
     return {
@@ -896,6 +904,7 @@ export function ProfitabilityManager({
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
       setCostForm(emptyCost);
       setCostAmountText('');
+      setOpenGastosUtilidad(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -949,7 +958,7 @@ export function ProfitabilityManager({
       setIncomeConcept('');
       setIncomeAmountText('');
       setIncomeNotes('');
-      setOpenGastos(true);
+      setOpenGastosUtilidad(true);
       setOpenMovimientos(true);
       await loadPeriod(from, to);
     } catch (err) {
@@ -1104,10 +1113,21 @@ export function ProfitabilityManager({
     .reduce((sum, row) => sum + Number(row.amount), 0);
   const listedCosts = costs.filter((row) => costAppliesToRange(row.terms, from, to));
   const listedCostGroups = groupOperatingCostsByCategory(listedCosts, costCategoryOf);
-  const operatingByCategory = listedCostGroups.map((group) => ({
-    category: group.category,
-    amount: group.items.reduce((sum, row) => sum + chargedCostAmount(row, from, to), 0),
-  }));
+  const operatingByCategory = (() => {
+    const rows = listedCostGroups.map((group) => ({
+      category: group.category,
+      amount: group.items.reduce((sum, row) => sum + chargedCostAmount(row, from, to), 0),
+    }));
+    const visit = Number(summary?.visit_expenses ?? 0);
+    if (!(visit > 0.009)) return rows.filter((row) => row.amount > 0.009);
+    const variableIdx = rows.findIndex((row) => row.category === 'variable');
+    if (variableIdx >= 0) {
+      return rows.map((row, index) =>
+        index === variableIdx ? { ...row, amount: row.amount + visit } : row,
+      );
+    }
+    return [...rows, { category: 'variable' as const, amount: visit }];
+  })();
   const removedHereCosts = costs.filter(
     (row) =>
       !costAppliesToRange(row.terms, from, to) &&
@@ -1245,8 +1265,8 @@ export function ProfitabilityManager({
             value={formatMoney(cashOut)}
             hint={
               rentCharged > 0
-                ? `Compras, renta y visita · renta ${formatMoney(rentCharged)} ya contó`
-                : 'Compras, renta y visita · caja y cuenta'
+                ? `Compras y gastos · renta ${formatMoney(rentCharged)} ya contó`
+                : 'Compras y gastos del local · caja y cuenta'
             }
           />
           <MetricCard
@@ -1325,13 +1345,13 @@ export function ProfitabilityManager({
       </details>
 
       <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openUtilidad}
-        onToggle={(event) => setOpenUtilidad(event.currentTarget.open)}
+        className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+        open={openGastosUtilidad}
+        onToggle={(event) => setOpenGastosUtilidad(event.currentTarget.open)}
       >
         <FoldableSummary
-          title="Cálculo de utilidad"
-          hint="Del periodo · no es Tienes"
+          title="Gastos y Utilidad"
+          hint="Desglose del periodo · abajo, cómo se gasta"
           emoji="🧮"
           iconClass="bg-violet-100"
         />
@@ -1341,172 +1361,14 @@ export function ProfitabilityManager({
           zeroCostSold={zeroCostSold}
           operatingByCategory={operatingByCategory}
         />
-      </details>
-
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openCategoria}
-        onToggle={(event) => setOpenCategoria(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Por categoría"
-          hint={`Margen bruto · ${activePeriodLabel}`}
-          emoji="📊"
-          iconClass="bg-violet-100"
-        />
-
-        {categories.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">Sin ventas en el periodo.</p>
-        ) : (
-          <div className="space-y-4">
-            {categories.map((row) => {
-              const profit = Number(row.gross_profit);
-              const width = Math.max((Math.abs(profit) / categoryMaxProfit) * 100, 4);
-              const positive = profit >= 0;
-              return (
-                <div key={row.category_name}>
-                  <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                    <span className="font-medium text-slate-900">{row.category_name}</span>
-                    <span className="text-slate-600">
-                      {formatMoney(profit)}
-                      <span className="ml-2 text-xs text-slate-400">
-                        {Number(row.gross_margin_percent).toFixed(1)}% · {formatMoney(Number(row.revenue))} ventas
-                      </span>
-                    </span>
-                  </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        positive ? 'bg-emerald-500' : 'bg-rose-400'
-                      }`}
-                      style={{ width: `${width}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {row.product_count} productos · {formatDecimal(Number(row.units_sold))} unidades
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {categories.length > 0 ? (
-          <details className="group/sub rounded-xl border border-slate-100">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
-              <p className="text-sm font-medium text-slate-800">Tabla detallada</p>
-              <NestedFoldChip />
-            </summary>
-            <div className="overflow-x-auto border-t border-slate-100 pb-3">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    <th className="px-4 py-2">Categoría</th>
-                    <th className="px-4 py-2">Productos</th>
-                    <th className="px-4 py-2">Unidades</th>
-                    <th className="px-4 py-2">Ingresos</th>
-                    <th className="px-4 py-2">Costo</th>
-                    <th className="px-4 py-2">Utilidad bruta</th>
-                    <th className="px-4 py-2">Margen %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((row) => (
-                    <tr key={`t-${row.category_name}`} className="border-t border-slate-100">
-                      <td className="px-4 py-2 font-medium">{row.category_name}</td>
-                      <td className="px-4 py-2">{row.product_count}</td>
-                      <td className="px-4 py-2">{formatDecimal(Number(row.units_sold))}</td>
-                      <td className="px-4 py-2">{formatMoney(Number(row.revenue))}</td>
-                      <td className="px-4 py-2">{formatMoney(Number(row.cogs))}</td>
-                      <td className="px-4 py-2 font-semibold">{formatMoney(Number(row.gross_profit))}</td>
-                      <td className="px-4 py-2">{Number(row.gross_margin_percent).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        ) : null}
-      </details>
-
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openMargenes}
-        onToggle={(event) => setOpenMargenes(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Precio vs costo"
-          hint="Anaquel de hoy · no es el mix vendido"
-          emoji="🥬"
-          iconClass="bg-emerald-100"
-        />
-
-        {inStockMargins.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">Sin productos con margen.</p>
-        ) : (
-          <div>
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {visibleMargins.map((row) => {
-                const pct = Number(row.margin_percent);
-                const width = Math.max((Math.abs(pct) / marginBarMax) * 100, 3);
-                const healthy = pct >= 15;
-                return (
-                  <div
-                    key={row.branch_product_id}
-                    className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-medium leading-snug text-slate-900">
-                        {row.product_name}
-                      </p>
-                      <span
-                        className={`shrink-0 text-sm font-bold ${
-                          healthy ? 'text-emerald-700' : 'text-rose-600'
-                        }`}
-                      >
-                        {pct.toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
-                      <div
-                        className={`h-full rounded-full ${healthy ? 'bg-emerald-500' : 'bg-amber-400'}`}
-                        style={{ width: `${Math.min(width, 100)}%` }}
-                      />
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-slate-500">
-                      {formatMoney(Number(row.sale_price))} · costo {formatMoney(Number(row.avg_unit_cost))}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            {inStockMargins.length > 12 ? (
-              <ActionChip
-                className="mt-4"
-                emoji="📋"
-                onClick={() => setShowAllMargins((v) => !v)}
-              >
-                {showAllMargins ? 'Ver menos' : `Ver todos (${inStockMargins.length})`}
-              </ActionChip>
-            ) : null}
-          </div>
-        )}
-      </details>
-
-      <details
-        className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
-        open={openGastos}
-        onToggle={(event) => setOpenGastos(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Gastos del mes"
-          hint="Compras, local y visita. El costo de lo vendido está arriba."
-          emoji="🧾"
-          iconClass="bg-amber-100"
-        />
-
         {summary && costBreakdown.total > 0 ? (
           <div className="space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">Gastos del mes</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Compras y gastos. La visita al mercado entra en variables.
+              </p>
+            </div>
             <div className="flex h-7 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-100">
               {costBreakdown.segments.map((seg) => (
                 <div
@@ -1571,8 +1433,9 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Gasolina, diablero y caseta de la visita. Las compras de mercancía van en Compras.
-              Aquí también anotas aportaciones u otros ingresos.
+              Gasolina, diablero y caseta de la visita. Entran en Gastos variables.
+              Las compras de mercancía van en Compras. Aquí también anotas aportaciones u otros
+              ingresos.
             </p>
             {visitMovements.length > 0 ? (
               <details className="group/vis border-t border-slate-100">
@@ -2112,6 +1975,156 @@ export function ProfitabilityManager({
             </div>
         </div>
         </details>
+      </details>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openCategoria}
+        onToggle={(event) => setOpenCategoria(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Por categoría"
+          hint={`Margen bruto · ${activePeriodLabel}`}
+          emoji="📊"
+          iconClass="bg-violet-100"
+        />
+
+        {categories.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">Sin ventas en el periodo.</p>
+        ) : (
+          <div className="space-y-4">
+            {categories.map((row) => {
+              const profit = Number(row.gross_profit);
+              const width = Math.max((Math.abs(profit) / categoryMaxProfit) * 100, 4);
+              const positive = profit >= 0;
+              return (
+                <div key={row.category_name}>
+                  <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                    <span className="font-medium text-slate-900">{row.category_name}</span>
+                    <span className="text-slate-600">
+                      {formatMoney(profit)}
+                      <span className="ml-2 text-xs text-slate-400">
+                        {Number(row.gross_margin_percent).toFixed(1)}% · {formatMoney(Number(row.revenue))} ventas
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        positive ? 'bg-emerald-500' : 'bg-rose-400'
+                      }`}
+                      style={{ width: `${width}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {row.product_count} productos · {formatDecimal(Number(row.units_sold))} unidades
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {categories.length > 0 ? (
+          <details className="group/sub rounded-xl border border-slate-100">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+              <p className="text-sm font-medium text-slate-800">Tabla detallada</p>
+              <NestedFoldChip />
+            </summary>
+            <div className="overflow-x-auto border-t border-slate-100 pb-3">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-left text-slate-600">
+                  <tr>
+                    <th className="px-4 py-2">Categoría</th>
+                    <th className="px-4 py-2">Productos</th>
+                    <th className="px-4 py-2">Unidades</th>
+                    <th className="px-4 py-2">Ingresos</th>
+                    <th className="px-4 py-2">Costo</th>
+                    <th className="px-4 py-2">Utilidad bruta</th>
+                    <th className="px-4 py-2">Margen %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((row) => (
+                    <tr key={`t-${row.category_name}`} className="border-t border-slate-100">
+                      <td className="px-4 py-2 font-medium">{row.category_name}</td>
+                      <td className="px-4 py-2">{row.product_count}</td>
+                      <td className="px-4 py-2">{formatDecimal(Number(row.units_sold))}</td>
+                      <td className="px-4 py-2">{formatMoney(Number(row.revenue))}</td>
+                      <td className="px-4 py-2">{formatMoney(Number(row.cogs))}</td>
+                      <td className="px-4 py-2 font-semibold">{formatMoney(Number(row.gross_profit))}</td>
+                      <td className="px-4 py-2">{Number(row.gross_margin_percent).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        ) : null}
+      </details>
+
+      <details
+        className="group pv-glass-card space-y-4 p-4 sm:p-6"
+        open={openMargenes}
+        onToggle={(event) => setOpenMargenes(event.currentTarget.open)}
+      >
+        <FoldableSummary
+          title="Precio vs costo"
+          hint="Anaquel de hoy · no es el mix vendido"
+          emoji="🥬"
+          iconClass="bg-emerald-100"
+        />
+
+        {inStockMargins.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">Sin productos con margen.</p>
+        ) : (
+          <div>
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {visibleMargins.map((row) => {
+                const pct = Number(row.margin_percent);
+                const width = Math.max((Math.abs(pct) / marginBarMax) * 100, 3);
+                const healthy = pct >= 15;
+                return (
+                  <div
+                    key={row.branch_product_id}
+                    className="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-sm font-medium leading-snug text-slate-900">
+                        {row.product_name}
+                      </p>
+                      <span
+                        className={`shrink-0 text-sm font-bold ${
+                          healthy ? 'text-emerald-700' : 'text-rose-600'
+                        }`}
+                      >
+                        {pct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
+                      <div
+                        className={`h-full rounded-full ${healthy ? 'bg-emerald-500' : 'bg-amber-400'}`}
+                        style={{ width: `${Math.min(width, 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-slate-500">
+                      {formatMoney(Number(row.sale_price))} · costo {formatMoney(Number(row.avg_unit_cost))}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            {inStockMargins.length > 12 ? (
+              <ActionChip
+                className="mt-4"
+                emoji="📋"
+                onClick={() => setShowAllMargins((v) => !v)}
+              >
+                {showAllMargins ? 'Ver menos' : `Ver todos (${inStockMargins.length})`}
+              </ActionChip>
+            ) : null}
+          </div>
+        )}
       </details>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
