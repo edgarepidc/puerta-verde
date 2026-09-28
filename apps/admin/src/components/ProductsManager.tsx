@@ -1288,7 +1288,7 @@ export function ProductsManager({
                           window.location.assign('/?paquete=1');
                         }}
                       >
-                        En vez de tirar, armar paquete
+                        Paquete
                       </ActionChip>
                       <p className="max-w-[16rem] text-xs text-slate-500">
                         Convierte lo que pesaste en bolsas a precio fijo, en Caja.
@@ -1302,7 +1302,7 @@ export function ProductsManager({
                         disabled={stockSaving}
                         onClick={openTransform}
                       >
-                        En vez de tirar, transformar
+                        Transforma
                       </ActionChip>
                       <p className="max-w-[16rem] text-xs text-slate-500">
                         Haz pulpa, paletas u otro producto. El costo pasa; no es merma.
