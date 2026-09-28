@@ -14,6 +14,8 @@ import { DecimalInput } from '@/components/DecimalInput';
 import { LogoutButton } from '@/components/LogoutButton';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
+const SNOOZE_MS = 5 * 60 * 1000;
+
 type PendingSummary = {
   closingDate: string;
   totals: { cash: number };
@@ -21,6 +23,36 @@ type PendingSummary = {
   grandTotal: number;
   suggestedOpeningFloat: number | null;
 };
+
+function snoozeKey(date: string) {
+  return `pv-pending-cash-close-snooze:${date}`;
+}
+
+function readSnoozeUntil(date: string): number {
+  try {
+    const raw = sessionStorage.getItem(snoozeKey(date));
+    const until = Number(raw);
+    return Number.isFinite(until) ? until : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeSnoozeUntil(date: string, until: number) {
+  try {
+    sessionStorage.setItem(snoozeKey(date), String(until));
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearSnooze(date: string) {
+  try {
+    sessionStorage.removeItem(snoozeKey(date));
+  } catch {
+    /* private mode */
+  }
+}
 
 export function PendingCashCloseGate({
   date,
@@ -39,6 +71,21 @@ export function PendingCashCloseGate({
   const [error, setError] = useState<string | null>(null);
   const [closed, setClosed] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [snoozeUntil, setSnoozeUntil] = useState(0);
+
+  useEffect(() => {
+    setSnoozeUntil(readSnoozeUntil(date));
+    setReady(true);
+  }, [date]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const remaining = snoozeUntil - Date.now();
+    if (remaining <= 0) return;
+    const timer = window.setTimeout(() => setSnoozeUntil(0), remaining);
+    return () => window.clearTimeout(timer);
+  }, [ready, snoozeUntil]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,11 +98,12 @@ export function PendingCashCloseGate({
         if (!response.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja de ayer');
         if (cancelled) return;
         if (payload.closing) {
+          clearSnooze(date);
           setClosed(true);
           return;
         }
         setSummary(payload);
-        if (payload.suggestedOpeningFloat != null) {
+        if (payload.suggestedOpeningFloat != null && openingFloat === '') {
           setOpeningFloat(String(payload.suggestedOpeningFloat));
         }
       } catch (err) {
@@ -68,16 +116,37 @@ export function PendingCashCloseGate({
     return () => {
       cancelled = true;
     };
+    // openingFloat is only used to avoid overwriting a typed fondo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, reloadToken]);
 
+  const visible = ready && !closed && snoozeUntil <= Date.now();
+
   useEffect(() => {
-    if (closed) return;
+    if (!visible) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [closed]);
+  }, [visible]);
+
+  function snooze() {
+    const until = Date.now() + SNOOZE_MS;
+    writeSnoozeUntil(date, until);
+    setSnoozeUntil(until);
+  }
+
+  useEffect(() => {
+    if (!visible) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') snooze();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // snooze closes over `date` from this render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, date]);
 
   async function closeYesterday() {
     if (!canClose || !summary) return;
@@ -106,6 +175,7 @@ export function PendingCashCloseGate({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo cerrar la caja');
+      clearSnooze(date);
       setClosed(true);
       router.refresh();
     } catch (err) {
@@ -115,7 +185,7 @@ export function PendingCashCloseGate({
     }
   }
 
-  if (closed) return null;
+  if (!visible) return null;
 
   const expected = expectedCashOnHand(
     openingFloat === '' ? 0 : Number(openingFloat),
@@ -129,12 +199,16 @@ export function PendingCashCloseGate({
     <div
       className="pv-modal-overlay fixed inset-0 z-[90] flex items-end justify-center overflow-y-auto p-4 sm:items-center"
       role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) snooze();
+      }}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="pending-cash-close-title"
         className="pv-glass-card w-full max-w-lg p-5 shadow-xl sm:p-6"
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Cierre pendiente</p>
         <h2 id="pending-cash-close-title" className="mt-1 text-xl font-semibold text-slate-900">
@@ -143,7 +217,7 @@ export function PendingCashCloseGate({
         <p className="mt-1 text-sm text-slate-600">
           {spoken}
           {weekday ? ` · ${weekday}` : ''}. Cuenta lo que había en caja al terminar ayer (sin las
-          ventas de hoy) antes de seguir.
+          ventas de hoy). Si hay una venta en curso, cierra este aviso: vuelve a salir en 5 minutos.
         </p>
 
         {loading ? <p className="mt-4 text-sm text-slate-500">Cargando ventas de ayer…</p> : null}
@@ -215,15 +289,17 @@ export function PendingCashCloseGate({
 
         {!canClose ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Pide a quien cierra caja que entre y cuente el efectivo de ayer. Mientras tanto no se
-            puede seguir en el admin.
+            Pide a quien cierra caja que cuente el efectivo de ayer. Puedes cerrar el aviso para
+            vender; vuelve a salir en 5 minutos.
           </p>
         ) : null}
 
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          {!canClose || (!summary && !loading) ? <LogoutButton /> : <span />}
+          <ActionChip tone="slate" onClick={snooze}>
+            Seguir vendiendo
+          </ActionChip>
           {canClose && summary ? (
             <ActionChip
               size="lg"
@@ -247,9 +323,12 @@ export function PendingCashCloseGate({
             </ActionChip>
           ) : null}
           {canClose && !summary && !loading ? (
-            <ActionChip tone="slate" onClick={() => setReloadToken((n) => n + 1)}>
-              Reintentar
-            </ActionChip>
+            <div className="flex flex-wrap gap-2">
+              <LogoutButton />
+              <ActionChip tone="slate" onClick={() => setReloadToken((n) => n + 1)}>
+                Reintentar
+              </ActionChip>
+            </div>
           ) : null}
         </div>
       </section>

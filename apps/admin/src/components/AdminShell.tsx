@@ -12,8 +12,10 @@ import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
 
-const PendingCashCloseGate = dynamic(() =>
-  import('@/components/PendingCashCloseGate').then((mod) => ({ default: mod.PendingCashCloseGate })),
+const PendingCashCloseGate = dynamic(
+  () =>
+    import('@/components/PendingCashCloseGate').then((mod) => ({ default: mod.PendingCashCloseGate })),
+  { ssr: false },
 );
 
 function StorefrontIcon({ className = 'h-4 w-4' }: { className?: string }) {
