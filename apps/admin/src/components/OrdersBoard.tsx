@@ -38,7 +38,6 @@ import {
 } from '@/components/CounterSalePanel';
 import type { ActiveClearancePack } from '@/components/ClearancePackPanel';
 import { DecimalInput, parseDecimal } from '@/components/DecimalInput';
-import { LowStockBanner } from '@/components/LowStockBanner';
 import { ProductSearchSelect } from '@/components/ProductSearchSelect';
 import { ThermalPrinterChip } from '@/components/ThermalPrinterChip';
 import {
@@ -775,7 +774,6 @@ export function OrdersBoard({
 
   return (
     <div className="space-y-3">
-      <LowStockBanner products={products.filter((product) => !product.product.pos_only)} />
       {newOrderNotice ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p className="min-w-0 font-medium">{newOrderNotice}</p>
