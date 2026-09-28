@@ -38,7 +38,7 @@ export const OPERATING_COST_CATEGORY_HINTS: Record<OperatingCostCategory, string
   rent: 'Local y similares',
   payroll: 'Sueldos y pagos a personas',
   fixed: 'Internet, luz, agua, suscripciones',
-  variable: 'Lo que no se paga igual cada mes',
+  variable: 'Visita al mercado y lo que no se paga igual cada mes',
 };
 
 export function isOperatingCostCategory(value: unknown): value is OperatingCostCategory {
