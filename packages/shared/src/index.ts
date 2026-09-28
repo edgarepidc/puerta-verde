@@ -34,6 +34,12 @@ export {
 } from './sales-export';
 
 export {
+  cashCloseValidationError,
+  expectedCashOnHand,
+  parseOptionalMoney,
+} from './cash-closing';
+
+export {
   PERMISSION_KEYS,
   PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,

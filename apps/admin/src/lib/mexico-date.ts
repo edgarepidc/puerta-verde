@@ -180,6 +180,27 @@ export function addMexicoDays(ymd: string, days: number): string {
   return todayMexicoYmd(probe);
 }
 
+export function yesterdayMexicoYmd(date = new Date()): string {
+  return addMexicoDays(todayMexicoYmd(date), -1);
+}
+
+export function formatMexicoSpokenDay(ymd: string): string {
+  if (!isValidYmd(ymd)) return ymd;
+  const date = new Date(`${ymd}T12:00:00`);
+  const month = date
+    .toLocaleDateString('es-MX', { month: 'short' })
+    .replace('.', '')
+    .toLowerCase();
+  const yy = String(date.getFullYear()).slice(-2);
+  return `${date.getDate()} ${month} ${yy}`;
+}
+
+export function formatMexicoWeekday(ymd: string): string {
+  if (!isValidYmd(ymd)) return '';
+  const date = new Date(`${ymd}T12:00:00`);
+  return date.toLocaleDateString('es-MX', { weekday: 'long' }).toLowerCase();
+}
+
 /** Inclusive start / exclusive end instants for a Mexico City calendar day. */
 export function mexicoYmdBoundsIso(ymd: string): { start: string; end: string } {
   return {
