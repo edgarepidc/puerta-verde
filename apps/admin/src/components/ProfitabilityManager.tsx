@@ -33,7 +33,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
+import { ActionChip, ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
 import { MoneyPocketField } from '@/components/MoneyPocketField';
 import {
   PeriodSalesCharts,
@@ -1662,16 +1662,22 @@ export function ProfitabilityManager({
                   const groupTotal = group.items.reduce((sum, row) => sum + Number(row.amount), 0);
                   return (
                     <li key={group.category}>
-                      <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800">{group.label}</p>
-                          <p className="text-xs text-slate-500">{group.hint}</p>
-                        </div>
-                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
-                          {formatMoney(groupTotal)}
-                        </p>
-                      </div>
-                      <ul className="divide-y divide-slate-50">
+                      <details className="group/cost">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50/90 px-4 py-2.5 marker:content-none [&::-webkit-details-marker]:hidden">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-800">{group.label}</p>
+                            <p className="text-xs text-slate-500">
+                              {group.items.length} · {group.hint}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <p className="text-sm font-semibold tabular-nums text-slate-900">
+                              {formatMoney(groupTotal)}
+                            </p>
+                            <ChevronDownIcon nested="cost" className="text-slate-400" />
+                          </div>
+                        </summary>
+                      <ul className="divide-y divide-slate-50 border-t border-slate-50">
                         {group.items.map((row) => {
                   const editing = editCost?.id === row.id;
                   const chargeDay = normalizeChargeDay(row.charge_day);
@@ -1788,24 +1794,28 @@ export function ProfitabilityManager({
                   );
                 })}
                       </ul>
+                      </details>
                     </li>
                   );
                 })}
               </ul>
             )}
 
-            <div className="border-t border-slate-100">
-              <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
+            <details className="group/cost border-t border-slate-100">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50/90 px-4 py-2.5 marker:content-none [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800">Gastos de visita</p>
                   <p className="text-xs text-slate-500">
-                    {OPERATING_COST_CATEGORY_HINTS.variable}
+                    {visitMovements.length} · {OPERATING_COST_CATEGORY_HINTS.variable}
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
-                  {formatMoney(visitTotal)}
-                </p>
-              </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="text-sm font-semibold tabular-nums text-slate-900">
+                    {formatMoney(visitTotal)}
+                  </p>
+                  <ChevronDownIcon nested="cost" className="text-slate-400" />
+                </div>
+              </summary>
               {visitMovements.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-slate-500">
                   Sin gastos de visita en este periodo.
@@ -1913,6 +1923,7 @@ export function ProfitabilityManager({
                   })}
                 </ul>
               )}
+            </details>
               <div className="border-t border-slate-50 bg-white/70 p-4">
                 <p className="text-xs text-slate-500">Gasolina, diablero o caseta de una visita.</p>
                 <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
@@ -1954,7 +1965,6 @@ export function ProfitabilityManager({
                   onChange={(e) => setVisitNotes(e.target.value)}
                 />
               </div>
-            </div>
 
             {removedHereCosts.length > 0 ? (
               <details className="border-t border-slate-100">

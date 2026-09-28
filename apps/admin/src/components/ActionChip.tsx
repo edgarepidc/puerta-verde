@@ -15,14 +15,16 @@ export function ChevronDownIcon({
   nested = false,
 }: {
   className?: string;
-  nested?: boolean | 'sub' | 'vis';
+  nested?: boolean | 'sub' | 'vis' | 'cost';
 }) {
   const rotate =
     nested === 'vis'
       ? 'group-open/vis:rotate-180'
-      : nested
-        ? 'group-open/sub:rotate-180'
-        : 'group-open:rotate-180';
+      : nested === 'cost'
+        ? 'group-open/cost:rotate-180'
+        : nested
+          ? 'group-open/sub:rotate-180'
+          : 'group-open:rotate-180';
   return (
     <svg
       className={`h-4 w-4 transition ${rotate} ${className}`}
