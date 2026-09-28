@@ -1,22 +1,16 @@
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { redirect } from 'next/navigation';
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { AdminNav } from '@/components/AdminNav';
 import { BranchSwitcher } from '@/components/BranchSwitcher';
 import { LogoutButton } from '@/components/LogoutButton';
+import { PendingCashCloseGate } from '@/components/PendingCashCloseGate';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { mexicoDayGreeting, yesterdayMexicoYmd } from '@/lib/mexico-date';
 import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
-
-const PendingCashCloseGate = dynamic(
-  () =>
-    import('@/components/PendingCashCloseGate').then((mod) => ({ default: mod.PendingCashCloseGate })),
-  { ssr: false },
-);
 
 function StorefrontIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
