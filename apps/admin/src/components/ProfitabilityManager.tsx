@@ -1407,9 +1407,9 @@ export function ProfitabilityManager({
                 📊
               </div>
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Por categoría</p>
+                <p className="text-base font-semibold text-slate-900">Margen por categoría y producto</p>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Margen del mix vendido · {activePeriodLabel}
+                  Mix vendido y anaquel de hoy · {activePeriodLabel}
                 </p>
               </div>
             </div>
@@ -1489,35 +1489,22 @@ export function ProfitabilityManager({
             </div>
           </details>
         ) : null}
-          </div>
-        </details>
 
         <details
-          className="group/sub rounded-xl border border-slate-100"
+          className="group/vis rounded-xl border border-slate-100"
           open={openMargenes}
           onToggle={(event) => setOpenMargenes(event.currentTarget.open)}
         >
           <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
-            <div className="flex min-w-0 items-start gap-3">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
-                aria-hidden
-              >
-                🥬
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Precio vs costo</p>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Anaquel de hoy · no es el mix vendido
-                </p>
-              </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800">Margen de cada producto</p>
+              <p className="mt-0.5 text-xs text-slate-500">Anaquel de hoy · no es el mix vendido</p>
             </div>
-            <NestedFoldChip />
+            <NestedFoldChip group="vis" />
           </summary>
           <div className="space-y-4 border-t border-slate-100 p-4">
-
         {inStockMargins.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">Sin productos con margen.</p>
+          <p className="py-4 text-center text-sm text-slate-500">Sin productos con margen.</p>
         ) : (
           <div>
             <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1566,6 +1553,8 @@ export function ProfitabilityManager({
             ) : null}
           </div>
         )}
+          </div>
+        </details>
           </div>
         </details>
       </details>
