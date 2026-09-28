@@ -8,7 +8,6 @@ import {
   OPERATING_COST_CATEGORY_LABELS,
   formatChargeDayLabel,
   formatDecimal,
-  formatMexicoDayLabel,
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
@@ -586,105 +585,6 @@ function ProfitBuildUp({
           {zeroCostSold.length > 4 ? ` · +${zeroCostSold.length - 4}` : ''}. Eso infla el margen.
         </p>
       ) : null}
-    </section>
-  );
-}
-
-function CashBridge({
-  openingTotal,
-  openingAsOf,
-  ticketIn,
-  ticketInCash,
-  ticketInAccount,
-  pausedIn,
-  periodIn,
-  periodOut,
-  closing,
-}: {
-  openingTotal: number;
-  openingAsOf: string | null;
-  ticketIn: number;
-  ticketInCash: number;
-  ticketInAccount: number;
-  pausedIn: number;
-  periodIn: number;
-  periodOut: number;
-  closing: number;
-}) {
-  const otherIn = Math.max(periodIn - ticketIn - pausedIn, 0);
-  return (
-    <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-      <h3 className="text-sm font-semibold text-slate-900">Caja y cuenta</h3>
-      <p className="mt-0.5 text-xs text-slate-500">
-        Del último conteo a Tienes, con los tickets cobrados. No es la utilidad.
-      </p>
-      <ul className="mt-3 space-y-2.5 text-sm">
-        <li className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">Conteo</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              {openingAsOf ? formatMexicoDayLabel(openingAsOf) : 'Aún no hay un conteo guardado'}
-            </span>
-          </span>
-          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(openingTotal)}
-          </span>
-        </li>
-        <li className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">+ Tickets cobrados</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Efectivo {formatMoney(ticketInCash)} · cuenta {formatMoney(ticketInAccount)}
-            </span>
-          </span>
-          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(ticketIn)}
-          </span>
-        </li>
-        {pausedIn > 0.009 ? (
-          <li className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0">
-              <span className="font-medium text-slate-800">+ Seguía en la cuenta</span>
-              <span className="mt-0.5 block text-xs text-slate-500">
-                Renta de agosto que no se pagó
-              </span>
-            </span>
-            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-              {formatMoney(pausedIn)}
-            </span>
-          </li>
-        ) : null}
-        {otherIn > 0.009 ? (
-          <li className="flex items-baseline justify-between gap-3">
-            <span className="font-medium text-slate-800">+ Aportaciones y otros</span>
-            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-              {formatMoney(otherIn)}
-            </span>
-          </li>
-        ) : null}
-        <li className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">− Salió</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Incluye la renta que sí pagaste el 1 · compras y visita
-            </span>
-          </span>
-          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(periodOut)}
-          </span>
-        </li>
-        <li className="flex items-baseline justify-between gap-3 border-t border-emerald-100 pt-2.5">
-          <span className="min-w-0">
-            <span className="font-medium text-slate-800">= Tienes</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              Caja + cuenta. La tarjeta entra al cobrar, no cuando el banco deposita.
-            </span>
-          </span>
-          <span className="shrink-0 font-semibold tabular-nums text-slate-900">
-            {formatMoney(closing)}
-          </span>
-        </li>
-      </ul>
     </section>
   );
 }
@@ -1603,18 +1503,6 @@ export function ProfitabilityManager({
           hint="Compras, local y visita. El costo de lo vendido está arriba."
           emoji="🧾"
           iconClass="bg-amber-100"
-        />
-
-        <CashBridge
-          openingTotal={Number(moneyPosition?.openingTotal ?? 0)}
-          openingAsOf={moneyPosition?.openingAsOf ?? null}
-          ticketIn={Number(moneyPosition?.ticketIn ?? 0)}
-          ticketInCash={Number(moneyPosition?.ticketInCash ?? 0)}
-          ticketInAccount={Number(moneyPosition?.ticketInAccount ?? 0)}
-          pausedIn={Number(moneyPosition?.pausedIn ?? 0)}
-          periodIn={Number(moneyPosition?.periodIn ?? 0)}
-          periodOut={Number(moneyPosition?.periodOut ?? 0)}
-          closing={leftover}
         />
 
         {summary && costBreakdown.total > 0 ? (
