@@ -288,6 +288,7 @@ export {
   remainingAfterWaste,
   quantityForWeighedWaste,
   quantityForStockCount,
+  validateTransformProduce,
   type InventoryMovementInput,
   type InventoryMovementType,
   type ManualInventoryMovementType,

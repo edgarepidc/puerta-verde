@@ -1,4 +1,11 @@
-export const INVENTORY_MOVEMENT_TYPES = ['purchase', 'sale', 'waste', 'adjustment', 'pack'] as const;
+export const INVENTORY_MOVEMENT_TYPES = [
+  'purchase',
+  'sale',
+  'waste',
+  'adjustment',
+  'pack',
+  'transform',
+] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
 export const MANUAL_INVENTORY_TYPES = ['purchase', 'waste', 'adjustment'] as const;
@@ -10,6 +17,7 @@ export const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovementType, string> = 
   waste: 'Merma',
   adjustment: 'Ajuste',
   pack: 'Paquete',
+  transform: 'Transformar',
 };
 
 export interface InventoryMovementInput {
@@ -94,6 +102,36 @@ export function remainingAfterWaste(counted: number, waste: number): number {
 /** Quantity to send when merma is weighed on its own (what you are throwing away). */
 export function quantityForWeighedWaste(waste: number): number {
   return roundStockQty(waste);
+}
+
+const WHOLE_TRANSFORM_UNITS = new Set(['piece', 'bunch', 'bag', 'box']);
+
+export function validateTransformProduce(input: {
+  sourceBranchProductId: string;
+  destBranchProductId: string;
+  sourceQuantity: number;
+  destQuantity: number;
+  destUnit?: string | null;
+}): string | null {
+  if (!input.sourceBranchProductId) return 'Selecciona el producto que conviertes.';
+  if (!input.destBranchProductId) return 'Elige el producto que armas (pulpa, paleta…).';
+  if (input.sourceBranchProductId === input.destBranchProductId) {
+    return 'Elige un producto distinto al que estás pesando.';
+  }
+  if (!(Number(input.sourceQuantity) > 0)) {
+    return 'Anota en A tirar lo que vas a convertir.';
+  }
+  if (!(Number(input.destQuantity) > 0)) {
+    return 'Indica cuánto salió (paletas, kg de pulpa…).';
+  }
+  if (
+    input.destUnit &&
+    WHOLE_TRANSFORM_UNITS.has(input.destUnit) &&
+    !Number.isInteger(Number(input.destQuantity))
+  ) {
+    return 'Indica piezas enteras.';
+  }
+  return null;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   quantityForWeighedWaste,
   remainingAfterWaste,
   roundStockQty,
+  validateTransformProduce,
   type ProductInput,
   type ProductUnit,
 } from '@puertaverde/shared';
@@ -58,6 +59,7 @@ interface ProductRow {
     is_active: boolean;
     shelf_life_days: number | null;
     weigh_at_fulfillment?: boolean;
+    pos_only?: boolean;
     category_id: string | null;
     category: { id: string; name: string } | null;
   };
@@ -217,6 +219,10 @@ export function ProductsManager({
   const [stockNotes, setStockNotes] = useState('');
   const [stockError, setStockError] = useState<string | null>(null);
   const [stockSaving, setStockSaving] = useState(false);
+  const [transformOpen, setTransformOpen] = useState(false);
+  const [transformDestId, setTransformDestId] = useState('');
+  const [transformQtyText, setTransformQtyText] = useState('');
+  const [transformQuery, setTransformQuery] = useState('');
   const [openProductos, setOpenProductos] = useState(true);
   const [openHistorial, setOpenHistorial] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -264,6 +270,20 @@ export function ProductsManager({
   const stockRemaining = remainingAfterWaste(stockCounted, stockWaste);
   const stockCountDelta = roundStockQty(stockCounted - stockSystem);
   const hasWasteQty = Boolean(wasteText.trim()) && stockWaste > 0;
+  const transformDest = products.find((row) => row.id === transformDestId) ?? null;
+  const transformMatches = useMemo(() => {
+    if (!stockRow) return [];
+    const q = transformQuery.trim().toLowerCase();
+    return products
+      .filter((row) => row.id !== stockRow.id && !row.product.pos_only)
+      .filter((row) => {
+        if (!q) return true;
+        const hay = `${row.product.name} ${row.product.category?.name ?? ''}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .sort((a, b) => a.product.name.localeCompare(b.product.name, 'es', { sensitivity: 'base' }))
+      .slice(0, 8);
+  }, [products, stockRow, transformQuery]);
 
   function toggleSort(column: SortKey) {
     if (sortKey === column) {
@@ -317,6 +337,10 @@ export function ProductsManager({
     setWasteText('');
     setStockNotes('');
     setStockError(null);
+    setTransformOpen(false);
+    setTransformDestId('');
+    setTransformQtyText('');
+    setTransformQuery('');
   }
 
   function closeForm() {
@@ -524,6 +548,10 @@ export function ProductsManager({
     setStockNotes('');
     setStockError(null);
     setStockSaving(false);
+    setTransformOpen(false);
+    setTransformDestId('');
+    setTransformQtyText('');
+    setTransformQuery('');
   }
 
   async function submitStock(kind: 'waste' | 'adjustment') {
@@ -613,6 +641,116 @@ export function ProductsManager({
       setStockError(null);
     } catch (err) {
       setStockError(err instanceof Error ? err.message : 'Error al registrar');
+    } finally {
+      setStockSaving(false);
+    }
+  }
+
+  function openTransform() {
+    if (!stockRow || !canAdjustInventory) return;
+    if (!hasWasteQty || stockRemaining < 0) {
+      setStockError('Anota en A tirar lo que vas a convertir.');
+      setTransformOpen(false);
+      return;
+    }
+    if (stockCountDelta !== 0) {
+      setStockError(
+        'Para transformar deja el conteo como el stock del sistema, o ajústalo primero. En “A tirar” anota lo que vas a convertir.',
+      );
+      setTransformOpen(false);
+      return;
+    }
+    setStockError(null);
+    setTransformOpen(true);
+    try {
+      const last = sessionStorage.getItem(`pv-transform-dest:${stockRow.id}`);
+      if (last && products.some((row) => row.id === last && row.id !== stockRow.id)) {
+        setTransformDestId(last);
+      }
+    } catch {
+      /* private mode */
+    }
+  }
+
+  async function submitTransform() {
+    if (!stockRow || !canAdjustInventory) return;
+    const counted = parseDecimal(countedText);
+    const waste = parseDecimal(wasteText);
+    if (!Number.isFinite(counted) || counted < 0) {
+      setStockError('Indica un conteo válido (0 o más).');
+      return;
+    }
+    if (roundStockQty(counted - Number(stockRow.stock)) !== 0) {
+      setStockError(
+        'Para transformar deja el conteo como el stock del sistema, o ajústalo primero.',
+      );
+      return;
+    }
+    if (remainingAfterWaste(counted, waste) < 0) {
+      setStockError('Lo que conviertes no puede ser mayor al conteo físico.');
+      return;
+    }
+    const destQty = parseDecimal(transformQtyText);
+    const validation = validateTransformProduce({
+      sourceBranchProductId: stockRow.id,
+      destBranchProductId: transformDestId,
+      sourceQuantity: waste,
+      destQuantity: destQty,
+      destUnit: transformDest?.product.unit,
+    });
+    if (validation) {
+      setStockError(validation);
+      return;
+    }
+    setStockSaving(true);
+    setStockError(null);
+    try {
+      const response = await fetch('/api/inventory/transform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceBranchProductId: stockRow.id,
+          destBranchProductId: transformDestId,
+          sourceQuantity: quantityForWeighedWaste(waste),
+          destQuantity: destQty,
+          destUnit: transformDest?.product.unit,
+          notes: stockNotes.trim() || null,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'No se pudo transformar');
+      try {
+        sessionStorage.setItem(`pv-transform-dest:${stockRow.id}`, transformDestId);
+      } catch {
+        /* private mode */
+      }
+      const [productsRes, inventoryRes] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/inventory'),
+      ]);
+      const payload = await productsRes.json();
+      if (productsRes.ok) {
+        setProducts(payload.products);
+        setCategories(payload.categories);
+        const updated = (payload.products as ProductRow[]).find((row) => row.id === stockRow.id);
+        if (updated) {
+          setStockRow(updated);
+          setEditingRow(updated);
+          setCountedText(formatStockQty(Number(updated.stock)));
+          setWasteText('');
+        }
+      }
+      if (inventoryRes.ok) {
+        const inventory = await inventoryRes.json();
+        setMovements(inventory.movements ?? []);
+      }
+      setStockNotes('');
+      setTransformOpen(false);
+      setTransformQtyText('');
+      setTransformQuery('');
+      setStockError(null);
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : 'Error al transformar');
     } finally {
       setStockSaving(false);
     }
@@ -1159,6 +1297,20 @@ export function ProductsManager({
                     <div className="space-y-1">
                       <ActionChip
                         size="lg"
+                        tone="emerald"
+                        emoji="🍧"
+                        disabled={stockSaving}
+                        onClick={openTransform}
+                      >
+                        En vez de tirar, transformar
+                      </ActionChip>
+                      <p className="max-w-[16rem] text-xs text-slate-500">
+                        Haz pulpa, paletas u otro producto. El costo pasa; no es merma.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <ActionChip
+                        size="lg"
                         tone="rose"
                         emoji="🍂"
                         disabled={stockSaving || !hasWasteQty || stockRemaining < 0}
@@ -1185,6 +1337,105 @@ export function ProductsManager({
                       </p>
                     </div>
                   </div>
+                  {transformOpen ? (
+                    <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                      <p className="text-sm text-emerald-950">
+                        Vas a convertir {formatStockQty(stockWaste)} {stockUnit} de{' '}
+                        {stockRow.product.name}. Primero crea en el catálogo el producto que armas
+                        (Paleta de mango, Pulpa…).
+                      </p>
+                      <label className="block text-sm font-medium text-slate-700">
+                        Producto que armas
+                        <input
+                          className="pv-input mt-1"
+                          value={
+                            transformDest && !transformQuery
+                              ? transformDest.product.name
+                              : transformQuery
+                          }
+                          onChange={(event) => {
+                            setTransformQuery(event.target.value);
+                            if (transformDestId) setTransformDestId('');
+                          }}
+                          onFocus={() => {
+                            if (transformDest) setTransformQuery('');
+                          }}
+                          placeholder="Busca paleta, pulpa…"
+                        />
+                      </label>
+                      {transformDest && !transformQuery ? (
+                        <p className="text-xs text-slate-600">
+                          {transformDest.product.name} · {PRODUCT_UNIT_LABELS[transformDest.product.unit]}
+                        </p>
+                      ) : (
+                        <ul className="max-h-40 overflow-y-auto rounded-xl border border-slate-100 bg-white">
+                          {transformMatches.length === 0 ? (
+                            <li className="px-3 py-2 text-sm text-slate-500">
+                              No hay coincidencias. Crea el producto en el catálogo.
+                            </li>
+                          ) : (
+                            transformMatches.map((row) => (
+                              <li key={row.id}>
+                                <button
+                                  type="button"
+                                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-emerald-50"
+                                  onClick={() => {
+                                    setTransformDestId(row.id);
+                                    setTransformQuery('');
+                                  }}
+                                >
+                                  <span className="font-medium text-slate-900">{row.product.name}</span>
+                                  <span className="text-xs text-slate-500">
+                                    {PRODUCT_UNIT_LABELS[row.product.unit]}
+                                  </span>
+                                </button>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                      <label className="block w-40 text-sm font-medium text-slate-700">
+                        Cuántas salieron
+                        <DecimalInput
+                          className="pv-input mt-1"
+                          value={transformQtyText}
+                          onChange={setTransformQtyText}
+                          placeholder="0"
+                          integer={
+                            transformDest
+                              ? ['piece', 'bunch', 'bag', 'box'].includes(transformDest.product.unit)
+                              : false
+                          }
+                        />
+                      </label>
+                      {transformDest ? (
+                        <p className="text-xs text-slate-500">
+                          En {PRODUCT_UNIT_LABELS[transformDest.product.unit]}
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap gap-2">
+                        <ActionChip
+                          size="lg"
+                          tone="emerald"
+                          emoji="🍧"
+                          disabled={stockSaving || !transformDestId || !transformQtyText.trim()}
+                          onClick={() => void submitTransform()}
+                        >
+                          {stockSaving ? 'Guardando…' : 'Convertir'}
+                        </ActionChip>
+                        <ActionChip
+                          tone="slate"
+                          disabled={stockSaving}
+                          onClick={() => {
+                            setTransformOpen(false);
+                            setTransformQuery('');
+                          }}
+                        >
+                          Cancelar
+                        </ActionChip>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </details>
             ) : null}

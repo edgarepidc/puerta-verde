@@ -444,7 +444,7 @@ export interface Database {
           id: string;
           branch_id: string;
           branch_product_id: string;
-          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack' | 'transform';
           quantity: number;
           notes: string | null;
           order_id: string | null;
@@ -457,7 +457,7 @@ export interface Database {
         Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
           branch_id: string;
           branch_product_id: string;
-          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack' | 'transform';
           quantity: number;
         };
         Update: Partial<Database['public']['Tables']['inventory_movements']['Row']>;
@@ -832,7 +832,7 @@ export interface Database {
       record_inventory_movement: {
         Args: {
           p_branch_product_id: string;
-          p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
+          p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack' | 'transform';
           p_quantity: number;
           p_notes: string | null;
           p_expires_at?: string | null;
@@ -856,6 +856,20 @@ export interface Database {
           quantity_remaining: number;
           price: number;
           title: string;
+        }>;
+      };
+      transform_produce: {
+        Args: {
+          p_source_branch_product_id: string;
+          p_source_quantity: number;
+          p_dest_branch_product_id: string;
+          p_dest_quantity: number;
+          p_notes?: string | null;
+        };
+        Returns: Array<{
+          source_stock: number;
+          dest_stock: number;
+          dest_avg_unit_cost: number;
         }>;
       };
       merge_branch_products: {

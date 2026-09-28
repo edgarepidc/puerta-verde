@@ -46,6 +46,7 @@ export default async function ProductsPage() {
           is_active,
           shelf_life_days,
           weigh_at_fulfillment,
+          pos_only,
           category_id,
           category:product_categories ( id, name )
         )
@@ -71,7 +72,7 @@ export default async function ProductsPage() {
         )
       `)
       .eq('branch_id', tenant.branchId)
-      .in('movement_type', ['waste', 'adjustment'])
+        .in('movement_type', ['waste', 'adjustment', 'transform'])
       .order('created_at', { ascending: false })
       .limit(80),
     supabase.rpc('get_restock_forecast', {

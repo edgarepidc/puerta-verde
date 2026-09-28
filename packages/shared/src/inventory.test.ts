@@ -11,6 +11,7 @@ import {
   quantityForWeighedWaste,
   remainingAfterWaste,
   roundStockQty,
+  validateTransformProduce,
 } from './inventory';
 
 test('chile detection by name or category', () => {
@@ -69,4 +70,45 @@ test('quantityForWeighedWaste keeps three decimal places', () => {
   assert.equal(quantityForWeighedWaste(0.8), 0.8);
   assert.equal(quantityForWeighedWaste(1.2346), 1.235);
   assert.equal(roundStockQty(12.08 - 0.8), 11.28);
+});
+
+test('validateTransformProduce requires a different destination and amounts', () => {
+  assert.equal(
+    validateTransformProduce({
+      sourceBranchProductId: 'mango',
+      destBranchProductId: '',
+      sourceQuantity: 1.2,
+      destQuantity: 10,
+    }),
+    'Elige el producto que armas (pulpa, paleta…).',
+  );
+  assert.equal(
+    validateTransformProduce({
+      sourceBranchProductId: 'mango',
+      destBranchProductId: 'mango',
+      sourceQuantity: 1.2,
+      destQuantity: 10,
+    }),
+    'Elige un producto distinto al que estás pesando.',
+  );
+  assert.equal(
+    validateTransformProduce({
+      sourceBranchProductId: 'mango',
+      destBranchProductId: 'paleta',
+      sourceQuantity: 1.2,
+      destQuantity: 12,
+      destUnit: 'piece',
+    }),
+    null,
+  );
+  assert.equal(
+    validateTransformProduce({
+      sourceBranchProductId: 'mango',
+      destBranchProductId: 'paleta',
+      sourceQuantity: 1.2,
+      destQuantity: 12.5,
+      destUnit: 'piece',
+    }),
+    'Indica piezas enteras.',
+  );
 });
