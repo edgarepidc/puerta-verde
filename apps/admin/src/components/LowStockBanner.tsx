@@ -45,9 +45,10 @@ export function LowStockBanner({
   );
 
   const [visible, setVisible] = useState(false);
+  const signature = lowStock.map((product) => product.id).join(',');
 
   useEffect(() => {
-    if (lowStock.length === 0) {
+    if (!signature) {
       setVisible(false);
       return;
     }
@@ -55,7 +56,7 @@ export function LowStockBanner({
     if (persist) return;
     const timer = window.setTimeout(() => setVisible(false), AUTO_HIDE_MS);
     return () => window.clearTimeout(timer);
-  }, [lowStock, persist]);
+  }, [signature, persist]);
 
   if (!visible || lowStock.length === 0) return null;
 

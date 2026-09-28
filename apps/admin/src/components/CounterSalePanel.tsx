@@ -188,7 +188,7 @@ export function CounterSalePanel({
   printerChip?: ReactNode;
   /** Shown when collapsed and the board has open orders. */
   queueHint?: string | null;
-  /** Filter chips for Hoy / Por atender / canal — sit in the collapsed toolbar. */
+  /** Filter chips for Hoy / Por atender / canal — sit above the collapsed toolbar. */
   boardFilters?: ReactNode;
   initialPacks?: ActiveClearancePack[];
 }) {
@@ -982,7 +982,7 @@ export function CounterSalePanel({
         )}
       </section>
       {boardFilters ? (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>
+        <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 [&_button]:whitespace-nowrap">{boardFilters}</div>
       ) : null}
     </>
     );
@@ -990,33 +990,37 @@ export function CounterSalePanel({
 
   if (!open) {
     return (
-      <div className="mb-3 flex items-center gap-x-2 overflow-x-auto">
-        <div className="shrink-0">
-          <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
-          <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">ventas del día</p>
-        </div>
+      <div className="mb-3 space-y-2">
         {boardFilters ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [&_button]:whitespace-nowrap [&_span]:whitespace-nowrap">{boardFilters}</div>
+          <div className="flex flex-wrap items-center justify-center gap-1.5 [&_button]:whitespace-nowrap">
+            {boardFilters}
+          </div>
         ) : null}
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {printerChip}
-          {canAdjustInventory ? (
-            <ActionChip
-              tone="amber"
-              emoji="🧺"
-              className="shrink-0"
-              onClick={() => {
-                setPackDraft([]);
-                setPackOpen(true);
-                setOpen(true);
-              }}
-            >
-              Paquete
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="shrink-0">
+            <h1 className="text-xl font-semibold leading-tight text-slate-900">Pedidos</h1>
+            <p className="text-[11px] leading-snug text-slate-500 sm:text-xs">ventas del día</p>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+            {printerChip}
+            {canAdjustInventory ? (
+              <ActionChip
+                tone="amber"
+                emoji="🧺"
+                className="shrink-0"
+                onClick={() => {
+                  setPackDraft([]);
+                  setPackOpen(true);
+                  setOpen(true);
+                }}
+              >
+                Paquete
+              </ActionChip>
+            ) : null}
+            <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
+              Nueva venta
             </ActionChip>
-          ) : null}
-          <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
-            Nueva venta
-          </ActionChip>
+          </div>
         </div>
       </div>
     );
@@ -1938,7 +1942,7 @@ export function CounterSalePanel({
         );
       })() : null}
       {boardFilters ? (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">{boardFilters}</div>
+        <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5 [&_button]:whitespace-nowrap">{boardFilters}</div>
       ) : null}
     </>
   );
