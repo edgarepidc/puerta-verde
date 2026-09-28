@@ -376,6 +376,8 @@ export {
   INCOME_ENTRY_TYPE_LABELS,
   isIncomeEntryType,
   validateIncomeEntryInput,
+  defaultIncomePocket,
+  parseIncomePocket,
   type IncomeEntryInput,
   type IncomeEntryType,
 } from './income-entries';

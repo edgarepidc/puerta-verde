@@ -1,9 +1,11 @@
 import {
   addCollectedTicket,
+  addPocketInflow,
   addPocketOutflow,
   applyCashPocketTransfer,
   applyOperatingCostsToPockets,
   calendarMonthStart,
+  parseIncomePocket,
   parseMoneyPocket,
   pocketTotal,
   resolveMoneyPosition,
@@ -133,7 +135,7 @@ export async function fetchMoneyPosition(
       fetchPaged((rangeFrom, rangeTo) =>
         supabase
           .from('income_entries')
-          .select('entry_type, amount')
+          .select('entry_type, amount, paid_from')
           .eq('branch_id', branchId)
           .gte('entry_date', movementStart)
           .lte('entry_date', to)
@@ -166,9 +168,11 @@ export async function fetchMoneyPosition(
     }
 
     for (const row of incomes) {
-      const amount = Number(row.amount ?? 0);
-      if (row.entry_type === 'contribution') flows.accountIn += amount;
-      else flows.cashIn += amount;
+      addPocketInflow(
+        flows,
+        parseIncomePocket(row.paid_from, row.entry_type),
+        Number(row.amount ?? 0),
+      );
     }
 
     applyOperatingCostsToPockets(flows, costs, {

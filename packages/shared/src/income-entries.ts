@@ -1,3 +1,5 @@
+import { isMoneyPocket, parseMoneyPocket, type MoneyPocket } from './money-position';
+
 export const INCOME_ENTRY_TYPES = ['contribution', 'operating'] as const;
 
 export type IncomeEntryType = (typeof INCOME_ENTRY_TYPES)[number];
@@ -8,9 +10,17 @@ export const INCOME_ENTRY_TYPE_LABELS: Record<IncomeEntryType, string> = {
 };
 
 export const INCOME_ENTRY_TYPE_HINTS: Record<IncomeEntryType, string> = {
-  contribution: 'Capital que metiste. Suma a Tienes.',
-  operating: 'Reembolso o venta suelta. Sí entra a Tienes.',
+  contribution: 'Capital que metiste. Elige si entra a efectivo o a cuenta.',
+  operating: 'Reembolso o venta suelta. Elige si entra a efectivo o a cuenta.',
 };
+
+export function defaultIncomePocket(entryType: IncomeEntryType): MoneyPocket {
+  return entryType === 'contribution' ? 'account' : 'cash';
+}
+
+export function parseIncomePocket(value: unknown, entryType: IncomeEntryType): MoneyPocket {
+  return parseMoneyPocket(value, defaultIncomePocket(entryType));
+}
 
 export interface IncomeEntryInput {
   entryType: IncomeEntryType;
@@ -18,6 +28,7 @@ export interface IncomeEntryInput {
   amount: number;
   entryDate: string;
   notes?: string | null;
+  paidFrom?: MoneyPocket;
 }
 
 export function isIncomeEntryType(value: string): value is IncomeEntryType {
@@ -30,6 +41,7 @@ export function validateIncomeEntryInput(input: {
   amount: number;
   entryDate: string;
   notes?: string | null;
+  paidFrom?: string | null;
 }): string | null {
   if (!isIncomeEntryType(input.entryType)) {
     return 'Elige si es aportación u otro ingreso.';
@@ -40,6 +52,9 @@ export function validateIncomeEntryInput(input: {
   if (!(input.amount > 0)) return 'El monto debe ser mayor a cero.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.entryDate ?? '')) {
     return 'La fecha es inválida.';
+  }
+  if (input.paidFrom != null && input.paidFrom !== '' && !isMoneyPocket(input.paidFrom)) {
+    return 'Elige si entra a efectivo o a cuenta.';
   }
   return null;
 }

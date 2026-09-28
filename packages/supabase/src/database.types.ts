@@ -696,6 +696,7 @@ export interface Database {
           amount: number;
           entry_date: string;
           notes: string | null;
+          paid_from: 'cash' | 'account';
           created_by: string | null;
           created_at: string;
         };

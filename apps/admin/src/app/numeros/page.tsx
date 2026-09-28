@@ -49,7 +49,7 @@ export default async function NumerosPage() {
             .limit(200),
           supabase
             .from('income_entries')
-            .select('id, entry_type, concept, amount, entry_date, notes')
+            .select('id, entry_type, concept, amount, entry_date, notes, paid_from')
             .eq('branch_id', tenant.branchId)
             .gte('entry_date', range.start)
             .lte('entry_date', range.end)
@@ -131,6 +131,7 @@ export default async function NumerosPage() {
               amount: number;
               entry_date: string;
               notes: string | null;
+              paid_from?: 'cash' | 'account' | null;
             }>}
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
