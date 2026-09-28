@@ -658,11 +658,6 @@ export function ProfitabilityManager({
   const [incomeAmountText, setIncomeAmountText] = useState('');
   const [incomeDate, setIncomeDate] = useState(() => todayMexicoYmd());
   const [incomeNotes, setIncomeNotes] = useState('');
-  const [visitConcept, setVisitConcept] = useState('');
-  const [visitAmountText, setVisitAmountText] = useState('');
-  const [visitDate, setVisitDate] = useState(() => todayMexicoYmd());
-  const [visitNotes, setVisitNotes] = useState('');
-  const [visitPaidFrom, setVisitPaidFrom] = useState<MoneyPocket>('cash');
   const [saving, setSaving] = useState(false);
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1000,36 +995,6 @@ export function ProfitabilityManager({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
       setEditIncome(null);
-      await loadPeriod(from, to);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function addVisit() {
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          concept: visitConcept,
-          amount: parseDecimal(visitAmountText),
-          expenseDate: visitDate,
-          notes: visitNotes || null,
-          paidFrom: visitPaidFrom,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
-      setVisitConcept('');
-      setVisitAmountText('');
-      setVisitNotes('');
-      setOpenGastosUtilidad(true);
-      setOpenGastosLista(true);
       await loadPeriod(from, to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -1818,7 +1783,7 @@ export function ProfitabilityManager({
               </summary>
               {visitMovements.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-slate-500">
-                  Sin gastos de visita en este periodo.
+                  Sin gastos de visita en este periodo. Se anotan al registrar la compra.
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-50">
@@ -1924,47 +1889,6 @@ export function ProfitabilityManager({
                 </ul>
               )}
             </details>
-              <div className="border-t border-slate-50 bg-white/70 p-4">
-                <p className="text-xs text-slate-500">Gasolina, diablero o caseta de una visita.</p>
-                <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
-                  <input
-                    placeholder="Concepto"
-                    className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                    value={visitConcept}
-                    onChange={(e) => setVisitConcept(e.target.value)}
-                  />
-                  <DecimalInput
-                    placeholder="Monto"
-                    className="pv-input min-w-0"
-                    groupThousands
-                    value={visitAmountText}
-                    onChange={setVisitAmountText}
-                  />
-                  <input
-                    type="date"
-                    max={today}
-                    className="pv-input min-w-0"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                  />
-                  <MoneyPocketField
-                    label="Sale de"
-                    value={visitPaidFrom}
-                    onChange={setVisitPaidFrom}
-                  />
-                  <div className="col-span-2 flex justify-end lg:col-span-1">
-                    <ActionChip emoji="🛻" disabled={saving} onClick={() => void addVisit()}>
-                      Agregar visita
-                    </ActionChip>
-                  </div>
-                </div>
-                <input
-                  placeholder="Nota (opcional)"
-                  className="pv-input mt-2 w-full text-sm"
-                  value={visitNotes}
-                  onChange={(e) => setVisitNotes(e.target.value)}
-                />
-              </div>
 
             {removedHereCosts.length > 0 ? (
               <details className="border-t border-slate-100">
