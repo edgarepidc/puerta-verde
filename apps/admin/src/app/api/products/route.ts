@@ -52,6 +52,7 @@ const PRODUCT_SELECT_WITH_WEIGH = `
     is_active,
     shelf_life_days,
     weigh_at_fulfillment,
+    pos_only,
     category_id,
     category:product_categories ( id, name )
   )

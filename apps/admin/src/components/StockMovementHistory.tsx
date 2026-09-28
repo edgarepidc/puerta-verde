@@ -19,9 +19,10 @@ export interface StockMovementRow {
   branch_product: { product: { name: string } | null } | null;
 }
 
-const STYLE: Record<'waste' | 'adjustment', { emoji: string; badge: string }> = {
+const STYLE: Record<'waste' | 'adjustment' | 'transform', { emoji: string; badge: string }> = {
   waste: { emoji: '🍂', badge: 'bg-rose-100 text-rose-800' },
   adjustment: { emoji: '⚖️', badge: 'bg-sky-100 text-sky-800' },
+  transform: { emoji: '🍧', badge: 'bg-emerald-100 text-emerald-800' },
 };
 
 export function StockMovementHistory({
@@ -33,11 +34,14 @@ export function StockMovementHistory({
   open?: boolean;
   onToggle?: (open: boolean) => void;
 }) {
-  const [filter, setFilter] = useState<'all' | 'waste' | 'adjustment'>('all');
+  const [filter, setFilter] = useState<'all' | 'waste' | 'adjustment' | 'transform'>('all');
 
   const rows = useMemo(() => {
     const relevant = movements.filter(
-      (row) => row.movement_type === 'waste' || row.movement_type === 'adjustment',
+      (row) =>
+        row.movement_type === 'waste' ||
+        row.movement_type === 'adjustment' ||
+        row.movement_type === 'transform',
     );
     if (filter === 'all') return relevant;
     return relevant.filter((row) => row.movement_type === filter);
@@ -45,13 +49,17 @@ export function StockMovementHistory({
 
   const wasteCount = movements.filter((row) => row.movement_type === 'waste').length;
   const adjustCount = movements.filter((row) => row.movement_type === 'adjustment').length;
-  const relevantCount = wasteCount + adjustCount;
+  const transformCount = movements.filter((row) => row.movement_type === 'transform').length;
+  const relevantCount = wasteCount + adjustCount + transformCount;
   const hint =
     relevantCount === 0
-      ? 'Mermas y ajustes de esta sucursal'
+      ? 'Mermas, ajustes y transformaciones de esta sucursal'
       : [
           wasteCount > 0 ? `${wasteCount} merma${wasteCount === 1 ? '' : 's'}` : null,
           adjustCount > 0 ? `${adjustCount} ajuste${adjustCount === 1 ? '' : 's'}` : null,
+          transformCount > 0
+            ? `${transformCount} transformaci${transformCount === 1 ? 'ón' : 'ones'}`
+            : null,
         ]
           .filter(Boolean)
           .join(' · ');
@@ -81,6 +89,7 @@ export function StockMovementHistory({
                 { key: 'all' as const, label: 'Todos' },
                 { key: 'waste' as const, label: 'Merma' },
                 { key: 'adjustment' as const, label: 'Ajuste' },
+                { key: 'transform' as const, label: 'Transformar' },
               ]
             ).map((opt) => (
               <button
@@ -101,15 +110,24 @@ export function StockMovementHistory({
 
         {rows.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-            Aún no hay mermas ni ajustes. Ábrelo desde el producto: anota lo que tiras o ajusta al conteo.
+            Aún no hay mermas, ajustes ni transformaciones. Ábrelo desde el producto.
           </p>
         ) : (
           <div className="space-y-2">
             {rows.map((row) => {
-              const kind = row.movement_type === 'adjustment' ? 'adjustment' : 'waste';
+              const kind =
+                row.movement_type === 'adjustment'
+                  ? 'adjustment'
+                  : row.movement_type === 'transform'
+                    ? 'transform'
+                    : 'waste';
               const style = STYLE[kind];
               const qty = Number(row.quantity);
-              const signed = kind === 'waste' ? -Math.abs(qty) : qty;
+              const signed =
+                kind === 'waste' ||
+                (kind === 'transform' && (row.notes ?? '').startsWith('Convierte'))
+                  ? -Math.abs(qty)
+                  : qty;
               return (
                 <div
                   key={row.id}
