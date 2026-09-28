@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   isIncomeEntryType,
+  parseIncomePocket,
   validateIncomeEntryInput,
   type IncomeEntryInput,
 } from '@puertaverde/shared';
@@ -11,7 +12,7 @@ import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 const SELECT =
-  'id, entry_type, concept, amount, entry_date, notes, created_at' as const;
+  'id, entry_type, concept, amount, entry_date, notes, paid_from, created_at' as const;
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
         amount: body.amount,
         entry_date: body.entryDate,
         notes: body.notes?.trim() ? body.notes.trim() : null,
+        paid_from: parseIncomePocket(body.paidFrom, body.entryType),
         created_by: auth.userId,
       })
       .select(SELECT)

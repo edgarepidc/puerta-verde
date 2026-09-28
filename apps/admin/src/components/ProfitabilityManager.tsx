@@ -11,6 +11,8 @@ import {
   formatMoney,
   INCOME_ENTRY_TYPE_HINTS,
   INCOME_ENTRY_TYPE_LABELS,
+  defaultIncomePocket,
+  parseIncomePocket,
   MONEY_POCKET_LABELS,
   costAppliesToRange,
   costPausedAtPeriodStart,
@@ -110,6 +112,7 @@ interface IncomeRow {
   amount: number;
   entry_date: string;
   notes: string | null;
+  paid_from?: MoneyPocket | null;
 }
 
 interface CategoryProfitRow {
@@ -658,6 +661,7 @@ export function ProfitabilityManager({
   const [incomeAmountText, setIncomeAmountText] = useState('');
   const [incomeDate, setIncomeDate] = useState(() => todayMexicoYmd());
   const [incomeNotes, setIncomeNotes] = useState('');
+  const [incomePaidFrom, setIncomePaidFrom] = useState<MoneyPocket>('account');
   const [saving, setSaving] = useState(false);
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -692,6 +696,7 @@ export function ProfitabilityManager({
     amount: string;
     entryDate: string;
     notes: string;
+    paidFrom: MoneyPocket;
   } | null>(null);
   const [editCost, setEditCost] = useState<{
     id: string;
@@ -953,6 +958,7 @@ export function ProfitabilityManager({
           amount: parseDecimal(incomeAmountText),
           entryDate: incomeDate,
           notes: incomeNotes,
+          paidFrom: incomePaidFrom,
         }),
       });
       const result = await response.json();
@@ -990,6 +996,7 @@ export function ProfitabilityManager({
           amount: parseDecimal(editIncome.amount),
           entryDate: editIncome.entryDate,
           notes: editIncome.notes || null,
+          paidFrom: editIncome.paidFrom,
         }),
       });
       const result = await response.json();
@@ -1187,6 +1194,7 @@ export function ProfitabilityManager({
           notes: row.notes,
           amount: Number(row.amount),
           entryType: row.entry_type,
+          paidFrom: parseIncomePocket(row.paid_from, row.entry_type),
         }))
         .sort((a, b) => b.date.localeCompare(a.date)),
     [incomes],
@@ -1997,7 +2005,7 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Aportaciones y reembolsos. Entran a Tienes. Los gastos de visita están en Gastos.
+              Aportaciones y reembolsos. Elige si entran a efectivo o a cuenta.
             </p>
             {incomeMovements.length === 0 ? (
               <p className="px-4 py-4 text-sm text-slate-500">
@@ -2049,6 +2057,15 @@ export function ProfitabilityManager({
                               setEditIncome((d) => (d ? { ...d, entryDate: e.target.value } : d))
                             }
                           />
+                          <div className="col-span-2">
+                            <MoneyPocketField
+                              label="Entra a"
+                              value={editIncome.paidFrom}
+                              onChange={(value) =>
+                                setEditIncome((d) => (d ? { ...d, paidFrom: value } : d))
+                              }
+                            />
+                          </div>
                           <input
                             className="pv-input col-span-2"
                             placeholder="Nota (opcional)"
@@ -2072,8 +2089,8 @@ export function ProfitabilityManager({
                             <p className="font-medium text-slate-900">{row.concept}</p>
                             <p className="text-xs text-slate-500">
                               {INCOME_ENTRY_TYPE_LABELS[row.entryType]} · {row.date}
+                              {` · ${MONEY_POCKET_LABELS[row.paidFrom]}`}
                               {row.notes ? ` · ${row.notes}` : ''}
-                              {' · entra a Tienes'}
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -2091,6 +2108,7 @@ export function ProfitabilityManager({
                                   amount: formatDecimal(row.amount),
                                   entryDate: row.date,
                                   notes: row.notes ?? '',
+                                  paidFrom: row.paidFrom,
                                 })
                               }
                             >
@@ -2120,13 +2138,16 @@ export function ProfitabilityManager({
                     key={key}
                     elevated={incomeType === key}
                     tone={incomeType === key ? 'emerald' : 'slate'}
-                    onClick={() => setIncomeType(key)}
+                    onClick={() => {
+                      setIncomeType(key);
+                      setIncomePaidFrom(defaultIncomePocket(key));
+                    }}
                   >
                     {INCOME_ENTRY_TYPE_LABELS[key]}
                   </ActionChip>
                 ))}
               </div>
-              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_auto]">
+              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
                 <input
                   placeholder="Concepto"
                   className="pv-input min-w-0 col-span-2 lg:col-span-1"
@@ -2146,6 +2167,11 @@ export function ProfitabilityManager({
                   className="pv-input min-w-0"
                   value={incomeDate}
                   onChange={(e) => setIncomeDate(e.target.value)}
+                />
+                <MoneyPocketField
+                  label="Entra a"
+                  value={incomePaidFrom}
+                  onChange={setIncomePaidFrom}
                 />
                 <div className="col-span-2 flex justify-end lg:col-span-1">
                   <ActionChip emoji="💰" disabled={saving} onClick={() => void addIncome()}>

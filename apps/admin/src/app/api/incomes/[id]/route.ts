@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { isIncomeEntryType } from '@puertaverde/shared';
+import { isIncomeEntryType, isMoneyPocket } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { getDefaultTenant } from '@/lib/tenant';
 
 const SELECT =
-  'id, entry_type, concept, amount, entry_date, notes, created_at' as const;
+  'id, entry_type, concept, amount, entry_date, notes, paid_from, created_at' as const;
 
 interface IncomePatchBody {
   entryType?: string;
@@ -15,6 +15,7 @@ interface IncomePatchBody {
   amount?: number;
   entryDate?: string;
   notes?: string | null;
+  paidFrom?: string;
 }
 
 async function requireProfit() {
@@ -59,6 +60,9 @@ export async function PATCH(
     if (body.entryDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(body.entryDate)) {
       return NextResponse.json({ error: 'La fecha es inválida.' }, { status: 400 });
     }
+    if (body.paidFrom !== undefined && !isMoneyPocket(body.paidFrom)) {
+      return NextResponse.json({ error: 'Elige si entra a efectivo o a cuenta.' }, { status: 400 });
+    }
 
     const supabase = createAdminClient();
     const { data, error } = await supabase
@@ -71,6 +75,7 @@ export async function PATCH(
         ...(body.notes !== undefined
           ? { notes: body.notes?.trim() ? body.notes.trim() : null }
           : {}),
+        ...(body.paidFrom !== undefined ? { paid_from: body.paidFrom } : {}),
       })
       .eq('id', id)
       .eq('branch_id', tenant.branchId)

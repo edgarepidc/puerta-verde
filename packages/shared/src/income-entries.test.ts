@@ -36,6 +36,42 @@ test('validateIncomeEntryInput rejects a missing type, concept, or amount', () =
   );
 });
 
+test('validateIncomeEntryInput accepts cash or account', () => {
+  assert.equal(
+    validateIncomeEntryInput({
+      entryType: 'contribution',
+      concept: 'Aportación',
+      amount: 1000,
+      entryDate: '2026-08-01',
+      paidFrom: 'cash',
+    }),
+    null,
+  );
+  assert.equal(
+    validateIncomeEntryInput({
+      entryType: 'operating',
+      concept: 'Reembolso',
+      amount: 50,
+      entryDate: '2026-08-01',
+      paidFrom: 'account',
+    }),
+    null,
+  );
+});
+
+test('validateIncomeEntryInput rejects an invalid pocket', () => {
+  assert.equal(
+    validateIncomeEntryInput({
+      entryType: 'contribution',
+      concept: 'Aportación',
+      amount: 1000,
+      entryDate: '2026-08-01',
+      paidFrom: 'wallet',
+    }),
+    'Elige si entra a efectivo o a cuenta.',
+  );
+});
+
 test('validateIncomeEntryInput rejects an invalid date', () => {
   assert.equal(
     validateIncomeEntryInput({
