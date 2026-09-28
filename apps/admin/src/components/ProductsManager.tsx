@@ -1312,9 +1312,6 @@ export function ProductsManager({
                       >
                         {stockSaving ? 'Guardando…' : 'Registrar merma'}
                       </ActionChip>
-                      <p className="max-w-[16rem] text-xs text-slate-500">
-                        Resta lo que tiras. El stock queda en el resultado.
-                      </p>
                     </div>
                     <div className="space-y-1">
                       <ActionChip
@@ -1326,9 +1323,6 @@ export function ProductsManager({
                       >
                         {stockSaving ? 'Guardando…' : 'Ajustar al conteo'}
                       </ActionChip>
-                      <p className="max-w-[16rem] text-xs text-slate-500">
-                        Si pesaste toda la mercancía, el stock pasa a ser el conteo.
-                      </p>
                     </div>
                   </div>
                   {transformOpen ? (
