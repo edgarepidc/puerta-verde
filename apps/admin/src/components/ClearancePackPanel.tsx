@@ -7,6 +7,11 @@ import {
   PRODUCT_UNIT_LABELS,
   formatDecimal,
   formatMoney,
+  isWeighProduce,
+  perBagFromTotal,
+  preloadPackTemplate,
+  totalFromPerBag,
+  type ClearancePackTemplate,
   type ProductUnit,
 } from '@puertaverde/shared';
 
@@ -19,6 +24,7 @@ export interface ClearanceIngredientProduct {
   id: string;
   price: number;
   stock: number;
+  piece_stock?: number | null;
   min_stock?: number | null;
   product: {
     id: string;
@@ -26,6 +32,7 @@ export interface ClearanceIngredientProduct {
     unit: ProductUnit;
     sku?: string | null;
     pos_only?: boolean;
+    weigh_at_fulfillment?: boolean;
   };
 }
 
@@ -40,6 +47,19 @@ export interface ActiveClearancePack {
 interface PackLine {
   branchProductId: string;
   quantity: string;
+  pieces: string;
+  piecesPerBag: number | null;
+  quantityPerBag: number | null;
+}
+
+function emptyLine(branchProductId: string): PackLine {
+  return {
+    branchProductId,
+    quantity: '',
+    pieces: '',
+    piecesPerBag: null,
+    quantityPerBag: null,
+  };
 }
 
 export function ClearancePackPanel({
@@ -54,7 +74,7 @@ export function ClearancePackPanel({
   onClose: () => void;
   products: ClearanceIngredientProduct[];
   usbScaleEnabled?: boolean;
-  initialItems?: Array<{ branchProductId: string; quantity: number }>;
+  initialItems?: Array<{ branchProductId: string; quantity: number; pieces?: number }>;
   onAssembled: (payload: {
     product: ClearanceIngredientProduct;
     pack: ActiveClearancePack;
@@ -65,6 +85,9 @@ export function ClearancePackPanel({
     () => products.filter((product) => !product.product.pos_only),
     [products],
   );
+  const [templates, setTemplates] = useState<ClearancePackTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [title, setTitle] = useState(CLEARANCE_PACK_DEFAULT_TITLE);
   const [lines, setLines] = useState<PackLine[]>([]);
   const [pickerId, setPickerId] = useState('');
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -74,57 +97,237 @@ export function ClearancePackPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const productById = useMemo(
+    () => new Map(ingredients.map((product) => [product.id, product])),
+    [ingredients],
+  );
+
+  const catalog = useMemo(
+    () =>
+      ingredients.map((product) => ({
+        branchProductId: product.id,
+        productId: product.product.id,
+        unit: product.product.unit,
+        weighAtFulfillment: Boolean(product.product.weigh_at_fulfillment),
+      })),
+    [ingredients],
+  );
+
+  function applyTemplate(template: ClearancePackTemplate, bags = template.defaultBagCount) {
+    const bagText = String(Math.max(1, Math.round(Number(bags) || 0)));
+    setSelectedTemplateId(template.id);
+    setTitle(template.title);
+    setPrice(String(template.defaultPrice));
+    setBagCount(bagText);
+    const next = preloadPackTemplate({
+      items: template.items,
+      catalog,
+      bagCount: Number(bagText),
+    });
+    setLines(
+      next.map((line) => ({
+        branchProductId: line.branchProductId,
+        quantity: line.quantity > 0 ? decimalFromNumber(line.quantity, false) : '',
+        pieces: line.pieces && line.pieces > 0 ? decimalFromNumber(line.pieces, false) : '',
+        piecesPerBag: line.piecesPerBag,
+        quantityPerBag: line.quantityPerBag,
+      })),
+    );
+    setFocusedId(next.find((line) => line.quantity === 0)?.branchProductId ?? next[0]?.branchProductId ?? null);
+    setError(null);
+  }
+
   useEffect(() => {
     if (!open) return;
     setError(null);
     setSaving(false);
     setPickerId('');
-    if (initialItems.length) {
-      setLines(
-        initialItems.map((item) => ({
-          branchProductId: item.branchProductId,
-          quantity: decimalFromNumber(item.quantity, false),
-        })),
-      );
-      setFocusedId(initialItems[0]?.branchProductId ?? null);
-    } else {
-      setLines([]);
-      setFocusedId(null);
-    }
-  }, [open, initialItems]);
+    setSelectedTemplateId(null);
+    setTitle(CLEARANCE_PACK_DEFAULT_TITLE);
+    setBagCount('3');
+    setPrice('50');
 
-  const productById = useMemo(
-    () => new Map(ingredients.map((product) => [product.id, product])),
-    [ingredients],
-  );
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/clearance-pack-templates');
+        const payload = (await response.json()) as {
+          templates?: ClearancePackTemplate[];
+          error?: string;
+        };
+        if (!response.ok) throw new Error(payload.error ?? 'No se pudieron cargar los paquetes');
+        if (cancelled) return;
+        const nextTemplates = payload.templates ?? [];
+        setTemplates(nextTemplates);
+
+        if (initialItems.length) {
+          setLines(
+            initialItems.map((item) => ({
+              branchProductId: item.branchProductId,
+              quantity: decimalFromNumber(item.quantity, false),
+              pieces: item.pieces && item.pieces > 0 ? decimalFromNumber(item.pieces, false) : '',
+              piecesPerBag: null,
+              quantityPerBag: null,
+            })),
+          );
+          setFocusedId(initialItems[0]?.branchProductId ?? null);
+          return;
+        }
+
+        if (nextTemplates[0]) {
+          applyTemplate(nextTemplates[0]);
+          return;
+        }
+
+        setLines([]);
+        setFocusedId(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar los paquetes');
+        if (initialItems.length) {
+          setLines(
+            initialItems.map((item) => ({
+              branchProductId: item.branchProductId,
+              quantity: decimalFromNumber(item.quantity, false),
+              pieces: '',
+              piecesPerBag: null,
+              quantityPerBag: null,
+            })),
+          );
+          setFocusedId(initialItems[0]?.branchProductId ?? null);
+        } else {
+          setLines([]);
+          setFocusedId(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Reset only when the dialog opens; catalog/templates load in this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function addPicked(id: string) {
     if (!id) return;
     setPickerId('');
     setLines((current) => {
       if (current.some((line) => line.branchProductId === id)) return current;
-      return [...current, { branchProductId: id, quantity: '' }];
+      return [...current, emptyLine(id)];
     });
     setFocusedId(id);
+  }
+
+  function bagsFromInput(value = bagCount) {
+    return Math.max(1, Math.round(parseDecimal(value)) || 0) || 1;
+  }
+
+  function updateBagCount(next: string) {
+    const bags = bagsFromInput(next);
+    setBagCount(next);
+    setLines((current) =>
+      current.map((line) => {
+        const product = productById.get(line.branchProductId);
+        const weigh = isWeighProduce({
+          unit: product?.product.unit,
+          weighAtFulfillment: product?.product.weigh_at_fulfillment,
+        });
+        if (weigh && line.piecesPerBag && line.piecesPerBag > 0) {
+          return {
+            ...line,
+            pieces: decimalFromNumber(totalFromPerBag(line.piecesPerBag, bags), false),
+          };
+        }
+        if (!weigh && line.quantityPerBag && line.quantityPerBag > 0) {
+          return {
+            ...line,
+            quantity: decimalFromNumber(totalFromPerBag(line.quantityPerBag, bags), false),
+          };
+        }
+        return line;
+      }),
+    );
+  }
+
+  function updateQuantity(branchProductId: string, quantity: string) {
+    const bags = bagsFromInput();
+    setLines((current) =>
+      current.map((line) => {
+        if (line.branchProductId !== branchProductId) return line;
+        const product = productById.get(line.branchProductId);
+        const weigh = isWeighProduce({
+          unit: product?.product.unit,
+          weighAtFulfillment: product?.product.weigh_at_fulfillment,
+        });
+        const total = parseDecimal(quantity);
+        return {
+          ...line,
+          quantity,
+          quantityPerBag: weigh || !(total > 0) ? line.quantityPerBag : perBagFromTotal(total, bags),
+        };
+      }),
+    );
+  }
+
+  function updatePieces(branchProductId: string, pieces: string) {
+    const bags = bagsFromInput();
+    setLines((current) =>
+      current.map((line) => {
+        if (line.branchProductId !== branchProductId) return line;
+        const total = parseDecimal(pieces);
+        return {
+          ...line,
+          pieces,
+          piecesPerBag: total > 0 ? perBagFromTotal(total, bags) : null,
+        };
+      }),
+    );
   }
 
   async function submit() {
     setSaving(true);
     setError(null);
     try {
+      const bags = Math.round(parseDecimal(bagCount));
+      for (const line of lines) {
+        const product = productById.get(line.branchProductId);
+        if (!product) continue;
+        const weigh = isWeighProduce({
+          unit: product.product.unit,
+          weighAtFulfillment: product.product.weigh_at_fulfillment,
+        });
+        if (weigh && !(parseDecimal(line.pieces) > 0)) {
+          throw new Error(`Indica las piezas de ${product.product.name}.`);
+        }
+        if (!(parseDecimal(line.quantity) > 0)) {
+          throw new Error(`Pesa ${product.product.name}.`);
+        }
+      }
+
       const response = await fetch('/api/clearance-packs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: CLEARANCE_PACK_DEFAULT_TITLE,
+          title: title.trim() || CLEARANCE_PACK_DEFAULT_TITLE,
           price: parseDecimal(price),
-          bagCount: Math.round(parseDecimal(bagCount)),
+          bagCount: bags,
           notifyNeighbors,
+          templateId: selectedTemplateId,
+          saveTemplate: true,
           items: lines
-            .map((line) => ({
-              branchProductId: line.branchProductId,
-              quantity: parseDecimal(line.quantity),
-            }))
+            .map((line) => {
+              const product = productById.get(line.branchProductId);
+              const weigh = isWeighProduce({
+                unit: product?.product.unit,
+                weighAtFulfillment: product?.product.weigh_at_fulfillment,
+              });
+              return {
+                branchProductId: line.branchProductId,
+                quantity: parseDecimal(line.quantity),
+                pieces: weigh ? parseDecimal(line.pieces) : null,
+              };
+            })
             .filter((line) => line.quantity > 0),
         }),
       });
@@ -167,7 +370,7 @@ export function ClearancePackPanel({
               Armar paquete
             </h2>
             <p className="text-sm text-slate-500">
-              Pesa lo que metes en todas las bolsas. Se vende a precio fijo en mostrador.
+              Elige un paquete guardado. Solo pesas el total; las piezas ya vienen en la receta.
             </p>
           </div>
           <ActionChip
@@ -182,18 +385,47 @@ export function ClearancePackPanel({
           </ActionChip>
         </div>
 
+        {templates.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {templates.map((template) => (
+              <ActionChip
+                key={template.id}
+                tone={selectedTemplateId === template.id ? 'amber' : 'slate'}
+                onClick={() => applyTemplate(template)}
+              >
+                {template.title}
+              </ActionChip>
+            ))}
+            <ActionChip
+              tone={selectedTemplateId ? 'slate' : 'amber'}
+              onClick={() => {
+                setSelectedTemplateId(null);
+                setTitle(CLEARANCE_PACK_DEFAULT_TITLE);
+                setLines([]);
+                setFocusedId(null);
+              }}
+            >
+              Nuevo
+            </ActionChip>
+          </div>
+        ) : null}
+
+        <label className="mt-4 block text-sm">
+          <span className="font-medium text-slate-700">Nombre del paquete</span>
+          <input
+            className="pv-input mt-1 w-full"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder={CLEARANCE_PACK_DEFAULT_TITLE}
+          />
+        </label>
+
         {usbScaleEnabled ? (
           <div className="mt-3">
             <ScalePanel
               onWeight={(kg) => {
                 if (!focusedId) return;
-                setLines((current) =>
-                  current.map((line) =>
-                    line.branchProductId === focusedId
-                      ? { ...line, quantity: String(Number(kg.toFixed(3))) }
-                      : line,
-                  ),
-                );
+                updateQuantity(focusedId, String(Number(kg.toFixed(3))));
               }}
             />
           </div>
@@ -218,11 +450,16 @@ export function ClearancePackPanel({
               const product = productById.get(line.branchProductId);
               if (!product) return null;
               const unit = PRODUCT_UNIT_LABELS[product.product.unit];
+              const weigh = isWeighProduce({
+                unit: product.product.unit,
+                weighAtFulfillment: product.product.weigh_at_fulfillment,
+              });
               const focused = focusedId === line.branchProductId;
+              const pieceStock = Number(product.piece_stock ?? 0);
               return (
                 <li
                   key={line.branchProductId}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
+                  className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
                     focused ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'
                   }`}
                 >
@@ -235,22 +472,30 @@ export function ClearancePackPanel({
                       {product.product.name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Hay {formatDecimal(Number(product.stock))} {unit}
+                      {weigh && pieceStock > 0
+                        ? `Hay ${formatDecimal(pieceStock)} pza · ${formatDecimal(Number(product.stock))} kg`
+                        : `Hay ${formatDecimal(Number(product.stock))} ${unit}`}
+                      {weigh ? ' · pesa el total' : ''}
                     </p>
                   </button>
+                  {weigh ? (
+                    <label className="flex shrink-0 items-center gap-1 text-sm">
+                      <DecimalInput
+                        className="pv-input w-16! px-1.5! py-1.5 text-center"
+                        value={line.pieces}
+                        integer
+                        onChange={(value) => updatePieces(line.branchProductId, value)}
+                        onFocus={() => setFocusedId(line.branchProductId)}
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-slate-500">pza</span>
+                    </label>
+                  ) : null}
                   <label className="flex shrink-0 items-center gap-1 text-sm">
                     <DecimalInput
                       className="pv-input w-20! px-1.5! py-1.5 text-center"
                       value={line.quantity}
-                      onChange={(value) =>
-                        setLines((current) =>
-                          current.map((row) =>
-                            row.branchProductId === line.branchProductId
-                              ? { ...row, quantity: value }
-                              : row,
-                          ),
-                        )
-                      }
+                      onChange={(value) => updateQuantity(line.branchProductId, value)}
                       onFocus={() => setFocusedId(line.branchProductId)}
                       placeholder="0"
                     />
@@ -276,7 +521,7 @@ export function ClearancePackPanel({
         <div className="mt-4 grid grid-cols-2 gap-3">
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Bolsas</span>
-            <DecimalInput className="pv-input mt-1" value={bagCount} onChange={setBagCount} />
+            <DecimalInput className="pv-input mt-1" value={bagCount} onChange={updateBagCount} />
           </label>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">Precio por bolsa</span>

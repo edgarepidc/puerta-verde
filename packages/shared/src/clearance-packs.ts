@@ -14,11 +14,13 @@ export interface ClearancePackDraftItem {
   name: string;
   unit?: string;
   quantity: number;
+  pieces?: number;
 }
 
 export interface ClearancePackItemInput {
   branchProductId: string;
   quantity: number;
+  pieces?: number | null;
 }
 
 export interface AssembleClearancePackInput {
@@ -27,6 +29,82 @@ export interface AssembleClearancePackInput {
   bagCount: number;
   items: ClearancePackItemInput[];
   notifyNeighbors?: boolean;
+  templateId?: string | null;
+  saveTemplate?: boolean;
+}
+
+export interface ClearancePackTemplateItem {
+  productId: string;
+  piecesPerBag: number | null;
+  quantityPerBag: number | null;
+}
+
+export interface ClearancePackTemplate {
+  id: string;
+  title: string;
+  defaultPrice: number;
+  defaultBagCount: number;
+  items: ClearancePackTemplateItem[];
+}
+
+export interface ClearancePackCatalogProduct {
+  branchProductId: string;
+  productId: string;
+  unit?: string | null;
+  weighAtFulfillment?: boolean | null;
+}
+
+export function isWeighProduce(input: {
+  unit?: string | null;
+  weighAtFulfillment?: boolean | null;
+}) {
+  return Boolean(input.weighAtFulfillment) && input.unit === 'kg';
+}
+
+export function totalFromPerBag(perBag: number, bagCount: number) {
+  const bags = Math.max(0, Math.round(Number(bagCount) || 0));
+  const per = Number(perBag);
+  if (!(per > 0) || bags <= 0) return 0;
+  return Number((per * bags).toFixed(3));
+}
+
+export function perBagFromTotal(total: number, bagCount: number) {
+  const bags = Math.max(1, Math.round(Number(bagCount) || 0));
+  const qty = Number(total);
+  if (!(qty > 0)) return 0;
+  return Number((qty / bags).toFixed(3));
+}
+
+export function preloadPackTemplate(input: {
+  items: ClearancePackTemplateItem[];
+  catalog: ClearancePackCatalogProduct[];
+  bagCount: number;
+}) {
+  const bags = Math.max(1, Math.round(Number(input.bagCount) || 0));
+  const lines: Array<{
+    branchProductId: string;
+    quantity: number;
+    pieces: number | null;
+    piecesPerBag: number | null;
+    quantityPerBag: number | null;
+  }> = [];
+  for (const item of input.items) {
+    const product = input.catalog.find((row) => row.productId === item.productId);
+    if (!product) continue;
+    const weigh = isWeighProduce(product);
+    const piecesPerBag =
+      weigh && Number(item.piecesPerBag) > 0 ? Number(item.piecesPerBag) : null;
+    const quantityPerBag =
+      !weigh && Number(item.quantityPerBag) > 0 ? Number(item.quantityPerBag) : null;
+    lines.push({
+      branchProductId: product.branchProductId,
+      quantity: quantityPerBag ? totalFromPerBag(quantityPerBag, bags) : 0,
+      pieces: piecesPerBag ? totalFromPerBag(piecesPerBag, bags) : null,
+      piecesPerBag,
+      quantityPerBag,
+    });
+  }
+  return lines;
 }
 
 export function validateAssembleClearancePack(input: AssembleClearancePackInput): string | null {
@@ -40,6 +118,9 @@ export function validateAssembleClearancePack(input: AssembleClearancePackInput)
     if (seen.has(item.branchProductId)) return 'Ese producto ya está en el paquete.';
     seen.add(item.branchProductId);
     if (!(Number(item.quantity) > 0)) return 'Cada producto necesita cantidad mayor a cero.';
+    if (item.pieces != null && item.pieces !== undefined && !(Number(item.pieces) > 0)) {
+      return 'Indica las piezas de cada producto que se vende por pieza.';
+    }
   }
   return null;
 }
