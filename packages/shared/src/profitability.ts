@@ -13,6 +13,9 @@ export type OperatingCostType = (typeof OPERATING_COST_TYPES)[number];
 export const OPERATING_COST_PERIODS = ['monthly', 'daily', 'per_order'] as const;
 export type OperatingCostPeriod = (typeof OPERATING_COST_PERIODS)[number];
 
+export const OPERATING_COST_CATEGORIES = ['rent', 'payroll', 'fixed', 'variable'] as const;
+export type OperatingCostCategory = (typeof OPERATING_COST_CATEGORIES)[number];
+
 export const OPERATING_COST_TYPE_LABELS: Record<OperatingCostType, string> = {
   fixed: 'Fijo',
   variable: 'Variable',
@@ -23,6 +26,71 @@ export const OPERATING_COST_PERIOD_LABELS: Record<OperatingCostPeriod, string> =
   daily: 'Diario',
   per_order: 'Por pedido',
 };
+
+export const OPERATING_COST_CATEGORY_LABELS: Record<OperatingCostCategory, string> = {
+  rent: 'Renta',
+  payroll: 'Nómina',
+  fixed: 'Gastos fijos',
+  variable: 'Gastos variables',
+};
+
+export const OPERATING_COST_CATEGORY_HINTS: Record<OperatingCostCategory, string> = {
+  rent: 'Local y similares',
+  payroll: 'Sueldos y pagos a personas',
+  fixed: 'Internet, luz, agua, suscripciones',
+  variable: 'Lo que no se paga igual cada mes',
+};
+
+export function isOperatingCostCategory(value: unknown): value is OperatingCostCategory {
+  return typeof value === 'string' && (OPERATING_COST_CATEGORIES as readonly string[]).includes(value);
+}
+
+export function parseOperatingCostCategory(
+  value: unknown,
+  fallback: OperatingCostCategory = 'fixed',
+): OperatingCostCategory {
+  return isOperatingCostCategory(value) ? value : fallback;
+}
+
+export function costTypeFromCategory(category: OperatingCostCategory): OperatingCostType {
+  return category === 'variable' ? 'variable' : 'fixed';
+}
+
+export function inferOperatingCostCategory(input: {
+  name?: string | null;
+  category?: string | null;
+  costType?: OperatingCostType | null;
+}): OperatingCostCategory {
+  if (isOperatingCostCategory(input.category)) return input.category;
+  const name = (input.name ?? '').toLowerCase();
+  if (/(renta|alquiler)/i.test(name)) return 'rent';
+  if (/(n[oó]mina|sueldo|salario|ceci|vale|pago a )/i.test(name)) return 'payroll';
+  if (input.costType === 'variable') return 'variable';
+  return 'fixed';
+}
+
+export function groupOperatingCostsByCategory<T>(
+  rows: T[],
+  categoryOf: (row: T) => OperatingCostCategory,
+) {
+  const buckets = new Map<OperatingCostCategory, T[]>();
+  for (const category of OPERATING_COST_CATEGORIES) buckets.set(category, []);
+  for (const row of rows) {
+    buckets.get(categoryOf(row))?.push(row);
+  }
+  return OPERATING_COST_CATEGORIES.flatMap((category) => {
+    const items = buckets.get(category) ?? [];
+    if (!items.length) return [];
+    return [
+      {
+        category,
+        label: OPERATING_COST_CATEGORY_LABELS[category],
+        hint: OPERATING_COST_CATEGORY_HINTS[category],
+        items,
+      },
+    ];
+  });
+}
 
 export const MIN_CHARGE_DAY = 1;
 export const MAX_CHARGE_DAY = 31;
@@ -35,6 +103,7 @@ export interface OperatingCostInput {
   notes?: string | null;
   isActive: boolean;
   paidFrom?: MoneyPocket;
+  category?: OperatingCostCategory;
   /** Calendar day (1–31) when the full amount leaves caja/cuenta. */
   chargeDay?: number;
   /** First day the cost should apply (the start of the Números period being viewed). */
@@ -128,6 +197,9 @@ export function applyOperatingCostsToPockets(
 
 export function validateOperatingCostInput(input: OperatingCostInput): string | null {
   if (!input.name.trim()) return 'El nombre del costo es obligatorio.';
+  if (input.category != null && !isOperatingCostCategory(input.category)) {
+    return 'Elige una categoría.';
+  }
   if (!OPERATING_COST_TYPES.includes(input.costType)) return 'Tipo de costo inválido.';
   if (!OPERATING_COST_PERIODS.includes(input.period)) return 'Periodo inválido.';
   if (input.amount < 0) return 'El monto no puede ser negativo.';
