@@ -278,6 +278,7 @@ export interface Database {
           product_name: string;
           unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
           quantity: number;
+          pieces: number | null;
           unit_cost: number | null;
           created_at: string;
         };
@@ -295,6 +296,57 @@ export interface Database {
             columns: ['pack_id'];
             isOneToOne: false;
             referencedRelation: 'clearance_packs';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      clearance_pack_templates: {
+        Row: {
+          id: string;
+          branch_id: string;
+          title: string;
+          default_price: number;
+          default_bag_count: number;
+          last_used_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['clearance_pack_templates']['Row']> & {
+          branch_id: string;
+          title: string;
+          default_price: number;
+        };
+        Update: Partial<Database['public']['Tables']['clearance_pack_templates']['Row']>;
+        Relationships: [];
+      };
+      clearance_pack_template_items: {
+        Row: {
+          id: string;
+          template_id: string;
+          product_id: string;
+          sort_order: number;
+          pieces_per_bag: number | null;
+          quantity_per_bag: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['clearance_pack_template_items']['Row']> & {
+          template_id: string;
+          product_id: string;
+        };
+        Update: Partial<Database['public']['Tables']['clearance_pack_template_items']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'clearance_pack_template_items_template_id_fkey';
+            columns: ['template_id'];
+            isOneToOne: false;
+            referencedRelation: 'clearance_pack_templates';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'clearance_pack_template_items_product_id_fkey';
+            columns: ['product_id'];
+            isOneToOne: false;
+            referencedRelation: 'products';
             referencedColumns: ['id'];
           },
         ];

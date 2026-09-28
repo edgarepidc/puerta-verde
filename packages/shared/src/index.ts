@@ -239,12 +239,19 @@ export {
 export {
   CLEARANCE_PACK_DEFAULT_TITLE,
   CLEARANCE_PACK_DRAFT_KEY,
+  isWeighProduce,
+  totalFromPerBag,
+  perBagFromTotal,
+  preloadPackTemplate,
   validateAssembleClearancePack,
   formatClearancePackPromoBody,
   buildVisitStoreBroadcastMessage,
   type AssembleClearancePackInput,
+  type ClearancePackCatalogProduct,
   type ClearancePackDraftItem,
   type ClearancePackItemInput,
+  type ClearancePackTemplate,
+  type ClearancePackTemplateItem,
 } from './clearance-packs';
 
 export {
