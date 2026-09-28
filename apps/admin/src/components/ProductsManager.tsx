@@ -1290,9 +1290,6 @@ export function ProductsManager({
                       >
                         Paquete
                       </ActionChip>
-                      <p className="max-w-[16rem] text-xs text-slate-500">
-                        Convierte lo que pesaste en bolsas a precio fijo, en Caja.
-                      </p>
                     </div>
                     <div className="space-y-1">
                       <ActionChip
@@ -1304,9 +1301,6 @@ export function ProductsManager({
                       >
                         Transforma
                       </ActionChip>
-                      <p className="max-w-[16rem] text-xs text-slate-500">
-                        Haz pulpa, paletas u otro producto. El costo pasa; no es merma.
-                      </p>
                     </div>
                     <div className="space-y-1">
                       <ActionChip
