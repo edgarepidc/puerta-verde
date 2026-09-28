@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import {
+  CLEARANCE_PACK_DEFAULT_TITLE,
   PAYMENT_METHOD_LABELS,
   POS_PAYMENT_METHODS,
   PRODUCT_UNIT_LABELS,
@@ -28,8 +29,13 @@ import {
 } from '@puertaverde/shared';
 
 import { ActionChip, ChevronDownIcon } from '@/components/ActionChip';
+import {
+  ClearancePackPanel,
+  type ActiveClearancePack,
+} from '@/components/ClearancePackPanel';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 import { ScalePanel } from '@/components/ScalePanel';
+import { consumeClearancePackDraft, readClearancePackDraft } from '@/lib/clearance-pack-draft';
 import {
   ThermalReceipt,
   getAutoPrintTicket,
@@ -54,6 +60,7 @@ export interface CounterProduct {
     sku?: string | null;
     image_url?: string | null;
     weigh_at_fulfillment?: boolean;
+    pos_only?: boolean;
   };
 }
 
@@ -164,15 +171,18 @@ export function CounterSalePanel({
   onCreated,
   branchName,
   canEditPrice = false,
+  canAdjustInventory = false,
   usbScaleEnabled = false,
   printerChip,
   queueHint,
   boardFilters,
+  initialPacks = [],
 }: {
   products: CounterProduct[];
   onCreated: (order: CreatedOrder, items: ReceiptItem[]) => void;
   branchName?: string;
   canEditPrice?: boolean;
+  canAdjustInventory?: boolean;
   /** When true, shows USB/serial scale connect UI (Configuración → Báscula). */
   usbScaleEnabled?: boolean;
   printerChip?: ReactNode;
@@ -180,6 +190,7 @@ export function CounterSalePanel({
   queueHint?: string | null;
   /** Filter chips for Hoy / Por atender / canal — sit in the collapsed toolbar. */
   boardFilters?: ReactNode;
+  initialPacks?: ActiveClearancePack[];
 }) {
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState('');
@@ -221,21 +232,48 @@ export function CounterSalePanel({
     changeDue?: number | null;
   } | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState(products);
+  const [packOpen, setPackOpen] = useState(false);
+  const [packDraft, setPackDraft] = useState<Array<{ branchProductId: string; quantity: number }>>(
+    [],
+  );
+  const [activePack, setActivePack] = useState<ActiveClearancePack | null>(
+    initialPacks.find((pack) => Number(pack.quantity_remaining) > 0) ?? null,
+  );
+  const [packNotice, setPackNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCatalog(products);
+  }, [products]);
+
+  useEffect(() => {
+    const draft = readClearancePackDraft();
+    if (!draft.length) return;
+    setPackDraft(draft.map((item) => ({ branchProductId: item.branchProductId, quantity: item.quantity })));
+    setPackOpen(true);
+    setOpen(true);
+  }, []);
 
   const productById = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
-    [products],
+    () => new Map(catalog.map((product) => [product.id, product])),
+    [catalog],
   );
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (product) =>
-        product.product.name.toLowerCase().includes(q) ||
-        (product.product.sku ?? '').toLowerCase().includes(q),
-    );
-  }, [products, search]);
+    const matched = !q
+      ? catalog
+      : catalog.filter(
+          (product) =>
+            product.product.name.toLowerCase().includes(q) ||
+            (product.product.sku ?? '').toLowerCase().includes(q),
+        );
+    return [...matched].sort((a, b) => {
+      const aPack = a.product.pos_only && Number(a.stock) > 0 ? 1 : 0;
+      const bPack = b.product.pos_only && Number(b.stock) > 0 ? 1 : 0;
+      return bPack - aPack;
+    });
+  }, [catalog, search]);
 
   const total = useMemo(
     () =>
@@ -567,6 +605,25 @@ export function CounterSalePanel({
   }
 
   function addProduct(product: CounterProduct) {
+    if (product.product.pos_only) {
+      const nextItem: CartItem = {
+        branchProductId: product.id,
+        quantity: '1',
+        unitPrice: decimalFromNumber(Number(product.price), false),
+        saleMode: 'kg',
+        pieces: '',
+      };
+      setCart((current) => {
+        const existing = current.find((item) => item.branchProductId === product.id);
+        if (!existing) return [...current, nextItem];
+        const qty = parseDecimal(existing.quantity) + 1;
+        return current.map((item) =>
+          item.branchProductId === product.id ? { ...item, quantity: String(qty) } : item,
+        );
+      });
+      flashCartItem(product.id);
+      return;
+    }
     openLineEditor(product);
   }
 
@@ -817,6 +874,21 @@ export function CounterSalePanel({
       }
       setCart([]);
       clearCoupon();
+      setCatalog((current) =>
+        current.map((product) => {
+          const sold = cart.find((item) => item.branchProductId === product.id);
+          if (!sold) return product;
+          const nextStock = Math.max(0, Number(product.stock) - parseDecimal(sold.quantity));
+          return { ...product, stock: nextStock };
+        }),
+      );
+      setActivePack((current) => {
+        if (!current) return current;
+        const sold = cart.find((item) => item.branchProductId === current.branch_product_id);
+        if (!sold) return current;
+        const remaining = Math.max(0, Number(current.quantity_remaining) - parseDecimal(sold.quantity));
+        return remaining > 0 ? { ...current, quantity_remaining: remaining } : null;
+      });
       if (sendWhatsApp && !customer.walkIn) {
         window.open(whatsappTicketHref(payload.order.customer_phone, ticketText), '_blank');
       }
@@ -928,6 +1000,20 @@ export function CounterSalePanel({
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           {printerChip}
+          {canAdjustInventory ? (
+            <ActionChip
+              tone="amber"
+              emoji="🧺"
+              className="shrink-0"
+              onClick={() => {
+                setPackDraft([]);
+                setPackOpen(true);
+                setOpen(true);
+              }}
+            >
+              Paquete
+            </ActionChip>
+          ) : null}
           <ActionChip tone="emerald" emoji="🛒" className="shrink-0" onClick={() => setOpen(true)}>
             Nueva venta
           </ActionChip>
@@ -948,18 +1034,100 @@ export function CounterSalePanel({
               : 'Catálogo compacto, como en la tienda.'}
           </p>
         </div>
-        <ActionChip
-          icon={<span className="inline-flex rotate-180"><ChevronDownIcon /></span>}
-          onClick={() => {
-            closeLineEditor();
-            setOpen(false);
-          }}
-        >
-          Cerrar
-        </ActionChip>
+        <div className="flex flex-wrap gap-2">
+          {canAdjustInventory ? (
+            <ActionChip
+              tone="amber"
+              emoji="🧺"
+              onClick={() => {
+                setPackDraft([]);
+                setPackOpen(true);
+              }}
+            >
+              Armar paquete
+            </ActionChip>
+          ) : null}
+          <ActionChip
+            icon={<span className="inline-flex rotate-180"><ChevronDownIcon /></span>}
+            onClick={() => {
+              closeLineEditor();
+              setOpen(false);
+            }}
+          >
+            Cerrar
+          </ActionChip>
+        </div>
       </div>
 
       {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+      {packNotice ? (
+        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-950">{packNotice}</p>
+      ) : null}
+
+      {activePack && Number(activePack.quantity_remaining) > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p className="min-w-0 flex-1 font-medium">
+            {activePack.title || CLEARANCE_PACK_DEFAULT_TITLE} · {formatMoney(Number(activePack.price))} · quedan{' '}
+            {formatDecimal(Number(activePack.quantity_remaining))}
+          </p>
+          {canAdjustInventory ? (
+            <>
+              <ActionChip
+                tone="whatsapp"
+                onClick={async () => {
+                  setPackNotice(null);
+                  try {
+                    const response = await fetch(`/api/clearance-packs/${activePack.id}/broadcast`, {
+                      method: 'POST',
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error ?? 'No se pudo avisar');
+                    setPackNotice(`Aviso enviado a ${payload.sent} vecinos.`);
+                  } catch (err) {
+                    setPackNotice(err instanceof Error ? err.message : 'No se pudo avisar');
+                  }
+                }}
+              >
+                Avisar
+              </ActionChip>
+              <ActionChip
+                tone="rose"
+                emoji="🍂"
+                onClick={async () => {
+                  if (!confirm('¿Tirar las bolsas que quedan? Cuenta como merma de las bolsas, no de la fruta otra vez.')) {
+                    return;
+                  }
+                  setPackNotice(null);
+                  try {
+                    const response = await fetch(`/api/clearance-packs/${activePack.id}/waste`, {
+                      method: 'POST',
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error ?? 'No se pudo tirar');
+                    setCatalog((current) =>
+                      current.map((product) =>
+                        product.id === activePack.branch_product_id
+                          ? { ...product, stock: 0 }
+                          : product,
+                      ),
+                    );
+                    setActivePack(null);
+                    setPackNotice(
+                      payload.wasted > 0
+                        ? `Se tiraron ${payload.wasted} bolsa(s) sobrantes.`
+                        : 'Ya no había bolsas.',
+                    );
+                  } catch (err) {
+                    setPackNotice(err instanceof Error ? err.message : 'No se pudo tirar');
+                  }
+                }}
+              >
+                Tirar sobrantes
+              </ActionChip>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
         <div className="space-y-3">
@@ -986,7 +1154,14 @@ export function CounterSalePanel({
                 ),
               );
               return (
-                <article key={product.id} className="rounded-xl border border-slate-200/80 bg-white p-2.5">
+                <article
+                  key={product.id}
+                  className={`rounded-xl border p-2.5 ${
+                    product.product.pos_only
+                      ? 'border-amber-300 bg-amber-50/80'
+                      : 'border-slate-200/80 bg-white'
+                  }`}
+                >
                   {product.product.image_url ? (
                     <div className="relative mb-2 h-16 w-full overflow-hidden rounded-lg">
                       <Image
@@ -1005,7 +1180,11 @@ export function CounterSalePanel({
                   <p className="truncate text-sm font-semibold text-slate-900">{product.product.name}</p>
                   <p className="text-xs text-slate-500">
                     {formatMoney(Number(product.price))} / {PRODUCT_UNIT_LABELS[unit]}
-                    {product.product.weigh_at_fulfillment ? ' · pieza o kg' : ''}
+                    {product.product.pos_only
+                      ? ` · quedan ${formatDecimal(Number(product.stock))}`
+                      : product.product.weigh_at_fulfillment
+                        ? ' · pieza o kg'
+                        : ''}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span
@@ -1504,6 +1683,52 @@ export function CounterSalePanel({
         </aside>
       </div>
     </section>
+      <ClearancePackPanel
+        open={packOpen}
+        onClose={() => {
+          consumeClearancePackDraft();
+          setPackOpen(false);
+        }}
+        products={catalog}
+        usbScaleEnabled={usbScaleEnabled}
+        initialItems={packDraft}
+        onAssembled={({ product, pack, broadcastError }) => {
+          setCatalog((current) => {
+            const exists = current.some((item) => item.id === product.id);
+            const next = {
+              id: product.id,
+              price: Number(product.price),
+              stock: Number(product.stock),
+              min_stock: product.min_stock ?? 0,
+              product: {
+                id: product.product.id,
+                name: product.product.name,
+                unit: product.product.unit,
+                sku: product.product.sku,
+                image_url: null,
+                weigh_at_fulfillment: false,
+                pos_only: true,
+              },
+            } satisfies CounterProduct;
+            return exists
+              ? current.map((item) => (item.id === product.id ? { ...item, ...next } : item))
+              : [next, ...current];
+          });
+          setActivePack({
+            id: pack.id,
+            title: pack.title,
+            price: Number(pack.price),
+            quantity_remaining: Number(pack.quantity_remaining),
+            branch_product_id: pack.branch_product_id,
+          });
+          setPackNotice(
+            broadcastError
+              ? `Paquete listo. El aviso no se envió: ${broadcastError}`
+              : `Listas ${formatDecimal(Number(pack.quantity_remaining))} bolsas a ${formatMoney(Number(pack.price))}.`,
+          );
+          consumeClearancePackDraft();
+        }}
+      />
       {lineDraft ? (() => {
         const product = productById.get(lineDraft.productId);
         if (!product) return null;

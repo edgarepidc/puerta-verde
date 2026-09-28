@@ -1,4 +1,4 @@
-export const INVENTORY_MOVEMENT_TYPES = ['purchase', 'sale', 'waste', 'adjustment'] as const;
+export const INVENTORY_MOVEMENT_TYPES = ['purchase', 'sale', 'waste', 'adjustment', 'pack'] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
 export const MANUAL_INVENTORY_TYPES = ['purchase', 'waste', 'adjustment'] as const;
@@ -9,6 +9,7 @@ export const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovementType, string> = 
   sale: 'Venta',
   waste: 'Merma',
   adjustment: 'Ajuste',
+  pack: 'Paquete',
 };
 
 export interface InventoryMovementInput {

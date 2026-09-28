@@ -60,6 +60,7 @@ export interface Database {
           is_active: boolean;
           shelf_life_days: number | null;
           weigh_at_fulfillment: boolean;
+          pos_only: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -227,6 +228,77 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['promotions']['Row']>;
         Relationships: [];
       };
+      clearance_packs: {
+        Row: {
+          id: string;
+          branch_id: string;
+          branch_product_id: string;
+          promotion_id: string | null;
+          title: string;
+          price: number;
+          quantity_made: number;
+          quantity_remaining: number;
+          status: 'active' | 'sold_out' | 'wasted';
+          assembled_at: string;
+          assembled_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['clearance_packs']['Row']> & {
+          branch_id: string;
+          branch_product_id: string;
+          title: string;
+          price: number;
+          quantity_made: number;
+          quantity_remaining: number;
+        };
+        Update: Partial<Database['public']['Tables']['clearance_packs']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'clearance_packs_promotion_id_fkey';
+            columns: ['promotion_id'];
+            isOneToOne: false;
+            referencedRelation: 'promotions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'clearance_packs_branch_product_id_fkey';
+            columns: ['branch_product_id'];
+            isOneToOne: false;
+            referencedRelation: 'branch_products';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      clearance_pack_items: {
+        Row: {
+          id: string;
+          pack_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
+          quantity: number;
+          unit_cost: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['clearance_pack_items']['Row']> & {
+          pack_id: string;
+          branch_product_id: string;
+          product_name: string;
+          unit: 'kg' | 'piece' | 'bunch' | 'bag' | 'liter' | 'box';
+          quantity: number;
+        };
+        Update: Partial<Database['public']['Tables']['clearance_pack_items']['Row']>;
+        Relationships: [
+          {
+            foreignKeyName: 'clearance_pack_items_pack_id_fkey';
+            columns: ['pack_id'];
+            isOneToOne: false;
+            referencedRelation: 'clearance_packs';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       coupons: {
         Row: {
           id: string;
@@ -320,7 +392,7 @@ export interface Database {
           id: string;
           branch_id: string;
           branch_product_id: string;
-          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
           quantity: number;
           notes: string | null;
           order_id: string | null;
@@ -333,7 +405,7 @@ export interface Database {
         Insert: Partial<Database['public']['Tables']['inventory_movements']['Row']> & {
           branch_id: string;
           branch_product_id: string;
-          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
           quantity: number;
         };
         Update: Partial<Database['public']['Tables']['inventory_movements']['Row']>;
@@ -706,13 +778,31 @@ export interface Database {
       record_inventory_movement: {
         Args: {
           p_branch_product_id: string;
-          p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment';
+          p_movement_type: 'purchase' | 'sale' | 'waste' | 'adjustment' | 'pack';
           p_quantity: number;
           p_notes: string | null;
           p_expires_at?: string | null;
           p_unit_cost?: number | null;
         };
         Returns: Array<{ new_stock: number; new_avg_unit_cost: number }>;
+      };
+      assemble_clearance_pack: {
+        Args: {
+          p_branch_id: string;
+          p_title: string;
+          p_price: number;
+          p_bag_count: number;
+          p_items: Json;
+        };
+        Returns: Array<{
+          pack_id: string;
+          branch_product_id: string;
+          product_id: string;
+          quantity_made: number;
+          quantity_remaining: number;
+          price: number;
+          title: string;
+        }>;
       };
       merge_branch_products: {
         Args: {
