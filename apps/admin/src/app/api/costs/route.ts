@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
 import {
+  costTypeFromCategory,
+  inferOperatingCostCategory,
   normalizeChargeDay,
+  parseOperatingCostCategory,
   validateOperatingCostInput,
   type OperatingCostInput,
 } from '@puertaverde/shared';
@@ -64,13 +67,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
+    const category = parseOperatingCostCategory(
+      body.category,
+      inferOperatingCostCategory({ name: body.name, costType: body.costType }),
+    );
+    const costType = costTypeFromCategory(category);
+
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('branch_operating_costs')
       .insert({
         branch_id: tenant.branchId,
         name: body.name.trim(),
-        cost_type: body.costType,
+        cost_type: costType,
+        category,
         period: body.period,
         amount: body.amount,
         notes: body.notes?.trim() || null,

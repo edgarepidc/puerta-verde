@@ -483,6 +483,7 @@ export interface Database {
           is_active: boolean;
           paid_from: 'cash' | 'account';
           charge_day: number;
+          category: 'rent' | 'payroll' | 'fixed' | 'variable';
           created_at: string;
         };
         Insert: Partial<Database['public']['Tables']['branch_operating_costs']['Row']> & {

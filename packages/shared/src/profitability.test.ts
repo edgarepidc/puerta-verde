@@ -7,9 +7,39 @@ import {
   chargeDateForMonth,
   costAppliesToRange,
   costPausedAtPeriodStart,
+  costTypeFromCategory,
+  groupOperatingCostsByCategory,
+  inferOperatingCostCategory,
   operatingCostAmountForRange,
 } from './profitability';
 import { pocketTotal, resolveMoneyPosition } from './money-position';
+
+test('inferOperatingCostCategory maps rent, payroll and leftover fixed', () => {
+  assert.equal(inferOperatingCostCategory({ name: 'Renta local' }), 'rent');
+  assert.equal(inferOperatingCostCategory({ name: 'Ceci 4 días' }), 'payroll');
+  assert.equal(inferOperatingCostCategory({ name: 'Pago a Vale' }), 'payroll');
+  assert.equal(inferOperatingCostCategory({ name: 'Total Play' }), 'fixed');
+  assert.equal(inferOperatingCostCategory({ name: 'Empaque', costType: 'variable' }), 'variable');
+  assert.equal(inferOperatingCostCategory({ name: 'Ceci', category: 'fixed' }), 'fixed');
+  assert.equal(costTypeFromCategory('payroll'), 'fixed');
+  assert.equal(costTypeFromCategory('variable'), 'variable');
+});
+
+test('groupOperatingCostsByCategory keeps rent, payroll, then the rest', () => {
+  const groups = groupOperatingCostsByCategory(
+    [
+      { name: 'Total Play', category: 'fixed' as const },
+      { name: 'Renta local', category: 'rent' as const },
+      { name: 'Ceci', category: 'payroll' as const },
+    ],
+    (row) => row.category,
+  );
+  assert.deepEqual(
+    groups.map((group) => group.category),
+    ['rent', 'payroll', 'fixed'],
+  );
+  assert.equal(groups[0]?.items[0]?.name, 'Renta local');
+});
 
 test('costAppliesToRange is true for an open term that started before the period', () => {
   assert.equal(

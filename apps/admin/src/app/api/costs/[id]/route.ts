@@ -4,6 +4,9 @@ import {
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
   costAppliesToRange,
+  costTypeFromCategory,
+  inferOperatingCostCategory,
+  isOperatingCostCategory,
   normalizeChargeDay,
   type OperatingCostInput,
   type OperatingCostTerm,
@@ -38,6 +41,7 @@ export async function PATCH(
     const updates: Partial<{
       name: string;
       cost_type: OperatingCostInput['costType'];
+      category: NonNullable<OperatingCostInput['category']>;
       period: OperatingCostInput['period'];
       amount: number;
       notes: string | null;
@@ -46,8 +50,15 @@ export async function PATCH(
       charge_day: number;
     }> = {};
     if (body.name?.trim()) updates.name = body.name.trim();
-    if (body.costType && OPERATING_COST_TYPES.includes(body.costType)) {
+    if (isOperatingCostCategory(body.category)) {
+      updates.category = body.category;
+      updates.cost_type = costTypeFromCategory(body.category);
+    } else if (body.costType && OPERATING_COST_TYPES.includes(body.costType)) {
       updates.cost_type = body.costType;
+      updates.category = inferOperatingCostCategory({
+        name: body.name,
+        costType: body.costType,
+      });
     }
     if (body.period && OPERATING_COST_PERIODS.includes(body.period)) {
       updates.period = body.period;

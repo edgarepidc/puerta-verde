@@ -107,6 +107,7 @@ export default async function NumerosPage() {
               id: string;
               name: string;
               cost_type: OperatingCostType;
+              category?: 'rent' | 'payroll' | 'fixed' | 'variable' | null;
               period: OperatingCostPeriod;
               amount: number;
               notes: string | null;

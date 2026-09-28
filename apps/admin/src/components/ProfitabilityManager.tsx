@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  OPERATING_COST_CATEGORIES,
+  OPERATING_COST_CATEGORY_HINTS,
+  OPERATING_COST_CATEGORY_LABELS,
   formatChargeDayLabel,
   formatDecimal,
   formatMexicoDayLabel,
@@ -12,13 +15,18 @@ import {
   MONEY_POCKET_LABELS,
   costAppliesToRange,
   costPausedAtPeriodStart,
+  costTypeFromCategory,
+  groupOperatingCostsByCategory,
+  inferOperatingCostCategory,
   normalizeChargeDay,
   operatingCostAmountForRange,
   parseMoneyPocket,
+  parseOperatingCostCategory,
   pocketTotal,
   type IncomeEntryType,
   type MoneyPocket,
   type MoneyPositionView,
+  type OperatingCostCategory,
   type OperatingCostInput,
   type OperatingCostPeriod,
   type OperatingCostTerm,
@@ -61,6 +69,7 @@ interface CostRow {
   id: string;
   name: string;
   cost_type: OperatingCostType;
+  category?: OperatingCostCategory | null;
   period: OperatingCostPeriod;
   amount: number;
   notes: string | null;
@@ -119,6 +128,7 @@ type PeriodPreset = 'current' | 'previous' | 'custom';
 const emptyCost: OperatingCostInput = {
   name: '',
   costType: 'fixed',
+  category: 'payroll',
   period: 'monthly',
   amount: 0,
   notes: '',
@@ -126,6 +136,51 @@ const emptyCost: OperatingCostInput = {
   paidFrom: 'account',
   chargeDay: 1,
 };
+
+function CostCategoryField({
+  value,
+  onChange,
+}: {
+  value: OperatingCostCategory;
+  onChange: (value: OperatingCostCategory) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {OPERATING_COST_CATEGORIES.map((category) => (
+        <ActionChip
+          key={category}
+          elevated={value === category}
+          tone={value === category ? 'emerald' : 'slate'}
+          onClick={() => onChange(category)}
+        >
+          {OPERATING_COST_CATEGORY_LABELS[category]}
+        </ActionChip>
+      ))}
+    </div>
+  );
+}
+
+function costCategoryOf(row: CostRow): OperatingCostCategory {
+  return inferOperatingCostCategory({
+    name: row.name,
+    category: row.category,
+    costType: row.cost_type,
+  });
+}
+
+function chargedCostAmount(row: CostRow, from: string, to: string) {
+  return operatingCostAmountForRange(
+    {
+      costType: row.cost_type,
+      period: row.period,
+      amount: Number(row.amount),
+      chargeDay: normalizeChargeDay(row.charge_day),
+      terms: row.terms,
+    },
+    from,
+    to,
+  );
+}
 
 function monthParts(ymd: string): { year: number; month: number } {
   const year = Number(ymd.slice(0, 4));
@@ -325,10 +380,12 @@ function ProfitBuildUp({
   summary,
   wasteCost,
   zeroCostSold,
+  operatingByCategory = [],
 }: {
   summary: ProfitSummary | null;
   wasteCost: number;
   zeroCostSold: Array<{ name: string; revenue: number }>;
+  operatingByCategory?: Array<{ category: OperatingCostCategory; amount: number }>;
 }) {
   if (!summary) return null;
 
@@ -348,6 +405,7 @@ function ProfitBuildUp({
   const grossPct =
     revenue > 0 ? Number(summary.gross_margin_percent ?? (gross / revenue) * 100) : null;
   const netPct = revenue > 0 ? (operatingNet / revenue) * 100 : null;
+  const categoryLines = operatingByCategory.filter((row) => row.amount > 0.009);
 
   const formatPct = (value: number | null) =>
     value == null ? '—' : `${value.toFixed(1).replace(/^-/, '−')}%`;
@@ -371,14 +429,27 @@ function ProfitBuildUp({
     delta: -cogs,
     running,
   });
-  running -= fixed;
-  steps.push({
-    key: 'fixed',
-    label: '− Renta y nómina',
-    hint: 'Renta, nómina y otros del local',
-    delta: -fixed,
-    running,
-  });
+  if (categoryLines.length) {
+    for (const row of categoryLines) {
+      running -= row.amount;
+      steps.push({
+        key: row.category,
+        label: `− ${OPERATING_COST_CATEGORY_LABELS[row.category]}`,
+        hint: OPERATING_COST_CATEGORY_HINTS[row.category],
+        delta: -row.amount,
+        running,
+      });
+    }
+  } else {
+    running -= fixed;
+    steps.push({
+      key: 'fixed',
+      label: '− Renta y nómina',
+      hint: 'Renta, nómina y otros del local',
+      delta: -fixed,
+      running,
+    });
+  }
   running -= visit;
   steps.push({
     key: 'visit',
@@ -387,7 +458,7 @@ function ProfitBuildUp({
     delta: -visit,
     running,
   });
-  if (other > 0) {
+  if (!categoryLines.length && other > 0) {
     running -= other;
     steps.push({
       key: 'other',
@@ -723,6 +794,7 @@ export function ProfitabilityManager({
     name: string;
     amount: string;
     costType: OperatingCostType;
+    category: OperatingCostCategory;
     period: OperatingCostPeriod;
     paidFrom: MoneyPocket;
     chargeDay: number;
@@ -901,6 +973,8 @@ export function ProfitabilityManager({
         body: JSON.stringify({
           ...costForm,
           amount: parseDecimal(costAmountText),
+          costType: costTypeFromCategory(parseOperatingCostCategory(costForm.category, 'payroll')),
+          category: parseOperatingCostCategory(costForm.category, 'payroll'),
           effectiveFrom: from,
         }),
       });
@@ -1050,6 +1124,7 @@ export function ProfitabilityManager({
           name: editCost.name,
           amount: parseDecimal(editCost.amount),
           costType: editCost.costType,
+          category: editCost.category,
           period: editCost.period,
           paidFrom: editCost.paidFrom,
           chargeDay: editCost.chargeDay,
@@ -1114,6 +1189,11 @@ export function ProfitabilityManager({
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
   const listedCosts = costs.filter((row) => costAppliesToRange(row.terms, from, to));
+  const listedCostGroups = groupOperatingCostsByCategory(listedCosts, costCategoryOf);
+  const operatingByCategory = listedCostGroups.map((group) => ({
+    category: group.category,
+    amount: group.items.reduce((sum, row) => sum + chargedCostAmount(row, from, to), 0),
+  }));
   const removedHereCosts = costs.filter(
     (row) =>
       !costAppliesToRange(row.terms, from, to) &&
@@ -1345,6 +1425,7 @@ export function ProfitabilityManager({
           summary={summary}
           wasteCost={wasteCost}
           zeroCostSold={zeroCostSold}
+          operatingByCategory={operatingByCategory}
         />
       </details>
 
@@ -1902,11 +1983,23 @@ export function ProfitabilityManager({
                 🏠
               </div>
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Renta, nómina y otros</p>
+                <p className="text-base font-semibold text-slate-900">Gastos del local</p>
                 <p className="mt-0.5 text-sm text-slate-500">
                   {listedCosts.length} en la lista
                   {chargedThisPeriod > 0 ? ` · ${formatMoney(chargedThisPeriod)} este periodo` : ''}
                 </p>
+                {listedCostGroups.length ? (
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {listedCostGroups
+                      .map(
+                        (group) =>
+                          `${group.label} ${formatMoney(
+                            group.items.reduce((sum, row) => sum + Number(row.amount), 0),
+                          )}`,
+                      )
+                      .join(' · ')}
+                  </p>
+                ) : null}
               </div>
             </div>
             <NestedFoldChip />
@@ -1921,24 +2014,43 @@ export function ProfitabilityManager({
               <p className="px-4 py-4 text-sm text-slate-500">Sin gastos de este tipo en este periodo.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {listedCosts.map((row) => {
+                {listedCostGroups.map((group) => {
+                  const groupTotal = group.items.reduce((sum, row) => sum + Number(row.amount), 0);
+                  return (
+                    <li key={group.category}>
+                      <div className="flex items-baseline justify-between gap-3 bg-slate-50/90 px-4 py-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{group.label}</p>
+                          <p className="text-xs text-slate-500">{group.hint}</p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                          {formatMoney(groupTotal)}
+                        </p>
+                      </div>
+                      <ul className="divide-y divide-slate-50">
+                        {group.items.map((row) => {
                   const editing = editCost?.id === row.id;
                   const chargeDay = normalizeChargeDay(row.charge_day);
-                  const charged = operatingCostAmountForRange(
-                    {
-                      costType: row.cost_type,
-                      period: row.period,
-                      amount: Number(row.amount),
-                      chargeDay,
-                      terms: row.terms,
-                    },
-                    from,
-                    to,
-                  );
+                  const charged = chargedCostAmount(row, from, to);
                   return (
                     <li key={row.id} className="px-4 py-2.5">
                       {editing && editCost ? (
-                        <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
+                        <div className="space-y-2">
+                          <CostCategoryField
+                            value={editCost.category}
+                            onChange={(category) =>
+                              setEditCost((d) =>
+                                d
+                                  ? {
+                                      ...d,
+                                      category,
+                                      costType: costTypeFromCategory(category),
+                                    }
+                                  : d,
+                              )
+                            }
+                          />
+                          <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
                           <input
                             className="pv-input min-w-0 col-span-2 lg:col-span-1"
                             value={editCost.name}
@@ -1976,6 +2088,7 @@ export function ProfitabilityManager({
                               Cancelar
                             </ActionChip>
                           </div>
+                          </div>
                         </div>
                       ) : (
                         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2000,6 +2113,7 @@ export function ProfitabilityManager({
                                   name: row.name,
                                   amount: formatDecimal(Number(row.amount)),
                                   costType: row.cost_type,
+                                  category: costCategoryOf(row),
                                   period: row.period,
                                   paidFrom: parseMoneyPocket(row.paid_from, 'account'),
                                   chargeDay,
@@ -2026,6 +2140,10 @@ export function ProfitabilityManager({
                           </div>
                         </div>
                       )}
+                    </li>
+                  );
+                })}
+                      </ul>
                     </li>
                   );
                 })}
@@ -2068,7 +2186,17 @@ export function ProfitabilityManager({
             ) : null}
 
             <div className="border-t border-slate-100 bg-slate-50/80 p-4">
-              <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
+              <CostCategoryField
+                value={parseOperatingCostCategory(costForm.category, 'payroll')}
+                onChange={(category) =>
+                  setCostForm((f) => ({
+                    ...f,
+                    category,
+                    costType: costTypeFromCategory(category),
+                  }))
+                }
+              />
+              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
                 <input
                   placeholder="Nombre"
                   className="pv-input min-w-0 col-span-2 lg:col-span-1"
