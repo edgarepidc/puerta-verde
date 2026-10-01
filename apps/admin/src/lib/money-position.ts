@@ -299,7 +299,7 @@ export async function fetchMoneyLedger(
       .order('as_of_date', { ascending: true }),
     supabase
       .from('branch_operating_costs')
-      .select('cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
+      .select('name, category, cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
       .eq('branch_id', branchId),
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
@@ -317,7 +317,7 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('purchases')
-        .select('total_amount, paid_from, purchased_at')
+        .select('notes, total_amount, paid_from, purchased_at')
         .eq('branch_id', branchId)
         .gte('purchased_at', from)
         .lte('purchased_at', to)
@@ -326,7 +326,7 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('expenses')
-        .select('amount, paid_from, expense_date')
+        .select('concept, amount, paid_from, expense_date')
         .eq('branch_id', branchId)
         .gte('expense_date', from)
         .lte('expense_date', to)
@@ -335,19 +335,24 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('income_entries')
-        .select('entry_type, amount, paid_from, entry_date')
+        .select('entry_type, concept, amount, paid_from, entry_date')
         .eq('branch_id', branchId)
         .gte('entry_date', from)
         .lte('entry_date', to)
         .range(rangeFrom, rangeTo),
     ),
-    fetchPaged<{ amount: number; destination: string | null; withdrawal_date: string }>(
+    fetchPaged<{
+      amount: number;
+      destination: string | null;
+      notes: string | null;
+      withdrawal_date: string;
+    }>(
       (rangeFrom, rangeTo) =>
         // Table is not in generated types yet.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from('cash_withdrawals')
-          .select('amount, destination, withdrawal_date')
+          .select('amount, destination, notes, withdrawal_date')
           .eq('branch_id', branchId)
           .gte('withdrawal_date', from)
           .lte('withdrawal_date', to)
@@ -364,6 +369,8 @@ export async function fetchMoneyLedger(
     : null;
 
   const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
+    name: row.name,
+    category: row.category,
     costType: row.cost_type,
     period: row.period,
     amount: Number(row.amount),
@@ -395,22 +402,26 @@ export async function fetchMoneyLedger(
       ymd: moneyLedgerRowYmd(row.purchased_at),
       amount: Number(row.total_amount ?? 0),
       paidFrom: row.paid_from,
+      label: row.notes,
     })),
     expenses: expenses.map((row) => ({
       ymd: moneyLedgerRowYmd(row.expense_date),
       amount: Number(row.amount ?? 0),
       paidFrom: row.paid_from,
+      label: row.concept,
     })),
     incomes: incomes.map((row) => ({
       ymd: moneyLedgerRowYmd(row.entry_date),
       amount: Number(row.amount ?? 0),
       paidFrom: row.paid_from,
       entryType: isIncomeEntryType(row.entry_type) ? row.entry_type : 'operating',
+      label: row.concept,
     })),
     transfers: transfers.map((row) => ({
       ymd: moneyLedgerRowYmd(row.withdrawal_date),
       amount: Number(row.amount ?? 0),
       destination: row.destination,
+      label: row.notes,
     })),
     costs,
   });

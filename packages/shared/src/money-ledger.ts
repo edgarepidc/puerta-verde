@@ -1,10 +1,7 @@
 import { mexicoYmdFromIso } from './order-status';
 import { roundMoney } from './market-prices';
 import { parseIncomePocket } from './income-entries';
-import {
-  applyOperatingCostsToPockets,
-  type OperatingCostPocketInput,
-} from './profitability';
+import { operatingCostsChargedOnYmd, type OperatingCostPocketInput } from './profitability';
 import { parsePaymentSplits } from './payment-splits';
 import {
   isCollectedTicket,
@@ -13,6 +10,12 @@ import {
   ticketMoneyPocket,
   type MoneyPositionSnapshot,
 } from './money-position';
+
+export type MoneyDayDetail = {
+  label: string;
+  cash: number;
+  account: number;
+};
 
 export interface MoneyDayRow {
   ymd: string;
@@ -33,6 +36,9 @@ export interface MoneyDayRow {
   runningCash: number | null;
   runningAccount: number | null;
   counted: boolean;
+  details: MoneyDayDetail[];
+  countAdjustCash: number;
+  countAdjustAccount: number;
 }
 
 export interface MoneyLedgerTotals {
@@ -81,6 +87,7 @@ export interface MoneyLedgerPocketRow {
   ymd: string;
   amount: number;
   paidFrom?: string | null;
+  label?: string | null;
 }
 
 export interface MoneyLedgerIncomeRow {
@@ -88,12 +95,14 @@ export interface MoneyLedgerIncomeRow {
   amount: number;
   paidFrom?: string | null;
   entryType: 'contribution' | 'operating';
+  label?: string | null;
 }
 
 export interface MoneyLedgerTransferRow {
   ymd: string;
   amount: number;
   destination?: string | null;
+  label?: string | null;
 }
 
 export interface MoneyLedgerCount extends MoneyPositionSnapshot {
@@ -135,6 +144,9 @@ export function emptyMoneyDay(ymd: string): MoneyDayRow {
     runningCash: null,
     runningAccount: null,
     counted: false,
+    details: [],
+    countAdjustCash: 0,
+    countAdjustAccount: 0,
   };
 }
 
@@ -179,6 +191,46 @@ export function applyMoneyDayNets(day: MoneyDayRow): void {
   const accountOut = day.purchasesAccount + day.expensesAccount + day.toCash;
   day.netCash = roundMoney(cashIn - cashOut);
   day.netAccount = roundMoney(accountIn - accountOut);
+}
+
+const AUDIT_EPS = 0.005;
+
+function addDetail(day: MoneyDayRow, label: string, cash: number, account: number): void {
+  if (Math.abs(cash) < AUDIT_EPS && Math.abs(account) < AUDIT_EPS) return;
+  const nextCash = roundMoney(cash);
+  const nextAccount = roundMoney(account);
+  const existing = day.details.find((row) => row.label === label);
+  if (existing) {
+    existing.cash = roundMoney(existing.cash + nextCash);
+    existing.account = roundMoney(existing.account + nextAccount);
+    return;
+  }
+  day.details.push({ label, cash: nextCash, account: nextAccount });
+}
+
+export function moneyDayAuditMovements(day: MoneyDayRow): MoneyDayDetail[] {
+  const rows: MoneyDayDetail[] = [
+    { label: 'Ventas en efectivo', cash: day.cashSales, account: 0 },
+    { label: 'TPV', cash: 0, account: day.cardSales },
+    { label: 'Transferencia', cash: 0, account: day.transferSales },
+    { label: 'Stripe', cash: 0, account: day.onlineSales },
+    ...day.details,
+  ];
+  if (Math.abs(day.countAdjustCash) >= AUDIT_EPS) {
+    rows.push({
+      label: day.countAdjustCash < 0 ? 'Faltante de caja' : 'Sobrante de caja',
+      cash: day.countAdjustCash,
+      account: 0,
+    });
+  }
+  if (Math.abs(day.countAdjustAccount) >= AUDIT_EPS) {
+    rows.push({
+      label: day.countAdjustAccount < 0 ? 'Faltante de cuenta' : 'Sobrante de cuenta',
+      cash: 0,
+      account: day.countAdjustAccount,
+    });
+  }
+  return rows.filter((row) => Math.abs(row.cash) >= AUDIT_EPS || Math.abs(row.account) >= AUDIT_EPS);
 }
 
 export function moneyLedgerRowYmd(value: string | null | undefined): string {
@@ -231,8 +283,14 @@ export function buildMoneyLedger(input: {
     if (!day) continue;
     const amount = Number(row.amount ?? 0);
     if (!(amount > 0)) continue;
-    if (parseMoneyPocket(row.paidFrom) === 'account') day.purchasesAccount += amount;
-    else day.purchasesCash += amount;
+    const label = (row.label ?? '').trim() || 'Visita a central';
+    if (parseMoneyPocket(row.paidFrom) === 'account') {
+      day.purchasesAccount += amount;
+      addDetail(day, label, 0, -amount);
+    } else {
+      day.purchasesCash += amount;
+      addDetail(day, label, -amount, 0);
+    }
   }
 
   for (const row of input.expenses) {
@@ -240,8 +298,14 @@ export function buildMoneyLedger(input: {
     if (!day) continue;
     const amount = Number(row.amount ?? 0);
     if (!(amount > 0)) continue;
-    if (parseMoneyPocket(row.paidFrom) === 'account') day.expensesAccount += amount;
-    else day.expensesCash += amount;
+    const label = (row.label ?? '').trim() || 'Gasto';
+    if (parseMoneyPocket(row.paidFrom) === 'account') {
+      day.expensesAccount += amount;
+      addDetail(day, label, 0, -amount);
+    } else {
+      day.expensesCash += amount;
+      addDetail(day, label, -amount, 0);
+    }
   }
 
   for (const row of input.incomes) {
@@ -250,8 +314,15 @@ export function buildMoneyLedger(input: {
     const amount = Number(row.amount ?? 0);
     if (!(amount > 0)) continue;
     const pocket = parseIncomePocket(row.paidFrom, row.entryType);
-    if (pocket === 'account') day.otherInAccount += amount;
-    else day.otherInCash += amount;
+    const label =
+      (row.label ?? '').trim() || (row.entryType === 'contribution' ? 'Aportación' : 'Otro ingreso');
+    if (pocket === 'account') {
+      day.otherInAccount += amount;
+      addDetail(day, label, 0, amount);
+    } else {
+      day.otherInCash += amount;
+      addDetail(day, label, amount, 0);
+    }
   }
 
   for (const row of input.transfers) {
@@ -259,24 +330,33 @@ export function buildMoneyLedger(input: {
     if (!day) continue;
     const amount = Number(row.amount ?? 0);
     if (!(amount > 0)) continue;
-    if (parseMoneyPocket(row.destination, 'account') === 'cash') day.toCash += amount;
-    else day.toAccount += amount;
+    const named = (row.label ?? '').trim();
+    if (parseMoneyPocket(row.destination, 'account') === 'cash') {
+      day.toCash += amount;
+      addDetail(day, named || 'Cuenta → caja', amount, -amount);
+    } else {
+      day.toAccount += amount;
+      addDetail(day, named || 'Depósito a cuenta', -amount, amount);
+    }
   }
 
   if (input.costs?.length) {
     for (const ymd of days.keys()) {
-      const flows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-      applyOperatingCostsToPockets(flows, input.costs, {
-        from: ymd,
-        to: ymd,
-        dayBeforeFrom: previousYmd(ymd),
-        orderCount: orderCountByDay.get(ymd) ?? 0,
-        mode: 'outflow',
-      });
       const day = days.get(ymd);
       if (!day) continue;
-      day.expensesCash += flows.cashOut;
-      day.expensesAccount += flows.accountOut;
+      for (const cost of operatingCostsChargedOnYmd(
+        input.costs,
+        ymd,
+        orderCountByDay.get(ymd) ?? 0,
+      )) {
+        if (cost.paidFrom === 'account') {
+          day.expensesAccount += cost.amount;
+          addDetail(day, cost.name, 0, -cost.amount);
+        } else {
+          day.expensesCash += cost.amount;
+          addDetail(day, cost.name, -cost.amount, 0);
+        }
+      }
     }
   }
 
@@ -310,6 +390,10 @@ export function buildMoneyLedger(input: {
     const count = countByDay.get(day.ymd);
     if (count) {
       day.counted = true;
+      if (tracking) {
+        day.countAdjustCash = roundMoney(count.cash - roundMoney(cash + day.netCash));
+        day.countAdjustAccount = roundMoney(count.account - roundMoney(account + day.netAccount));
+      }
       cash = roundMoney(count.cash);
       account = roundMoney(count.account);
       tracking = true;
@@ -405,12 +489,6 @@ function addSaleMethod(
     return;
   }
   day.cashSales += amount;
-}
-
-function previousYmd(ymd: string): string {
-  const [year, month, day] = ymd.split('-').map(Number);
-  const cursor = new Date(Date.UTC(year, month - 1, day - 1));
-  return cursor.toISOString().slice(0, 10);
 }
 
 function emptyTotals(): MoneyLedgerTotals {
