@@ -41,23 +41,6 @@ function Stat({
   );
 }
 
-function Accumulated({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | null;
-}) {
-  return (
-    <div className="rounded-xl border border-emerald-100 bg-emerald-50/90 px-3 py-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">{label}</p>
-      <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
-        {value == null ? '—' : formatMoney(value)}
-      </p>
-    </div>
-  );
-}
-
 function DayLines({ day }: { day: MoneyDayRow }) {
   const lines: Array<{ label: string; amount: number }> = [
     { label: 'Ventas en efectivo', amount: day.cashSales },
@@ -74,50 +57,38 @@ function DayLines({ day }: { day: MoneyDayRow }) {
     { label: 'Gastos y renta · cuenta', amount: -day.expensesAccount },
   ].filter((line) => Math.abs(line.amount) >= 0.005);
 
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-          Llevamos acumulado
-        </p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          {day.counted
-            ? 'Tienes a este día, según el conteo. Lo de abajo es el movimiento del día.'
-            : 'Total a este día, no el movimiento de hoy.'}
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <Accumulated label="Efectivo" value={day.runningCash} />
-          <Accumulated label="Cuenta" value={day.runningAccount} />
-        </div>
-      </div>
+  if (!lines.length && !day.counted) {
+    return <p className="text-sm text-slate-500">Sin movimientos este día.</p>;
+  }
 
-      {lines.length === 0 && !day.counted ? (
-        <p className="text-sm text-slate-500">Sin movimientos este día.</p>
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {lines.map((line) => (
-            <li key={line.label} className="flex items-baseline justify-between gap-3 py-2">
-              <p className="text-sm text-slate-700">{line.label}</p>
-              <p className={`text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
-                {signedMoney(line.amount)}
-              </p>
-            </li>
-          ))}
-          <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
-            <p className="text-sm font-semibold text-slate-900">Este día · neto cuenta</p>
-            <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netAccount)}`}>
-              {signedMoney(day.netAccount)}
-            </p>
-          </li>
-          <li className="flex items-baseline justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-900">Este día · neto caja</p>
-            <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netCash)}`}>
-              {signedMoney(day.netCash)}
-            </p>
-          </li>
-        </ul>
-      )}
-    </div>
+  return (
+    <ul className="divide-y divide-slate-100">
+      {day.counted ? (
+        <li className="py-2 text-sm text-amber-800">
+          Hubo conteo. Tienes se queda en ese número; lo de abajo es lo registrado el mismo día.
+        </li>
+      ) : null}
+      {lines.map((line) => (
+        <li key={line.label} className="flex items-baseline justify-between gap-3 py-2">
+          <p className="text-sm text-slate-700">{line.label}</p>
+          <p className={`text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
+            {signedMoney(line.amount)}
+          </p>
+        </li>
+      ))}
+      <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
+        <p className="text-sm font-semibold text-slate-900">Este día · neto cuenta</p>
+        <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netAccount)}`}>
+          {signedMoney(day.netAccount)}
+        </p>
+      </li>
+      <li className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">Este día · neto caja</p>
+        <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netCash)}`}>
+          {signedMoney(day.netCash)}
+        </p>
+      </li>
+    </ul>
   );
 }
 
@@ -237,16 +208,21 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-start gap-3">
-                    {reviewingThis ? (
-                      <div className="text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-                          Efectivo
-                        </p>
-                        <p className="text-sm font-bold tabular-nums text-slate-900">
-                          {day.runningCash == null ? '—' : formatMoney(day.runningCash)}
-                        </p>
-                      </div>
-                    ) : null}
+                    <div className="text-right">
+                      <p
+                        className={`text-[11px] font-semibold uppercase tracking-wide ${
+                          reviewingThis ? 'text-emerald-800' : 'text-slate-500'
+                        }`}
+                      >
+                        Efectivo
+                      </p>
+                      <p className="text-sm font-bold tabular-nums text-slate-900">
+                        {day.runningCash == null ? '—' : formatMoney(day.runningCash)}
+                      </p>
+                      <p className={`text-xs tabular-nums ${moneyClass(day.netCash)}`}>
+                        {signedMoney(day.netCash)}
+                      </p>
+                    </div>
                     <div className="text-right">
                       <p
                         className={`text-[11px] font-semibold uppercase tracking-wide ${
