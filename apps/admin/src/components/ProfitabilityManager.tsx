@@ -355,6 +355,11 @@ function TeQuedoCard({
         <p className="mt-auto truncate pt-0.5 text-xs text-slate-500">
           En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
         </p>
+        {position?.openingAsOf ? (
+          <p className="truncate text-xs text-slate-400">
+            Desde el cierre. Ventas, gastos, renta y depósitos mueven los dos.
+          </p>
+        ) : null}
         {canAdjust && adjusting ? (
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className="text-xs font-medium text-slate-600">

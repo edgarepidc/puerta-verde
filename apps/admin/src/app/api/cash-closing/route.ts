@@ -6,6 +6,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { loadCashDay } from '@/lib/cash-day';
 import { isValidYmd, todayMexicoYmd } from '@/lib/mexico-date';
+import { syncTienesFromCashClose } from '@/lib/money-position';
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -86,6 +87,27 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (countedCash != null) {
+    try {
+      await syncTienesFromCashClose({
+        branchId: auth.branchId,
+        closingDate: requested,
+        countedCash,
+        userId: auth.userId,
+      });
+    } catch (syncError) {
+      return NextResponse.json(
+        {
+          error:
+            syncError instanceof Error
+              ? syncError.message
+              : 'Caja cerró, pero no se pudo actualizar Tienes',
+        },
+        { status: 400 },
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, closing: data, totals: summary.totals });

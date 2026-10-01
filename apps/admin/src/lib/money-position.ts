@@ -5,7 +5,6 @@ import {
   applyCashPocketTransfer,
   applyOperatingCostsToPockets,
   buildMoneyLedger,
-  calendarMonthStart,
   isIncomeEntryType,
   moneyLedgerRowYmd,
   parseIncomePocket,
@@ -13,6 +12,7 @@ import {
   pocketTotal,
   resolveMoneyPosition,
   roundMoney,
+  validateMoneyPositionInput,
   type MoneyLedger,
   type MoneyPositionFlows,
   type MoneyPositionView,
@@ -85,20 +85,7 @@ export async function fetchMoneyPosition(
 
   const flows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   const ticketFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-  const pausedFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
   let transfers: Array<{ amount: number; destination: string | null }> = [];
-
-  if (snapshot && !closesThisPeriod) {
-    const monthStart = calendarMonthStart(snapshot.asOfDate);
-    applyOperatingCostsToPockets(pausedFlows, costs, {
-      from: monthStart,
-      to: snapshot.asOfDate,
-      dayBeforeFrom: addMexicoDays(monthStart, -1),
-      mode: 'paused-addback',
-    });
-    flows.cashIn += pausedFlows.cashIn;
-    flows.accountIn += pausedFlows.accountIn;
-  }
 
   if (!closesThisPeriod && movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
@@ -226,8 +213,60 @@ export async function fetchMoneyPosition(
     ticketIn: roundMoney(ticketInCash + ticketInAccount),
     ticketInCash,
     ticketInAccount,
-    pausedIn: roundMoney(pausedFlows.cashIn + pausedFlows.accountIn),
+    pausedIn: 0,
   };
+}
+
+export async function saveMoneyPositionSnapshot(input: {
+  branchId: string;
+  cashAmount: number;
+  accountAmount: number;
+  asOfDate: string;
+  notes?: string | null;
+  userId: string | null;
+}): Promise<MoneyPositionView> {
+  const validationError = validateMoneyPositionInput({
+    cashAmount: input.cashAmount,
+    accountAmount: input.accountAmount,
+    asOfDate: input.asOfDate,
+    notes: input.notes ?? null,
+  });
+  if (validationError) throw new Error(validationError);
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from('branch_money_positions').upsert(
+    {
+      branch_id: input.branchId,
+      as_of_date: input.asOfDate,
+      cash_amount: input.cashAmount,
+      account_amount: input.accountAmount,
+      notes: input.notes?.trim() ? input.notes.trim() : null,
+      created_by: input.userId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'branch_id,as_of_date' },
+  );
+  if (error) throw new Error(error.message);
+
+  return fetchMoneyPosition(input.branchId, input.asOfDate, input.asOfDate);
+}
+
+/** Closing caja writes Tienes cash so efectivo and cuenta stay one book. */
+export async function syncTienesFromCashClose(input: {
+  branchId: string;
+  closingDate: string;
+  countedCash: number;
+  userId: string | null;
+}): Promise<MoneyPositionView> {
+  const current = await fetchMoneyPosition(input.branchId, input.closingDate, input.closingDate);
+  return saveMoneyPositionSnapshot({
+    branchId: input.branchId,
+    cashAmount: input.countedCash,
+    accountAmount: current.account,
+    asOfDate: input.closingDate,
+    notes: current.notes?.trim() || 'Cierre de caja',
+    userId: input.userId,
+  });
 }
 
 export async function fetchMoneyLedger(
@@ -337,24 +376,11 @@ export async function fetchMoneyLedger(
     from,
     to,
     opening,
-    counts: (countRows ?? []).map((row) => {
-      const paused = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-      const asOfDate = row.as_of_date;
-      const monthStart = calendarMonthStart(asOfDate);
-      applyOperatingCostsToPockets(paused, costs, {
-        from: monthStart,
-        to: asOfDate,
-        dayBeforeFrom: addMexicoDays(monthStart, -1),
-        mode: 'paused-addback',
-      });
-      return {
-        asOfDate,
-        cash: Number(row.cash_amount),
-        account: Number(row.account_amount),
-        pausedCash: paused.cashIn,
-        pausedAccount: paused.accountIn,
-      };
-    }),
+    counts: (countRows ?? []).map((row) => ({
+      asOfDate: row.as_of_date,
+      cash: Number(row.cash_amount),
+      account: Number(row.account_amount),
+    })),
     tickets: tickets.map((row) => ({
       ymd: moneyLedgerRowYmd(row.paid_at),
       status: row.status,

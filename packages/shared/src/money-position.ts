@@ -153,8 +153,8 @@ export function validateMoneyPositionInput(input: MoneyPositionInput): string | 
   if (!Number.isFinite(input.cashAmount) || input.cashAmount < 0) {
     return 'El efectivo no puede ser negativo.';
   }
-  if (!Number.isFinite(input.accountAmount) || input.accountAmount < 0) {
-    return 'El saldo en cuenta no puede ser negativo.';
+  if (!Number.isFinite(input.accountAmount)) {
+    return 'El saldo en cuenta no es válido.';
   }
   if ((input.notes ?? '').length > 240) {
     return 'La nota es demasiado larga.';

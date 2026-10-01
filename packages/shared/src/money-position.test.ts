@@ -36,6 +36,17 @@ test('validateMoneyPositionInput rejects a negative pocket', () => {
   );
 });
 
+test('validateMoneyPositionInput allows a negative account while auditing', () => {
+  assert.equal(
+    validateMoneyPositionInput({
+      cashAmount: 2634,
+      accountAmount: -1818.24,
+      asOfDate: '2026-10-01',
+    }),
+    null,
+  );
+});
+
 test('resolveMoneyPosition uses a snapshot that closes the period', () => {
   const result = resolveMoneyPosition({
     snapshot: { asOfDate: '2026-08-31', cash: 2605, account: 4362 },
