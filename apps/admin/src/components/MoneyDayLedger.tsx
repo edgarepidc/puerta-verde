@@ -95,7 +95,10 @@ function DayLines({ day }: { day: MoneyDayRow }) {
 export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
   const [open, setOpen] = useState(true);
   const days = useMemo(
-    () => (ledger ? ledger.days.filter((day) => moneyDayHasActivity(day)) : []),
+    () =>
+      ledger
+        ? ledger.days.filter((day) => moneyDayHasActivity(day)).toReversed()
+        : [],
     [ledger],
   );
 
@@ -177,16 +180,30 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                       {day.toAccount > 0 ? ` · Depósito ${formatMoney(day.toAccount)}` : ''}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Cuenta
-                    </p>
-                    <p className="text-sm font-bold tabular-nums text-slate-900">
-                      {day.runningAccount == null ? '—' : formatMoney(day.runningAccount)}
-                    </p>
-                    <p className={`text-xs tabular-nums ${moneyClass(day.netAccount)}`}>
-                      {signedMoney(day.netAccount)}
-                    </p>
+                  <div className="flex shrink-0 items-start gap-2">
+                    <div className="text-right">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Cuenta
+                      </p>
+                      <p className="text-sm font-bold tabular-nums text-slate-900">
+                        {day.runningAccount == null ? '—' : formatMoney(day.runningAccount)}
+                      </p>
+                      <p className={`text-xs tabular-nums ${moneyClass(day.netAccount)}`}>
+                        {signedMoney(day.netAccount)}
+                      </p>
+                    </div>
+                    <svg
+                      className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open/day:rotate-180"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </div>
                 </summary>
                 <div className="border-t border-slate-100 px-3 py-3">
