@@ -41,7 +41,10 @@ function Stat({
   );
 }
 
-type AuditLine = { label: string; amount: number; always?: boolean };
+type AuditLine = { label: string; amount: number };
+
+const AUDIT_GRID =
+  'grid grid-cols-[minmax(7.5rem,1.15fr)_minmax(8.5rem,1fr)_minmax(8.5rem,1fr)_1.25rem] items-start gap-x-3';
 
 function yesterdayPockets(ledger: MoneyLedger, ymd: string): {
   cash: number | null;
@@ -57,42 +60,36 @@ function yesterdayPockets(ledger: MoneyLedger, ymd: string): {
   return { cash: ledger.openingCash, account: ledger.openingAccount };
 }
 
-function AuditLines({
-  title,
-  today,
-  lines,
-}: {
-  title: string;
-  today: number | null;
-  lines: AuditLine[];
-}) {
-  const visible = lines.filter((line) => line.always || Math.abs(line.amount) >= 0.005);
+function pocketAmount(value: number | null): string {
+  return value == null ? '—' : formatMoney(value);
+}
+
+function MovementList({ lines }: { lines: AuditLine[] }) {
+  const visible = lines.filter((line) => Math.abs(line.amount) >= 0.005);
+  if (visible.length === 0) return null;
   return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">{title}</p>
-      <ul className="mt-2 divide-y divide-emerald-100/80">
-        {visible.map((line) => (
-          <li key={line.label} className="flex items-baseline justify-between gap-3 py-2">
-            <p className="text-sm text-slate-700">{line.label}</p>
-            <p className={`text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
-              {signedMoney(line.amount)}
-            </p>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex items-baseline justify-between gap-3 border-t-2 border-emerald-200 pt-3">
-        <p className="text-sm font-semibold text-slate-900">Hoy</p>
-        <p className="text-base font-bold tabular-nums text-slate-900">
-          {today == null ? '—' : formatMoney(today)}
-        </p>
-      </div>
-    </div>
+    <ul>
+      {visible.map((line) => (
+        <li key={line.label} className="flex items-baseline justify-between gap-2 py-1.5">
+          <p className="min-w-0 text-sm text-slate-700">{line.label}</p>
+          <p className={`shrink-0 text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
+            {signedMoney(line.amount)}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function DayAudit({ day }: { day: MoneyDayRow }) {
+function DayAudit({
+  day,
+  yesterday,
+}: {
+  day: MoneyDayRow;
+  yesterday: { cash: number | null; account: number | null };
+}) {
   const cashLines: AuditLine[] = [
-    { label: 'Ventas en efectivo', amount: day.cashSales, always: true },
+    { label: 'Ventas en efectivo', amount: day.cashSales },
     { label: 'Otros ingresos', amount: day.otherInCash },
     { label: 'Cuenta → caja', amount: day.toCash },
     { label: 'Compras', amount: -day.purchasesCash },
@@ -100,9 +97,9 @@ function DayAudit({ day }: { day: MoneyDayRow }) {
     { label: 'Depósito a cuenta', amount: -day.toAccount },
   ];
   const accountLines: AuditLine[] = [
-    { label: 'TPV', amount: day.cardSales, always: true },
-    { label: 'Transferencia', amount: day.transferSales, always: true },
-    { label: 'Stripe', amount: day.onlineSales, always: true },
+    { label: 'TPV', amount: day.cardSales },
+    { label: 'Transferencia', amount: day.transferSales },
+    { label: 'Stripe', amount: day.onlineSales },
     { label: 'Otros ingresos', amount: day.otherInAccount },
     { label: 'Depósito desde caja', amount: day.toAccount },
     { label: 'Cuenta → caja', amount: -day.toCash },
@@ -111,15 +108,33 @@ function DayAudit({ day }: { day: MoneyDayRow }) {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="border-t border-emerald-200/80 px-3 pb-3 pt-1">
       {day.counted ? (
-        <p className="text-sm text-amber-800">
-          Hubo conteo. Hoy es el número del cierre; lo de arriba ya está incluido.
+        <p className="mb-2 text-sm text-amber-800">
+          Hubo conteo. Hoy es el número del cierre; el desglose ya está incluido.
         </p>
       ) : null}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <AuditLines title="Efectivo" today={day.runningCash} lines={cashLines} />
-        <AuditLines title="Cuenta" today={day.runningAccount} lines={accountLines} />
+      <div className={AUDIT_GRID}>
+        <p className="pt-1 text-sm text-emerald-900/80">al día de ayer</p>
+        <p className="text-right text-sm font-bold tabular-nums text-slate-900">
+          {pocketAmount(yesterday.cash)}
+        </p>
+        <p className="text-right text-sm font-bold tabular-nums text-slate-900">
+          {pocketAmount(yesterday.account)}
+        </p>
+        <span />
+        <span />
+        <MovementList lines={cashLines} />
+        <MovementList lines={accountLines} />
+        <span />
+        <p className="border-t-2 border-emerald-200 pt-3 text-sm font-semibold text-slate-900">Hoy</p>
+        <p className="border-t-2 border-emerald-200 pt-3 text-right text-base font-bold tabular-nums text-slate-900">
+          {pocketAmount(day.runningCash)}
+        </p>
+        <p className="border-t-2 border-emerald-200 pt-3 text-right text-base font-bold tabular-nums text-slate-900">
+          {pocketAmount(day.runningAccount)}
+        </p>
+        <span />
       </div>
     </div>
   );
@@ -197,7 +212,11 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                 open={reviewingThis}
               >
                 <summary
-                  className="flex cursor-pointer list-none items-start justify-between gap-3 px-3 py-3 marker:content-none [&::-webkit-details-marker]:hidden"
+                  className={
+                    reviewingThis
+                      ? `${AUDIT_GRID} cursor-pointer list-none px-3 py-3 marker:content-none [&::-webkit-details-marker]:hidden`
+                      : 'flex cursor-pointer list-none items-start justify-between gap-3 px-3 py-3 marker:content-none [&::-webkit-details-marker]:hidden'
+                  }
                   onClick={(event) => {
                     event.preventDefault();
                     setReviewing((current) => (current === day.ymd ? null : day.ymd));
@@ -230,61 +249,43 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                     </p>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-start gap-3">
-                    <div className="text-right">
-                      <p
-                        className={`text-[11px] font-semibold uppercase tracking-wide ${
-                          reviewingThis ? 'text-emerald-800' : 'text-slate-500'
-                        }`}
-                      >
+                  {reviewingThis ? (
+                    <>
+                      <p className="pt-0.5 text-right text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
                         Efectivo
                       </p>
-                      {reviewingThis ? (
-                        <>
-                          <p className="text-[11px] text-emerald-800">al día de ayer</p>
-                          <p className="text-sm font-bold tabular-nums text-slate-900">
-                            {yesterday.cash == null ? '—' : formatMoney(yesterday.cash)}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm font-bold tabular-nums text-slate-900">
-                            {day.runningCash == null ? '—' : formatMoney(day.runningCash)}
-                          </p>
-                          <p className={`text-xs tabular-nums ${moneyClass(day.netCash)}`}>
-                            {signedMoney(day.netCash)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-[11px] font-semibold uppercase tracking-wide ${
-                          reviewingThis ? 'text-emerald-800' : 'text-slate-500'
-                        }`}
-                      >
+                      <p className="pt-0.5 text-right text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
                         Cuenta
                       </p>
-                      {reviewingThis ? (
-                        <>
-                          <p className="text-[11px] text-emerald-800">al día de ayer</p>
-                          <p className="text-sm font-bold tabular-nums text-slate-900">
-                            {yesterday.account == null ? '—' : formatMoney(yesterday.account)}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm font-bold tabular-nums text-slate-900">
-                            {day.runningAccount == null ? '—' : formatMoney(day.runningAccount)}
-                          </p>
-                          <p className={`text-xs tabular-nums ${moneyClass(day.netAccount)}`}>
-                            {signedMoney(day.netAccount)}
-                          </p>
-                        </>
-                      )}
+                    </>
+                  ) : (
+                  <div className="flex shrink-0 items-start gap-3">
+                    <div className="text-right">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Efectivo
+                      </p>
+                      <p className="text-sm font-bold tabular-nums text-slate-900">
+                        {day.runningCash == null ? '—' : formatMoney(day.runningCash)}
+                      </p>
+                      <p className={`text-xs tabular-nums ${moneyClass(day.netCash)}`}>
+                        {signedMoney(day.netCash)}
+                      </p>
                     </div>
+                    <div className="text-right">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Cuenta
+                      </p>
+                      <p className="text-sm font-bold tabular-nums text-slate-900">
+                        {day.runningAccount == null ? '—' : formatMoney(day.runningAccount)}
+                      </p>
+                      <p className={`text-xs tabular-nums ${moneyClass(day.netAccount)}`}>
+                        {signedMoney(day.netAccount)}
+                      </p>
+                    </div>
+                  </div>
+                  )}
                     <svg
-                      className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open/day:rotate-180"
+                      className="mt-1 h-4 w-4 shrink-0 justify-self-end text-slate-400 transition group-open/day:rotate-180"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden
@@ -295,11 +296,8 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                         clipRule="evenodd"
                       />
                     </svg>
-                  </div>
                 </summary>
-                <div className="border-t border-emerald-200/80 px-3 py-3">
-                  <DayAudit day={day} />
-                </div>
+                <DayAudit day={day} yesterday={yesterday} />
               </details>
             </li>
             );
