@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { validateMoneyPositionInput } from '@puertaverde/shared';
+import { alignLedgerClosing, validateMoneyPositionInput } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
-import { fetchMoneyPosition } from '@/lib/money-position';
+import { fetchMoneyLedger, fetchMoneyPosition } from '@/lib/money-position';
 import { resolveProfitDateRange } from '@/lib/mexico-date';
 import { getDefaultTenant } from '@/lib/tenant';
 
@@ -32,8 +32,11 @@ export async function GET(request: Request) {
     }
 
     const tenant = await getDefaultTenant();
-    const position = await fetchMoneyPosition(tenant.branchId, range.start, range.end);
-    return NextResponse.json({ position });
+    const [position, ledger] = await Promise.all([
+      fetchMoneyPosition(tenant.branchId, range.start, range.end),
+      fetchMoneyLedger(tenant.branchId, range.start, range.end),
+    ]);
+    return NextResponse.json({ position, ledger: alignLedgerClosing(ledger, position) });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Error al cargar caja y cuenta' },

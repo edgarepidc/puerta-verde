@@ -4,12 +4,16 @@ import {
   addPocketOutflow,
   applyCashPocketTransfer,
   applyOperatingCostsToPockets,
+  buildMoneyLedger,
   calendarMonthStart,
+  isIncomeEntryType,
+  moneyLedgerRowYmd,
   parseIncomePocket,
   parseMoneyPocket,
   pocketTotal,
   resolveMoneyPosition,
   roundMoney,
+  type MoneyLedger,
   type MoneyPositionFlows,
   type MoneyPositionView,
   type OperatingCostPocketInput,
@@ -18,7 +22,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { addMexicoDays, mexicoYmdBoundsIso } from '@/lib/mexico-date';
 
-export type { MoneyPositionView };
+export type { MoneyLedger, MoneyPositionView };
 
 async function fetchPaged<T>(
   run: (
@@ -224,4 +228,164 @@ export async function fetchMoneyPosition(
     ticketInAccount,
     pausedIn: roundMoney(pausedFlows.cashIn + pausedFlows.accountIn),
   };
+}
+
+export async function fetchMoneyLedger(
+  branchId: string,
+  from: string,
+  to: string,
+): Promise<MoneyLedger> {
+  const supabase = createAdminClient();
+  const saleStart = mexicoYmdBoundsIso(from).start;
+  const saleEnd = mexicoYmdBoundsIso(to).end;
+  const dayBefore = addMexicoDays(from, -1);
+
+  const [
+    openingView,
+    { data: countRows },
+    { data: costRows },
+    tickets,
+    purchases,
+    expenses,
+    incomes,
+    transfers,
+  ] = await Promise.all([
+    fetchMoneyPosition(branchId, dayBefore, dayBefore),
+    supabase
+      .from('branch_money_positions')
+      .select('as_of_date, cash_amount, account_amount')
+      .eq('branch_id', branchId)
+      .gte('as_of_date', from)
+      .lte('as_of_date', to)
+      .order('as_of_date', { ascending: true }),
+    supabase
+      .from('branch_operating_costs')
+      .select('cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
+      .eq('branch_id', branchId),
+    fetchPaged((rangeFrom, rangeTo) =>
+      supabase
+        .from('orders')
+        .select(
+          'paid_at, status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee',
+        )
+        .eq('branch_id', branchId)
+        .eq('payment_status', 'paid')
+        .neq('status', 'cancelled')
+        .gte('paid_at', saleStart)
+        .lt('paid_at', saleEnd)
+        .range(rangeFrom, rangeTo),
+    ),
+    fetchPaged((rangeFrom, rangeTo) =>
+      supabase
+        .from('purchases')
+        .select('total_amount, paid_from, purchased_at')
+        .eq('branch_id', branchId)
+        .gte('purchased_at', from)
+        .lte('purchased_at', to)
+        .range(rangeFrom, rangeTo),
+    ),
+    fetchPaged((rangeFrom, rangeTo) =>
+      supabase
+        .from('expenses')
+        .select('amount, paid_from, expense_date')
+        .eq('branch_id', branchId)
+        .gte('expense_date', from)
+        .lte('expense_date', to)
+        .range(rangeFrom, rangeTo),
+    ),
+    fetchPaged((rangeFrom, rangeTo) =>
+      supabase
+        .from('income_entries')
+        .select('entry_type, amount, paid_from, entry_date')
+        .eq('branch_id', branchId)
+        .gte('entry_date', from)
+        .lte('entry_date', to)
+        .range(rangeFrom, rangeTo),
+    ),
+    fetchPaged<{ amount: number; destination: string | null; withdrawal_date: string }>(
+      (rangeFrom, rangeTo) =>
+        // Table is not in generated types yet.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('cash_withdrawals')
+          .select('amount, destination, withdrawal_date')
+          .eq('branch_id', branchId)
+          .gte('withdrawal_date', from)
+          .lte('withdrawal_date', to)
+          .range(rangeFrom, rangeTo),
+    ),
+  ]);
+
+  const opening = openingView.openingAsOf
+    ? {
+        asOfDate: openingView.openingAsOf,
+        cash: openingView.cash,
+        account: openingView.account,
+      }
+    : null;
+
+  const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
+    costType: row.cost_type,
+    period: row.period,
+    amount: Number(row.amount),
+    chargeDay: row.charge_day ?? 1,
+    paidFrom: parseMoneyPocket(row.paid_from, 'account'),
+    terms: row.terms ?? [],
+  }));
+
+  return buildMoneyLedger({
+    from,
+    to,
+    opening,
+    counts: (countRows ?? []).map((row) => {
+      const paused = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+      const asOfDate = row.as_of_date;
+      const monthStart = calendarMonthStart(asOfDate);
+      applyOperatingCostsToPockets(paused, costs, {
+        from: monthStart,
+        to: asOfDate,
+        dayBeforeFrom: addMexicoDays(monthStart, -1),
+        mode: 'paused-addback',
+      });
+      return {
+        asOfDate,
+        cash: Number(row.cash_amount),
+        account: Number(row.account_amount),
+        pausedCash: paused.cashIn,
+        pausedAccount: paused.accountIn,
+      };
+    }),
+    tickets: tickets.map((row) => ({
+      ymd: moneyLedgerRowYmd(row.paid_at),
+      status: row.status,
+      payment_status: row.payment_status,
+      payment_method: row.payment_method,
+      payment_splits: row.payment_splits,
+      subtotal: row.subtotal,
+      discount_amount: row.discount_amount,
+      delivery_fee: row.delivery_fee,
+    })),
+    purchases: purchases.map((row) => ({
+      ymd: moneyLedgerRowYmd(row.purchased_at),
+      amount: Number(row.total_amount ?? 0),
+      paidFrom: row.paid_from,
+    })),
+    expenses: expenses.map((row) => ({
+      ymd: moneyLedgerRowYmd(row.expense_date),
+      amount: Number(row.amount ?? 0),
+      paidFrom: row.paid_from,
+    })),
+    incomes: incomes.map((row) => ({
+      ymd: moneyLedgerRowYmd(row.entry_date),
+      amount: Number(row.amount ?? 0),
+      paidFrom: row.paid_from,
+      entryType: isIncomeEntryType(row.entry_type) ? row.entry_type : 'operating',
+    })),
+    transfers: transfers.map((row) => ({
+      ymd: moneyLedgerRowYmd(row.withdrawal_date),
+      amount: Number(row.amount ?? 0),
+      destination: row.destination,
+    })),
+    costs,
+  });
 }
