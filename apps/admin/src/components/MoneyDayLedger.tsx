@@ -65,7 +65,8 @@ function DayLines({ day }: { day: MoneyDayRow }) {
     <ul className="divide-y divide-slate-100">
       {day.counted ? (
         <li className="py-2 text-sm text-amber-800">
-          Hubo conteo. Tienes se queda en ese número; lo de abajo es lo registrado el mismo día.
+          Hubo conteo. Ese día Tienes queda en el número del cierre; lo de abajo ya está incluido.
+          El día siguiente arranca de ahí.
         </li>
       ) : null}
       {lines.map((line) => (
@@ -126,10 +127,9 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
       />
 
       <p className="text-sm text-slate-600">
-        Tienes en cuenta no es el banco: es lo que el tablero espera según TPV, transferencias,
-        depósitos y gastos de cuenta. Si un día el banco no se mueve y aquí sí (o al revés), ahí
-        está el desfase. El TPV a veces entra al banco al día siguiente; las comisiones del banco
-        no están registradas.
+        Tienes arranca del último cierre. Cada venta, gasto, renta, compra y depósito mueve efectivo o
+        cuenta. Si un día el banco no se mueve y aquí sí (o al revés), ahí está el desfase: el TPV a
+        veces entra al día siguiente y las comisiones del banco no están registradas.
       </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

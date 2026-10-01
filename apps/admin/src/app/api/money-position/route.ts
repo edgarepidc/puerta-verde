@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 
 import { alignLedgerClosing, validateMoneyPositionInput } from '@puertaverde/shared';
-import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
-import { fetchMoneyLedger, fetchMoneyPosition } from '@/lib/money-position';
+import {
+  fetchMoneyLedger,
+  fetchMoneyPosition,
+  saveMoneyPositionSnapshot,
+} from '@/lib/money-position';
 import { resolveProfitDateRange } from '@/lib/mexico-date';
 import { getDefaultTenant } from '@/lib/tenant';
 
@@ -81,25 +84,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: range.error }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-    const { error } = await supabase.from('branch_money_positions').upsert(
-      {
-        branch_id: tenant.branchId,
-        as_of_date: asOfDate,
-        cash_amount: input.cashAmount,
-        account_amount: input.accountAmount,
-        notes: input.notes?.trim() ? input.notes.trim() : null,
-        created_by: auth.userId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'branch_id,as_of_date' },
-    );
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    const position = await fetchMoneyPosition(tenant.branchId, asOfDate, asOfDate);
+    const position = await saveMoneyPositionSnapshot({
+      branchId: tenant.branchId,
+      cashAmount: input.cashAmount,
+      accountAmount: input.accountAmount,
+      asOfDate,
+      notes: input.notes,
+      userId: auth.userId,
+    });
     return NextResponse.json({ position });
   } catch (error) {
     return NextResponse.json(
