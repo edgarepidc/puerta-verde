@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   formatMoney,
@@ -41,6 +41,23 @@ function Stat({
   );
 }
 
+function Accumulated({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | null;
+}) {
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-emerald-50/90 px-3 py-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">{label}</p>
+      <p className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
+        {value == null ? '—' : formatMoney(value)}
+      </p>
+    </div>
+  );
+}
+
 function DayLines({ day }: { day: MoneyDayRow }) {
   const lines: Array<{ label: string; amount: number }> = [
     { label: 'Ventas en efectivo', amount: day.cashSales },
@@ -57,43 +74,56 @@ function DayLines({ day }: { day: MoneyDayRow }) {
     { label: 'Gastos y renta · cuenta', amount: -day.expensesAccount },
   ].filter((line) => Math.abs(line.amount) >= 0.005);
 
-  if (!lines.length && !day.counted) {
-    return <p className="text-sm text-slate-500">Sin movimientos este día.</p>;
-  }
-
   return (
-    <ul className="divide-y divide-slate-100">
-      {day.counted ? (
-        <li className="py-2 text-sm text-amber-800">
-          Hubo conteo. Tienes se queda en ese número; lo de abajo es lo registrado el mismo día.
-        </li>
-      ) : null}
-      {lines.map((line) => (
-        <li key={line.label} className="flex items-baseline justify-between gap-3 py-2">
-          <p className="text-sm text-slate-700">{line.label}</p>
-          <p className={`text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
-            {signedMoney(line.amount)}
-          </p>
-        </li>
-      ))}
-      <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
-        <p className="text-sm font-semibold text-slate-900">Neto cuenta</p>
-        <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netAccount)}`}>
-          {signedMoney(day.netAccount)}
+    <div className="space-y-3">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
+          Llevamos acumulado
         </p>
-      </li>
-      <li className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-900">Neto caja</p>
-        <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netCash)}`}>
-          {signedMoney(day.netCash)}
+        <p className="mt-0.5 text-xs text-slate-500">
+          {day.counted
+            ? 'Tienes a este día, según el conteo. Lo de abajo es el movimiento del día.'
+            : 'Total a este día, no el movimiento de hoy.'}
         </p>
-      </li>
-    </ul>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Accumulated label="Efectivo" value={day.runningCash} />
+          <Accumulated label="Cuenta" value={day.runningAccount} />
+        </div>
+      </div>
+
+      {lines.length === 0 && !day.counted ? (
+        <p className="text-sm text-slate-500">Sin movimientos este día.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {lines.map((line) => (
+            <li key={line.label} className="flex items-baseline justify-between gap-3 py-2">
+              <p className="text-sm text-slate-700">{line.label}</p>
+              <p className={`text-sm font-semibold tabular-nums ${moneyClass(line.amount)}`}>
+                {signedMoney(line.amount)}
+              </p>
+            </li>
+          ))}
+          <li className="flex items-baseline justify-between gap-3 border-t-2 border-slate-200 pt-3">
+            <p className="text-sm font-semibold text-slate-900">Este día · neto cuenta</p>
+            <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netAccount)}`}>
+              {signedMoney(day.netAccount)}
+            </p>
+          </li>
+          <li className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-900">Este día · neto caja</p>
+            <p className={`text-sm font-bold tabular-nums ${moneyClass(day.netCash)}`}>
+              {signedMoney(day.netCash)}
+            </p>
+          </li>
+        </ul>
+      )}
+    </div>
   );
 }
 
 export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
   const [open, setOpen] = useState(true);
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const days = useMemo(
     () =>
       ledger
@@ -101,6 +131,10 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
         : [],
     [ledger],
   );
+
+  useEffect(() => {
+    setReviewing(null);
+  }, [ledger?.from, ledger?.to]);
 
   if (!ledger) return null;
 
@@ -158,21 +192,43 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
         <p className="text-sm text-slate-500">No hay movimientos de dinero en este periodo.</p>
       ) : (
         <ul className="space-y-2">
-          {days.map((day) => (
+          {days.map((day) => {
+            const reviewingThis = reviewing === day.ymd;
+            return (
             <li key={day.ymd}>
-              <details className="group/day rounded-xl border border-slate-100 bg-white">
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-3 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+              <details
+                className={
+                  reviewingThis
+                    ? 'group/day rounded-2xl border-2 border-emerald-500 bg-emerald-50/70 shadow-[0_0_0_4px_rgba(16,185,129,0.18)]'
+                    : 'group/day rounded-xl border border-slate-100 bg-white'
+                }
+                open={reviewingThis}
+              >
+                <summary
+                  className="flex cursor-pointer list-none items-start justify-between gap-3 px-3 py-3 marker:content-none [&::-webkit-details-marker]:hidden"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setReviewing((current) => (current === day.ymd ? null : day.ymd));
+                  }}
+                >
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className={`text-sm font-semibold ${reviewingThis ? 'text-emerald-950' : 'text-slate-900'}`}>
                       {formatMexicoSpokenDay(day.ymd)}
-                      <span className="ml-1 font-normal text-slate-500">{formatMexicoWeekday(day.ymd)}</span>
+                      <span className={`ml-1 font-normal ${reviewingThis ? 'text-emerald-800' : 'text-slate-500'}`}>
+                        {formatMexicoWeekday(day.ymd)}
+                      </span>
+                      {reviewingThis ? (
+                        <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                          Revisando
+                        </span>
+                      ) : null}
                       {day.counted ? (
                         <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                           Conteo
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className={`mt-0.5 text-xs ${reviewingThis ? 'text-emerald-900/70' : 'text-slate-500'}`}>
                       Efectivo {formatMoney(day.cashSales)}
                       {day.cardSales > 0 ? ` · TPV ${formatMoney(day.cardSales)}` : ''}
                       {day.transferSales > 0 ? ` · Transf. ${formatMoney(day.transferSales)}` : ''}
@@ -180,9 +236,23 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                       {day.toAccount > 0 ? ` · Depósito ${formatMoney(day.toAccount)}` : ''}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-start gap-2">
+                  <div className="flex shrink-0 items-start gap-3">
+                    {reviewingThis ? (
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
+                          Efectivo
+                        </p>
+                        <p className="text-sm font-bold tabular-nums text-slate-900">
+                          {day.runningCash == null ? '—' : formatMoney(day.runningCash)}
+                        </p>
+                      </div>
+                    ) : null}
                     <div className="text-right">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <p
+                        className={`text-[11px] font-semibold uppercase tracking-wide ${
+                          reviewingThis ? 'text-emerald-800' : 'text-slate-500'
+                        }`}
+                      >
                         Cuenta
                       </p>
                       <p className="text-sm font-bold tabular-nums text-slate-900">
@@ -206,12 +276,13 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
                     </svg>
                   </div>
                 </summary>
-                <div className="border-t border-slate-100 px-3 py-3">
+                <div className="border-t border-emerald-200/80 px-3 py-3">
                   <DayLines day={day} />
                 </div>
               </details>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </details>
