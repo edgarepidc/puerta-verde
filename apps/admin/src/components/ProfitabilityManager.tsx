@@ -25,6 +25,7 @@ import {
   parseOperatingCostCategory,
   pocketTotal,
   type IncomeEntryType,
+  type MoneyLedger,
   type MoneyPocket,
   type MoneyPositionView,
   type OperatingCostCategory,
@@ -36,6 +37,7 @@ import {
 } from '@puertaverde/shared';
 
 import { ActionChip, ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
+import { MoneyDayLedger } from '@/components/MoneyDayLedger';
 import { MoneyPocketField } from '@/components/MoneyPocketField';
 import {
   PeriodSalesCharts,
@@ -614,6 +616,7 @@ export function ProfitabilityManager({
   initialCollectedRevenue,
   initialCollectedCount,
   initialMoneyPosition,
+  initialMoneyLedger,
   initialSummary,
   initialCategories,
   canAdjustMoney,
@@ -633,6 +636,7 @@ export function ProfitabilityManager({
   initialCollectedRevenue: number;
   initialCollectedCount: number;
   initialMoneyPosition: MoneyPositionView | null;
+  initialMoneyLedger: MoneyLedger | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
   canAdjustMoney: boolean;
@@ -678,6 +682,7 @@ export function ProfitabilityManager({
   const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
   const [moneyPosition, setMoneyPosition] = useState<MoneyPositionView | null>(initialMoneyPosition);
+  const [moneyLedger, setMoneyLedger] = useState<MoneyLedger | null>(initialMoneyLedger);
   const [adjustingPockets, setAdjustingPockets] = useState(false);
   const [cashAdjustText, setCashAdjustText] = useState('');
   const [accountAdjustText, setAccountAdjustText] = useState('');
@@ -827,7 +832,6 @@ export function ProfitabilityManager({
       if (!categoriesRes.ok) throw new Error(categoriesPayload.error ?? 'Error categorías');
       if (!expensesRes.ok) throw new Error(expensesPayload.error ?? 'Error gastos de visita');
       if (!incomesRes.ok) throw new Error(incomesPayload.error ?? 'Error aportaciones');
-      if (!trendsRes.ok) throw new Error(trendsPayload.error ?? 'Error ventas del periodo');
       if (!moneyRes.ok) throw new Error(moneyPayload.error ?? 'Error caja y cuenta');
       setMargins(marginsPayload.margins);
       setCosts(costsPayload.costs);
@@ -843,13 +847,18 @@ export function ProfitabilityManager({
       setVisitExpenses(expensesPayload.expenses ?? []);
       setIncomes(incomesPayload.incomes ?? []);
       setMoneyPosition(moneyPayload.position ?? null);
+      setMoneyLedger(moneyPayload.ledger ?? null);
       setAdjustingPockets(false);
       setFrom(profitPayload.from ?? nextFrom);
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
       setPreset(detectPreset(profitPayload.from ?? nextFrom, profitPayload.to ?? nextTo));
-      setChartsStatus('ready');
-      await applyTrends(trendsPayload);
+      if (trendsRes.ok) {
+        setChartsStatus('ready');
+        await applyTrends(trendsPayload);
+      } else {
+        setChartsStatus('error');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
       setChartsStatus('error');
@@ -1091,6 +1100,12 @@ export function ProfitabilityManager({
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar el conteo');
       setMoneyPosition(result.position ?? null);
       setAdjustingPockets(false);
+      const ledgerRes = await fetch(`/api/money-position?${qs(from, to)}`);
+      const ledgerPayload = await ledgerRes.json();
+      if (ledgerRes.ok) {
+        setMoneyPosition(ledgerPayload.position ?? result.position ?? null);
+        setMoneyLedger(ledgerPayload.ledger ?? null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -1343,6 +1358,8 @@ export function ProfitabilityManager({
             />
           ) : null}
       </div>
+
+      <MoneyDayLedger ledger={moneyLedger} />
 
       <details
         className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
