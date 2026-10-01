@@ -111,7 +111,6 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
   if (!ledger) return null;
 
   const accountSales = ledger.totals.cardSales + ledger.totals.transferSales + ledger.totals.onlineSales;
-  const accountOut = ledger.totals.purchasesAccount + ledger.totals.expensesAccount + ledger.totals.toCash;
 
   return (
     <details
@@ -139,17 +138,6 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
           label="Transferencia"
           value={formatMoney(ledger.totals.transferSales)}
           hint="Cobros por transferencia"
-        />
-        <Stat
-          label="Depósitos"
-          value={formatMoney(ledger.totals.toAccount)}
-          hint="Efectivo que pasó a la cuenta"
-        />
-        <Stat label="Salió de cuenta" value={formatMoney(accountOut)} hint="Compras, renta y gastos" />
-        <Stat
-          label="Cuenta esperada"
-          value={formatMoney(ledger.closingAccount)}
-          hint={`Caja ${formatMoney(ledger.closingCash)}`}
         />
       </div>
 
