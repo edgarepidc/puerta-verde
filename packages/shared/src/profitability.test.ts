@@ -11,6 +11,7 @@ import {
   groupOperatingCostsByCategory,
   inferOperatingCostCategory,
   operatingCostAmountForRange,
+  operatingCostsChargedOnYmd,
 } from './profitability';
 import { pocketTotal, resolveMoneyPosition } from './money-position';
 
@@ -360,4 +361,21 @@ test('applyOperatingCostsToPockets does not add back rent that still applies', (
     },
   );
   assert.equal(flows.accountIn, 0);
+});
+
+test('operatingCostsChargedOnYmd lists cash payroll on its charge day', () => {
+  const cost = {
+    name: 'Pago de Ceci',
+    category: 'payroll' as const,
+    costType: 'fixed' as const,
+    period: 'monthly' as const,
+    amount: 450,
+    chargeDay: 30,
+    paidFrom: 'cash' as const,
+    terms: [{ start_date: '2026-09-01', end_date: null }],
+  };
+  assert.deepEqual(operatingCostsChargedOnYmd([cost], '2026-09-30'), [
+    { name: 'Pago de Ceci', category: 'payroll', amount: 450, paidFrom: 'cash' },
+  ]);
+  assert.equal(operatingCostsChargedOnYmd([cost], '2026-09-29').length, 0);
 });

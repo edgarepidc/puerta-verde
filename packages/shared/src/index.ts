@@ -36,8 +36,19 @@ export {
 export {
   cashCloseValidationError,
   expectedCashOnHand,
+  expectedCashOnHandForCount,
   parseOptionalMoney,
+  cashDrawerNet,
+  buildCashDrawerLines,
+  type CashDrawerLine,
 } from './cash-closing';
+
+export {
+  caretForGroupedDisplay,
+  formatGroupedNumber,
+  groupedCaretFromDisplay,
+  type GroupedCaret,
+} from './grouped-input';
 
 export {
   PERMISSION_KEYS,
@@ -369,6 +380,8 @@ export {
   type OperatingCostPeriod,
   type OperatingCostCategory,
   type OperatingCostPocketInput,
+  operatingCostsChargedOnYmd,
+  type OperatingCostOnYmd,
 } from './profitability';
 
 export {

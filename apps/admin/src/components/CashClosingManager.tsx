@@ -5,12 +5,13 @@ import { useEffect, useState } from 'react';
 import {
   PAYMENT_METHOD_LABELS,
   cashCloseValidationError,
-  expectedCashOnHand,
   formatMoney,
   todayMexicoYmd,
+  type CashDrawerLine,
 } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
 import { formatMexicoSpokenDay, formatMexicoWeekday, yesterdayMexicoYmd } from '@/lib/mexico-date';
 
@@ -38,6 +39,7 @@ interface CashSummary {
     created_at: string;
   } | null;
   suggestedOpeningFloat?: number | null;
+  cashLines?: CashDrawerLine[];
 }
 
 const METHOD_KEYS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
@@ -162,6 +164,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       openingFloat: openingFloat === '' ? '' : Number(openingFloat),
       cashSales: Number(summary?.totals.cash ?? 0),
       notes,
+      cashLines: summary?.cashLines,
     });
     if (validation) {
       setError(validation);
@@ -194,17 +197,13 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     Number(summary?.totals.card_terminal ?? 0) +
     Number(summary?.totals.transfer ?? 0) +
     Number(summary?.totals.online ?? 0);
-  const expectedCash = expectedCashOnHand(
-    openingFloat === '' ? 0 : Number(openingFloat),
-    Number(summary?.totals.cash ?? 0),
-  );
-  const cashDiff = countedCash === '' ? null : Number(countedCash) - expectedCash;
   const closeBlocked = Boolean(
     cashCloseValidationError({
       countedCash: countedCash === '' ? '' : Number(countedCash),
       openingFloat: openingFloat === '' ? '' : Number(openingFloat),
       cashSales: Number(summary?.totals.cash ?? 0),
       notes,
+      cashLines: summary?.cashLines,
     }),
   );
 
@@ -386,17 +385,15 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
                 groupThousands
               />
             </label>
-            {cashDiff != null ? (
-              <>
-                <ActionChip as="span" emoji="🧮">
-                  Esperado {formatMoney(expectedCash)}
-                </ActionChip>
-                <ActionChip as="span" tone={cashDiff < 0 ? 'rose' : 'emerald'} emoji={cashDiff < 0 ? '📉' : '📈'}>
-                  Diferencia {formatMoney(cashDiff)}
-                </ActionChip>
-              </>
-            ) : null}
           </div>
+          {countedCash !== '' || (summary.cashLines?.length ?? 0) > 0 ? (
+            <CashCloseExpected
+              openingFloat={openingFloat === '' ? 0 : Number(openingFloat)}
+              cashSales={Number(summary.totals.cash)}
+              cashLines={summary.cashLines ?? []}
+              countedCash={countedCash === '' ? null : Number(countedCash)}
+            />
+          ) : null}
           <label className="block text-sm font-medium text-slate-700">
             Notas del cierre
             <textarea

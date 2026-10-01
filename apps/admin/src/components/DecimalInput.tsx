@@ -9,7 +9,14 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { DECIMAL_FIELD_PROPS, INTEGER_FIELD_PROPS, formatDecimal } from '@puertaverde/shared';
+import {
+  DECIMAL_FIELD_PROPS,
+  INTEGER_FIELD_PROPS,
+  caretForGroupedDisplay,
+  formatDecimal,
+  formatGroupedNumber,
+  groupedCaretFromDisplay,
+} from '@puertaverde/shared';
 
 const DECIMAL_PATTERN = /^-?\d*\.?\d*$/;
 const INTEGER_PATTERN = /^-?\d*$/;
@@ -24,34 +31,6 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onC
   /** Whole numbers only — uses the iPad/iPhone number pad (no decimal key). */
   integer?: boolean;
 };
-
-function formatGrouped(raw: string): string {
-  if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return raw;
-  const negative = raw.startsWith('-');
-  const body = negative ? raw.slice(1) : raw;
-  const dot = body.indexOf('.');
-  const intPart = dot === -1 ? body : body.slice(0, dot);
-  const decPart = dot === -1 ? null : body.slice(dot + 1);
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const sign = negative ? '-' : '';
-  return decPart == null ? `${sign}${grouped}` : `${sign}${grouped}.${decPart}`;
-}
-
-function digitsBeforeCaret(value: string, caret: number): number {
-  return value.slice(0, caret).replace(/\D/g, '').length;
-}
-
-function caretFromDigitCount(value: string, digitCount: number): number {
-  if (digitCount <= 0) return 0;
-  let seen = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    if (/\d/.test(value[i])) {
-      seen += 1;
-      if (seen === digitCount) return i + 1;
-    }
-  }
-  return value.length;
-}
 
 function capFractionDigits(value: string, max = 3): string {
   const dot = value.indexOf('.');
@@ -148,7 +127,7 @@ export function DecimalInput({
         className={[className, useVirtualPad ? 'read-only:bg-inherit read-only:opacity-100' : null]
           .filter(Boolean)
           .join(' ')}
-        value={groupThousands ? formatGrouped(value) : value}
+        value={groupThousands ? formatGroupedNumber(value) : value}
         aria-controls={useVirtualPad ? padId : undefined}
         onTouchStart={onTouchStart}
         onFocus={(e) => {
@@ -162,15 +141,15 @@ export function DecimalInput({
         onChange={(e) => {
           const input = e.currentTarget;
           const caret = input.selectionStart ?? input.value.length;
-          const digits = digitsBeforeCaret(input.value, caret);
+          const groupedCaret = groupedCaretFromDisplay(input.value, caret);
           const raw = groupThousands ? input.value.replace(/,/g, '') : input.value.replace(',', '.');
           const nextRaw = applyTypedValue(raw, integer);
           if (nextRaw == null) return;
           onChange(nextRaw);
           if (groupThousands) {
-            const next = formatGrouped(nextRaw);
+            const next = formatGroupedNumber(nextRaw);
             queueMicrotask(() => {
-              const pos = caretFromDigitCount(next, digits);
+              const pos = caretForGroupedDisplay(next, groupedCaret);
               input.setSelectionRange(pos, pos);
             });
           }

@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 
 import {
   cashCloseValidationError,
-  expectedCashOnHand,
+  expectedCashOnHandForCount,
   formatMoney,
+  type CashDrawerLine,
 } from '@puertaverde/shared';
 
 import { ActionChip } from '@/components/ActionChip';
+import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
 import { LogoutButton } from '@/components/LogoutButton';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
@@ -22,6 +24,7 @@ type PendingSummary = {
   orderCount: number;
   grandTotal: number;
   suggestedOpeningFloat: number | null;
+  cashLines?: CashDrawerLine[];
 };
 
 function snoozeKey(date: string) {
@@ -155,6 +158,7 @@ export function PendingCashCloseGate({
       openingFloat: openingFloat === '' ? '' : Number(openingFloat),
       cashSales: summary.totals.cash,
       notes,
+      cashLines: summary.cashLines,
     });
     if (validation) {
       setError(validation);
@@ -187,9 +191,12 @@ export function PendingCashCloseGate({
 
   if (!visible) return null;
 
-  const expected = expectedCashOnHand(
+  const cashLines = summary?.cashLines ?? [];
+  const expected = expectedCashOnHandForCount(
     openingFloat === '' ? 0 : Number(openingFloat),
     summary?.totals.cash ?? 0,
+    cashLines,
+    countedCash === '' ? null : Number(countedCash),
   );
   const cashDiff = countedCash === '' ? null : Number(countedCash) - expected;
   const spoken = formatMexicoSpokenDay(date);
@@ -240,7 +247,7 @@ export function PendingCashCloseGate({
               <dd className="mt-0.5 font-semibold tabular-nums text-slate-900">
                 {formatMoney(summary.totals.cash)}
               </dd>
-              <dd className="text-xs text-slate-500">Más el fondo, lo esperado</dd>
+              <dd className="text-xs text-slate-500">Más el fondo, menos pagos en efectivo</dd>
             </div>
           </dl>
         ) : null}
@@ -267,15 +274,18 @@ export function PendingCashCloseGate({
                 />
               </label>
             </div>
-            {cashDiff != null ? (
-              <p className={`text-sm font-medium ${cashDiff < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
-                Esperado {formatMoney(expected)} · diferencia {formatMoney(cashDiff)}
-              </p>
+            {countedCash !== '' || cashLines.length > 0 ? (
+              <CashCloseExpected
+                openingFloat={openingFloat === '' ? 0 : Number(openingFloat)}
+                cashSales={summary.totals.cash}
+                cashLines={cashLines}
+                countedCash={countedCash === '' ? null : Number(countedCash)}
+              />
             ) : (
               <p className="text-sm text-slate-500">Cuenta el efectivo de la caja para poder cerrar.</p>
             )}
             <label className="block text-sm font-medium text-slate-700">
-              Notas {cashDiff != null && cashDiff !== 0 ? '(obligatorias si no cuadra)' : '(si hay diferencia)'}
+              Notas {cashDiff != null && Math.abs(cashDiff) >= 0.009 ? '(obligatorias si no cuadra)' : '(si hay diferencia)'}
               <textarea
                 className="pv-input mt-2"
                 rows={2}
@@ -314,6 +324,7 @@ export function PendingCashCloseGate({
                     openingFloat: openingFloat === '' ? '' : Number(openingFloat),
                     cashSales: summary.totals.cash,
                     notes,
+                    cashLines,
                   }),
                 )
               }

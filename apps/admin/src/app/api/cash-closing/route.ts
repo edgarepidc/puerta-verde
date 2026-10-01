@@ -58,6 +58,7 @@ export async function POST(request: Request) {
     openingFloat: body.openingFloat,
     cashSales: summary.totals.cash,
     notes,
+    cashLines: summary.cashLines,
   });
   if (validation) {
     return NextResponse.json({ error: validation }, { status: 400 });
