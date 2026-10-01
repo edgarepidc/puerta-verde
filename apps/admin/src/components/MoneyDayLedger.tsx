@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   formatMoney,
+  moneyDayAuditMovements,
   moneyDayHasActivity,
   type MoneyDayRow,
   type MoneyLedger,
@@ -62,10 +63,6 @@ function pocketAmount(value: number | null): string {
   return value == null ? '—' : formatMoney(value);
 }
 
-function shownAmount(amount: number): number | null {
-  return Math.abs(amount) >= 0.005 ? amount : null;
-}
-
 function PocketHead({
   label,
   amount,
@@ -102,31 +99,10 @@ function DayAudit({
   day: MoneyDayRow;
   yesterday: { cash: number | null; account: number | null };
 }) {
-  const movements = [
-    { label: 'Ventas en efectivo', cash: day.cashSales, account: 0 },
-    { label: 'TPV', cash: 0, account: day.cardSales },
-    { label: 'Transferencia', cash: 0, account: day.transferSales },
-    { label: 'Stripe', cash: 0, account: day.onlineSales },
-    { label: 'Otros ingresos', cash: day.otherInCash, account: day.otherInAccount },
-    { label: 'Depósito a cuenta', cash: -day.toAccount, account: day.toAccount },
-    { label: 'Cuenta → caja', cash: day.toCash, account: -day.toCash },
-    { label: 'Compras', cash: -day.purchasesCash, account: -day.purchasesAccount },
-    { label: 'Gastos y renta', cash: -day.expensesCash, account: -day.expensesAccount },
-  ]
-    .map((row) => ({
-      label: row.label,
-      cash: shownAmount(row.cash),
-      account: shownAmount(row.account),
-    }))
-    .filter((row) => row.cash != null || row.account != null);
+  const movements = moneyDayAuditMovements(day);
 
   return (
     <div className="border-t border-emerald-200/80 px-3 pb-3 pt-1">
-      {day.counted ? (
-        <p className="mb-2 text-sm text-amber-800">
-          Hubo conteo. Hoy es el número del cierre; el desglose ya está incluido.
-        </p>
-      ) : null}
       <div className={DAY_GRID}>
         <p className="py-1.5 text-sm text-emerald-900/80">ayer tenías</p>
         <p className="py-1.5 text-right text-sm font-bold tabular-nums text-slate-900">
@@ -136,26 +112,30 @@ function DayAudit({
           {pocketAmount(yesterday.account)}
         </p>
         <span />
-        {movements.map((row) => (
-          <div key={row.label} className="contents">
-            <p className="py-1.5 text-sm text-slate-700">{row.label}</p>
-            <p
-              className={`py-1.5 text-right text-sm font-semibold tabular-nums ${
-                row.cash != null ? moneyClass(row.cash) : ''
-              }`}
-            >
-              {row.cash != null ? signedMoney(row.cash) : ''}
-            </p>
-            <p
-              className={`py-1.5 text-right text-sm font-semibold tabular-nums ${
-                row.account != null ? moneyClass(row.account) : ''
-              }`}
-            >
-              {row.account != null ? signedMoney(row.account) : ''}
-            </p>
-            <span />
-          </div>
-        ))}
+        {movements.map((row, index) => {
+          const cash = Math.abs(row.cash) >= 0.005 ? row.cash : null;
+          const account = Math.abs(row.account) >= 0.005 ? row.account : null;
+          return (
+            <div key={`${row.label}-${index}`} className="contents">
+              <p className="py-1.5 text-sm text-slate-700">{row.label}</p>
+              <p
+                className={`py-1.5 text-right text-sm font-semibold tabular-nums ${
+                  cash != null ? moneyClass(cash) : ''
+                }`}
+              >
+                {cash != null ? signedMoney(cash) : ''}
+              </p>
+              <p
+                className={`py-1.5 text-right text-sm font-semibold tabular-nums ${
+                  account != null ? moneyClass(account) : ''
+                }`}
+              >
+                {account != null ? signedMoney(account) : ''}
+              </p>
+              <span />
+            </div>
+          );
+        })}
         <div className="col-span-4 mt-1 border-t-2 border-emerald-200" />
         <p className="pt-3 text-sm font-semibold text-slate-900">Total al día de hoy</p>
         <p className="pt-3 text-right text-base font-bold tabular-nums text-slate-900">

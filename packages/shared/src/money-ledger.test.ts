@@ -6,6 +6,7 @@ import {
   buildMoneyLedger,
   eachInclusiveYmd,
   emptyMoneyDay,
+  moneyDayAuditMovements,
   moneyDayHasActivity,
   moneyLedgerRowYmd,
 } from './money-ledger';
@@ -180,4 +181,76 @@ test('paused rent after a mid-period count enters the following day, like Tienes
   });
   assert.equal(ledger.days[1]!.runningAccount, 800);
   assert.equal(ledger.days[2]!.runningAccount, 940);
+});
+
+test('audit lines name visit, expense and rent instead of lumping them', () => {
+  const ledger = buildMoneyLedger({
+    from: '2026-09-01',
+    to: '2026-09-01',
+    opening: { asOfDate: '2026-08-31', cash: 2000, account: 5000 },
+    tickets: [],
+    purchases: [{ ymd: '2026-09-01', amount: 800, paidFrom: 'cash', label: 'Central de abasto' }],
+    expenses: [{ ymd: '2026-09-01', amount: 120, paidFrom: 'cash', label: 'Gasolina' }],
+    incomes: [],
+    transfers: [],
+    costs: [
+      {
+        name: 'Renta local',
+        category: 'rent',
+        costType: 'fixed',
+        period: 'monthly',
+        amount: 9500,
+        chargeDay: 1,
+        paidFrom: 'account',
+        terms: [{ start_date: '2026-01-01', end_date: null }],
+      },
+    ],
+  });
+  const lines = moneyDayAuditMovements(ledger.days[0]!);
+  assert.deepEqual(
+    lines.map((row) => [row.label, row.cash, row.account]),
+    [
+      ['Central de abasto', -800, 0],
+      ['Gasolina', -120, 0],
+      ['Renta local', 0, -9500],
+    ],
+  );
+  assert.equal(ledger.days[0]!.runningCash, 1080);
+  assert.equal(ledger.days[0]!.runningAccount, -4500);
+});
+
+test('a short cash close shows the missing amount as Faltante de caja', () => {
+  const ledger = buildMoneyLedger({
+    from: '2026-09-01',
+    to: '2026-09-01',
+    opening: { asOfDate: '2026-08-31', cash: 1000, account: 4000 },
+    counts: [{ asOfDate: '2026-09-01', cash: 1050, account: 4500 }],
+    tickets: [
+      {
+        ymd: '2026-09-01',
+        status: 'delivered',
+        payment_status: 'paid',
+        payment_method: 'cash',
+        subtotal: 100,
+      },
+      {
+        ymd: '2026-09-01',
+        status: 'delivered',
+        payment_status: 'paid',
+        payment_method: 'card_terminal',
+        subtotal: 500,
+      },
+    ],
+    purchases: [],
+    expenses: [],
+    incomes: [],
+    transfers: [],
+  });
+  const day = ledger.days[0]!;
+  assert.equal(day.counted, true);
+  assert.equal(day.countAdjustCash, -50);
+  assert.equal(day.countAdjustAccount, 0);
+  assert.equal(day.runningCash, 1050);
+  const faltante = moneyDayAuditMovements(day).find((row) => row.label === 'Faltante de caja');
+  assert.deepEqual(faltante, { label: 'Faltante de caja', cash: -50, account: 0 });
 });
