@@ -42,7 +42,7 @@ function Stat({
 }
 
 const DAY_GRID =
-  'grid grid-cols-[minmax(0,1fr)_8rem_8rem_1.25rem] items-start gap-x-3';
+  'grid grid-cols-[minmax(0,1fr)_6.25rem_6.25rem_1.25rem] items-start gap-x-4';
 
 function yesterdayPockets(ledger: MoneyLedger, ymd: string): {
   cash: number | null;
@@ -76,7 +76,7 @@ function PocketHead({
   reviewing: boolean;
 }) {
   return (
-    <div className="text-right">
+    <div className="w-full text-right">
       <p
         className={`text-[11px] font-semibold uppercase tracking-wide ${
           reviewing ? 'text-emerald-800' : 'text-slate-500'
