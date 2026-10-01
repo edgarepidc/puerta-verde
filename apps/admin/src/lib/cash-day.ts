@@ -1,4 +1,11 @@
-import { orderPaymentAmounts } from '@puertaverde/shared';
+import {
+  buildCashDrawerLines,
+  operatingCostsChargedOnYmd,
+  orderPaymentAmounts,
+  parseMoneyPocket,
+  type CashDrawerLine,
+  type OperatingCostPocketInput,
+} from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { addMexicoDays } from '@/lib/mexico-date';
@@ -21,6 +28,7 @@ export type CashDaySummary = {
   grandTotal: number;
   closing: Record<string, unknown> | null;
   suggestedOpeningFloat: number | null;
+  cashLines: CashDrawerLine[];
 };
 
 function emptyMethodTotals(): MethodTotals {
@@ -40,13 +48,28 @@ function channelPayload(totals: MethodTotals, orderCount: number) {
   };
 }
 
+function asTermList(value: unknown): OperatingCostPocketInput['terms'] {
+  if (Array.isArray(value)) return value as OperatingCostPocketInput['terms'];
+  if (value && typeof value === 'object') return [value as { start_date: string; end_date: string | null }];
+  return [];
+}
+
 export async function loadCashDay(branchId: string, closingDate: string): Promise<CashDaySummary> {
   const supabase = createAdminClient();
   const startOfDay = `${closingDate}T00:00:00-06:00`;
   const endOfDay = `${closingDate}T23:59:59-06:00`;
   const priorDate = addMexicoDays(closingDate, -1);
 
-  const [{ data: orders }, { data: closing }, { data: prior }] = await Promise.all([
+  const [
+    { data: orders },
+    { data: closing },
+    { data: prior },
+    { data: costRows },
+    { data: expenses },
+    { data: purchases },
+    { data: incomes },
+    { data: transfers },
+  ] = await Promise.all([
     supabase
       .from('orders')
       .select('total, payment_method, payment_splits, payment_status, paid_at, delivery_notes, source')
@@ -66,6 +89,34 @@ export async function loadCashDay(branchId: string, closingDate: string): Promis
       .eq('branch_id', branchId)
       .eq('closing_date', priorDate)
       .maybeSingle(),
+    supabase
+      .from('branch_operating_costs')
+      .select(
+        'name, category, cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)',
+      )
+      .eq('branch_id', branchId),
+    supabase
+      .from('expenses')
+      .select('concept, amount, paid_from')
+      .eq('branch_id', branchId)
+      .eq('expense_date', closingDate),
+    supabase
+      .from('purchases')
+      .select('notes, total_amount, paid_from')
+      .eq('branch_id', branchId)
+      .eq('purchased_at', closingDate),
+    supabase
+      .from('income_entries')
+      .select('concept, amount, paid_from, entry_type')
+      .eq('branch_id', branchId)
+      .eq('entry_date', closingDate),
+    // Table is not in generated types yet.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('cash_withdrawals')
+      .select('amount, destination, notes')
+      .eq('branch_id', branchId)
+      .eq('withdrawal_date', closingDate),
   ]);
 
   const totals = emptyMethodTotals();
@@ -94,6 +145,44 @@ export async function loadCashDay(branchId: string, closingDate: string): Promis
       ? Number(prior.counted_cash)
       : null;
 
+  const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
+    name: row.name,
+    category: row.category,
+    costType: row.cost_type,
+    period: row.period,
+    amount: Number(row.amount),
+    chargeDay: row.charge_day ?? 1,
+    paidFrom: parseMoneyPocket(row.paid_from, 'account'),
+    terms: asTermList(row.terms),
+  }));
+
+  const cashLines = buildCashDrawerLines({
+    operating: operatingCostsChargedOnYmd(costs, closingDate, (orders ?? []).length),
+    expenses: (expenses ?? []).map((row) => ({
+      concept: row.concept,
+      amount: Number(row.amount ?? 0),
+      paidFrom: row.paid_from,
+    })),
+    purchases: (purchases ?? []).map((row) => ({
+      notes: row.notes,
+      amount: Number(row.total_amount ?? 0),
+      paidFrom: row.paid_from,
+    })),
+    incomes: (incomes ?? []).map((row) => ({
+      concept: row.concept,
+      amount: Number(row.amount ?? 0),
+      paidFrom: row.paid_from,
+      entryType: row.entry_type,
+    })),
+    transfers: (
+      (transfers ?? []) as Array<{ amount: number; destination: string | null; notes: string | null }>
+    ).map((row) => ({
+      notes: row.notes,
+      amount: Number(row.amount ?? 0),
+      destination: row.destination,
+    })),
+  });
+
   return {
     closingDate,
     totals,
@@ -105,5 +194,6 @@ export async function loadCashDay(branchId: string, closingDate: string): Promis
     grandTotal: Object.values(totals).reduce((sum, value) => sum + value, 0),
     closing: closing ?? null,
     suggestedOpeningFloat: suggested,
+    cashLines,
   };
 }

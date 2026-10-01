@@ -158,12 +158,46 @@ export function formatChargeDayLabel(chargeDay: number): string {
 }
 
 export interface OperatingCostPocketInput {
+  name?: string | null;
+  category?: OperatingCostCategory | string | null;
   costType: OperatingCostType;
   period: OperatingCostPeriod;
   amount: number;
   chargeDay?: number;
   paidFrom?: MoneyPocket | null;
   terms?: OperatingCostTerm[];
+}
+
+export interface OperatingCostOnYmd {
+  name: string;
+  category: OperatingCostCategory;
+  amount: number;
+  paidFrom: MoneyPocket;
+}
+
+/** Costs whose charge day (or daily/per-order amount) falls on `ymd`. */
+export function operatingCostsChargedOnYmd(
+  costs: OperatingCostPocketInput[],
+  ymd: string,
+  orderCount = 0,
+): OperatingCostOnYmd[] {
+  const rows: OperatingCostOnYmd[] = [];
+  for (const cost of costs) {
+    if (!costAppliesToRange(cost.terms, ymd, ymd)) continue;
+    const amount = operatingCostAmountForRange(cost, ymd, ymd, orderCount);
+    if (!(amount > 0)) continue;
+    rows.push({
+      name: (cost.name ?? '').trim() || 'Costo',
+      category: inferOperatingCostCategory({
+        name: cost.name,
+        category: cost.category,
+        costType: cost.costType,
+      }),
+      amount,
+      paidFrom: parseMoneyPocket(cost.paidFrom, 'account'),
+    });
+  }
+  return rows;
 }
 
 /** Rent, payroll, and services leave (or return to) caja/cuenta. */
