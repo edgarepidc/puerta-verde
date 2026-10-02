@@ -13,7 +13,7 @@ import { ActionChip } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
 import { LogoutButton } from '@/components/LogoutButton';
-import { PillField, PILL_INPUT_CLASS } from '@/components/PillField';
+import { PillField, pillInputClass } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
 const SNOOZE_MS = 5 * 60 * 1000;
@@ -248,26 +248,26 @@ export function PendingCashCloseGate({
         {canClose && summary ? (
           <div className="mt-4 space-y-3">
             <div className="flex flex-wrap items-end gap-2">
-              <PillField label="Fondo inicial" icon="$" className="w-[9.75rem] shrink-0">
+              <PillField label="Fondo inicial" icon="$" tone="slate" className="w-[9.75rem] shrink-0">
                 <DecimalInput
-                  className={PILL_INPUT_CLASS}
+                  className={pillInputClass('slate')}
                   value={openingFloat}
                   onChange={setOpeningFloat}
                   groupThousands
                 />
               </PillField>
-              <PillField label="Efectivo contado" icon="$" className="w-[9.75rem] shrink-0">
+              <PillField label="Efectivo contado" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
                 <DecimalInput
-                  className={PILL_INPUT_CLASS}
+                  className={pillInputClass('emerald')}
                   value={countedCash}
                   onChange={setCountedCash}
                   groupThousands
                 />
               </PillField>
-              <PillField label="Notas del cierre" icon="📝" className="min-w-[12rem] flex-1">
+              <PillField label="Notas del cierre" icon="📝" tone="sky" className="min-w-[10rem] flex-1">
                 <input
                   type="text"
-                  className={PILL_INPUT_CLASS}
+                  className={pillInputClass('sky')}
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Ej. faltante de $20 en caja chica"
