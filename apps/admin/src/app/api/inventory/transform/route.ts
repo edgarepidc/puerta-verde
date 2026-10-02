@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { quantityForWeighedWaste, validateTransformProduce } from '@puertaverde/shared';
-import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
+import { transformProduce } from '@/lib/transform-produce';
 
 export async function POST(request: Request) {
   const auth = await requireStaffApi();
@@ -40,19 +40,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validation }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.rpc('transform_produce', {
-    p_source_branch_product_id: sourceBranchProductId,
-    p_source_quantity: sourceQuantity,
-    p_dest_branch_product_id: destBranchProductId,
-    p_dest_quantity: destQuantity,
-    p_notes: body.notes?.trim() || null,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  try {
+    const result = await transformProduce({
+      sourceBranchProductId,
+      destBranchProductId,
+      sourceQuantity,
+      destQuantity,
+      destUnit: body.destUnit,
+      notes: body.notes?.trim() || null,
+    });
+    return NextResponse.json({ ok: true, result });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'No se pudo transformar' },
+      { status: 400 },
+    );
   }
-
-  const row = Array.isArray(data) ? data[0] : data;
-  return NextResponse.json({ ok: true, result: row ?? null });
 }
