@@ -1,4 +1,5 @@
--- RPC: consume leftover produce and add stock to pulp/paletas/etc.
+-- Postgres cannot compare product_unit to text[] (`= any`).
+-- Paletas/piezas failed with: operator does not exist: product_unit = text
 
 create or replace function public.transform_produce(
   p_source_branch_product_id uuid,
