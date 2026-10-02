@@ -305,28 +305,10 @@ function TeQuedoCard({
   total,
   totalPositive,
   position,
-  adjusting,
-  cashText,
-  accountText,
-  saving,
-  onCashText,
-  onAccountText,
-  onToggleAdjust,
-  onSave,
-  canAdjust,
 }: {
   total: number;
   totalPositive: boolean;
   position: MoneyPositionView | null;
-  adjusting: boolean;
-  cashText: string;
-  accountText: string;
-  saving: boolean;
-  onCashText: (value: string) => void;
-  onAccountText: (value: string) => void;
-  onToggleAdjust: () => void;
-  onSave: () => void;
-  canAdjust: boolean;
 }) {
   return (
     <div className="pv-glass-card flex h-full gap-3 p-4">
@@ -339,52 +321,11 @@ function TeQuedoCard({
         {totalPositive ? '💚' : '⚠️'}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tienes</p>
-          {canAdjust && !adjusting ? (
-            <button
-              type="button"
-              className="shrink-0 text-[11px] font-semibold text-slate-500 hover:text-slate-800"
-              onClick={onToggleAdjust}
-            >
-              Ajustar
-            </button>
-          ) : null}
-        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tienes</p>
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">{formatMoney(total)}</p>
         <p className="mt-auto truncate pt-0.5 text-xs text-slate-500">
           En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
         </p>
-        {canAdjust && adjusting ? (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <label className="text-xs font-medium text-slate-600">
-              Caja
-              <DecimalInput
-                className="pv-input mt-1"
-                groupThousands
-                value={cashText}
-                onChange={onCashText}
-              />
-            </label>
-            <label className="text-xs font-medium text-slate-600">
-              Cuenta
-              <DecimalInput
-                className="pv-input mt-1"
-                groupThousands
-                value={accountText}
-                onChange={onAccountText}
-              />
-            </label>
-            <div className="col-span-2 flex flex-wrap gap-2">
-              <ActionChip emoji="💾" disabled={saving} onClick={onSave}>
-                {saving ? 'Guardando…' : 'Guardar conteo'}
-              </ActionChip>
-              <ActionChip elevated={false} onClick={onToggleAdjust}>
-                Cancelar
-              </ActionChip>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -615,7 +556,6 @@ export function ProfitabilityManager({
   initialMoneyLedger,
   initialSummary,
   initialCategories,
-  canAdjustMoney,
 }: {
   periodLabel: string;
   initialFrom: string;
@@ -631,7 +571,6 @@ export function ProfitabilityManager({
   initialMoneyLedger: MoneyLedger | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
-  canAdjustMoney: boolean;
 }) {
   const [margins, setMargins] = useState(initialMargins);
   const [costs, setCosts] = useState(initialCosts);
@@ -671,9 +610,6 @@ export function ProfitabilityManager({
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
   const [moneyPosition, setMoneyPosition] = useState<MoneyPositionView | null>(initialMoneyPosition);
   const [moneyLedger, setMoneyLedger] = useState<MoneyLedger | null>(initialMoneyLedger);
-  const [adjustingPockets, setAdjustingPockets] = useState(false);
-  const [cashAdjustText, setCashAdjustText] = useState('');
-  const [accountAdjustText, setAccountAdjustText] = useState('');
   const [editVisit, setEditVisit] = useState<{
     id: string;
     concept: string;
@@ -832,7 +768,6 @@ export function ProfitabilityManager({
       setIncomes(incomesPayload.incomes ?? []);
       setMoneyPosition(moneyPayload.position ?? null);
       setMoneyLedger(moneyPayload.ledger ?? null);
-      setAdjustingPockets(false);
       setFrom(profitPayload.from ?? nextFrom);
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
@@ -1066,37 +1001,6 @@ export function ProfitabilityManager({
     }
   }
 
-  async function saveMoneyAdjust() {
-    if (!canAdjustMoney) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/money-position', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cashAmount: parseDecimal(cashAdjustText),
-          accountAmount: parseDecimal(accountAdjustText),
-          asOfDate: to,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar el conteo');
-      setMoneyPosition(result.position ?? null);
-      setAdjustingPockets(false);
-      const ledgerRes = await fetch(`/api/money-position?${qs(from, to)}`);
-      const ledgerPayload = await ledgerRes.json();
-      if (ledgerRes.ok) {
-        setMoneyPosition(ledgerPayload.position ?? result.position ?? null);
-        setMoneyLedger(ledgerPayload.ledger ?? null);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const leftover = pocketTotal({
     cash: moneyPosition?.cash ?? 0,
     account: moneyPosition?.account ?? 0,
@@ -1282,24 +1186,6 @@ export function ProfitabilityManager({
             total={leftover}
             totalPositive={leftoverPositive}
             position={moneyPosition}
-            adjusting={adjustingPockets}
-            cashText={cashAdjustText}
-            accountText={accountAdjustText}
-            saving={saving}
-            canAdjust={canAdjustMoney}
-            onCashText={setCashAdjustText}
-            onAccountText={setAccountAdjustText}
-            onToggleAdjust={() => {
-              if (!canAdjustMoney) return;
-              if (adjustingPockets) {
-                setAdjustingPockets(false);
-                return;
-              }
-              setCashAdjustText(formatDecimal(moneyPosition?.cash ?? 0));
-              setAccountAdjustText(formatDecimal(moneyPosition?.account ?? 0));
-              setAdjustingPockets(true);
-            }}
-            onSave={() => void saveMoneyAdjust()}
           />
           {contributionsTotal > 0 ? (
             <MetricCard

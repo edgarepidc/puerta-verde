@@ -19,7 +19,6 @@ export default async function NumerosPage() {
   const tenant = await getDefaultTenant();
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);
   const canViewProfit = staffHasPermission(staff, 'profit.view', permissionMatrix);
-  const canAdjustMoney = staffHasPermission(staff, 'profit.adjust_cash', permissionMatrix);
   const supabase = createAdminClient();
   const range = currentMexicoMonthRange();
   const periodLabel = formatMexicoPeriodLabel(range.start, range.end);
@@ -143,7 +142,6 @@ export default async function NumerosPage() {
             initialMoneyLedger={
               moneyLedger && moneyPosition ? alignLedgerClosing(moneyLedger, moneyPosition) : moneyLedger
             }
-            canAdjustMoney={canAdjustMoney}
             initialSummary={(summaryRows?.data?.[0] as {
               period_days: number;
               revenue: number;
