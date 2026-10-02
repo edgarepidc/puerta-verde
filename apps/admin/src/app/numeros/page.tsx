@@ -139,10 +139,6 @@ export default async function NumerosPage() {
             initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
             initialZeroCostSold={profitExtras.zeroCostSold ?? []}
-            initialUnpaidRevenue={Number(profitExtras.unpaidRevenue ?? 0)}
-            initialUnpaidCount={Number(profitExtras.unpaidCount ?? 0)}
-            initialCollectedRevenue={Number(profitExtras.collectedRevenue ?? 0)}
-            initialCollectedCount={Number(profitExtras.collectedCount ?? 0)}
             initialMoneyPosition={moneyPosition}
             initialMoneyLedger={
               moneyLedger && moneyPosition ? alignLedgerClosing(moneyLedger, moneyPosition) : moneyLedger

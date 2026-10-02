@@ -355,11 +355,6 @@ function TeQuedoCard({
         <p className="mt-auto truncate pt-0.5 text-xs text-slate-500">
           En caja {formatMoney(position?.cash ?? 0)} · En cuenta {formatMoney(position?.account ?? 0)}
         </p>
-        {position?.openingAsOf ? (
-          <p className="truncate text-xs text-slate-400">
-            Desde el cierre. Ventas, gastos, renta y depósitos mueven los dos.
-          </p>
-        ) : null}
         {canAdjust && adjusting ? (
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className="text-xs font-medium text-slate-600">
@@ -616,10 +611,6 @@ export function ProfitabilityManager({
   initialPurchasesTotal,
   initialWasteCost,
   initialZeroCostSold,
-  initialUnpaidRevenue,
-  initialUnpaidCount,
-  initialCollectedRevenue,
-  initialCollectedCount,
   initialMoneyPosition,
   initialMoneyLedger,
   initialSummary,
@@ -636,10 +627,6 @@ export function ProfitabilityManager({
   initialPurchasesTotal: number;
   initialWasteCost: number;
   initialZeroCostSold: Array<{ name: string; revenue: number }>;
-  initialUnpaidRevenue: number;
-  initialUnpaidCount: number;
-  initialCollectedRevenue: number;
-  initialCollectedCount: number;
   initialMoneyPosition: MoneyPositionView | null;
   initialMoneyLedger: MoneyLedger | null;
   initialSummary: ProfitSummary | null;
@@ -653,10 +640,6 @@ export function ProfitabilityManager({
   const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
   const [wasteCost, setWasteCost] = useState(initialWasteCost);
   const [zeroCostSold, setZeroCostSold] = useState(initialZeroCostSold);
-  const [unpaidRevenue, setUnpaidRevenue] = useState(initialUnpaidRevenue);
-  const [unpaidCount, setUnpaidCount] = useState(initialUnpaidCount);
-  const [collectedRevenue, setCollectedRevenue] = useState(initialCollectedRevenue);
-  const [collectedCount, setCollectedCount] = useState(initialCollectedCount);
   const [summary, setSummary] = useState(initialSummary);
   const [categories, setCategories] = useState(initialCategories);
   const [activePeriodLabel, setActivePeriodLabel] = useState(periodLabel);
@@ -844,10 +827,6 @@ export function ProfitabilityManager({
       setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
       setWasteCost(Number(profitPayload.wasteCost ?? 0));
       setZeroCostSold(profitPayload.zeroCostSold ?? []);
-      setUnpaidRevenue(Number(profitPayload.unpaidRevenue ?? 0));
-      setUnpaidCount(Number(profitPayload.unpaidCount ?? 0));
-      setCollectedRevenue(Number(profitPayload.collectedRevenue ?? 0));
-      setCollectedCount(Number(profitPayload.collectedCount ?? 0));
       setCategories(categoriesPayload.categories);
       setVisitExpenses(expensesPayload.expenses ?? []);
       setIncomes(incomesPayload.incomes ?? []);
@@ -1127,16 +1106,8 @@ export function ProfitabilityManager({
 
   const revenue = Number(summary?.revenue ?? 0);
   const cogs = Number(summary?.cogs ?? 0);
-  const ticketCount = Number(summary?.order_count ?? 0);
-  const ticketAvg = ticketCount > 0 ? revenue / ticketCount : null;
-  const rentCharged = Number(summary?.fixed_costs ?? 0);
   const cashOut =
     purchasesTotal + Number(summary?.operating_costs_total ?? 0);
-  const grossMarginPct =
-    revenue > 0
-      ? Number(summary?.gross_margin_percent ?? ((revenue - cogs) / revenue) * 100)
-      : null;
-  const inventorySpread = totals.inventorySale - totals.inventoryCost;
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
@@ -1282,53 +1253,30 @@ export function ProfitabilityManager({
             tone="green"
             label="Vendiste"
             value={formatMoney(revenue)}
-            hint={
-              unpaidCount > 0
-                ? `${collectedCount} cobrados ${formatMoney(collectedRevenue)} · ${unpaidCount} por cobrar ${formatMoney(unpaidRevenue)} · ${activePeriodLabel}`
-                : ticketAvg == null
-                  ? `${ticketCount} tickets · ${activePeriodLabel}`
-                  : `${ticketCount} ticket${ticketCount === 1 ? '' : 's'} · ${formatMoney(ticketAvg)} c/u · ${activePeriodLabel}`
-            }
           />
           <MetricCard
             emoji="🥬"
             tone="amber"
             label="Costo de lo vendido"
             value={formatMoney(cogs)}
-            hint={
-              grossMarginPct == null
-                ? 'La mercancía que sí se vendió, no el anaquel'
-                : `Mercancía que sí se vendió · margen ${grossMarginPct.toFixed(0).replace(/^-/, '−')}%`
-            }
           />
           <MetricCard
             emoji="🧾"
             tone="slate"
             label="Salió de caja"
             value={formatMoney(cashOut)}
-            hint={
-              rentCharged > 0
-                ? `Compras y gastos · renta ${formatMoney(rentCharged)} ya contó`
-                : 'Compras y gastos del local · caja y cuenta'
-            }
           />
           <MetricCard
             emoji="🏷️"
             tone="leaf"
             label="Inventario a venta"
             value={formatMoney(totals.inventorySale)}
-            hint={
-              inventorySpread >= 0
-                ? `Hoy · si se vende todo · ${formatMoney(inventorySpread)} de margen`
-                : 'Hoy · si se vende todo, al precio de lista'
-            }
           />
           <MetricCard
             emoji="📦"
             tone="slate"
             label="Inventario a costo"
             value={formatMoney(totals.inventoryCost)}
-            hint="Hoy · lo que pagaste por lo que sigue en anaquel"
           />
           <TeQuedoCard
             total={leftover}
@@ -1359,12 +1307,9 @@ export function ProfitabilityManager({
               tone="green"
               label="Aportaste"
               value={formatMoney(contributionsTotal)}
-              hint="Capital que metiste. Ya está en Tienes."
             />
           ) : null}
       </div>
-
-      <MoneyDayLedger ledger={moneyLedger} />
 
       <details
         className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
@@ -2212,6 +2157,8 @@ export function ProfitabilityManager({
         </details>
 
       </details>
+
+      <MoneyDayLedger ledger={moneyLedger} />
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
