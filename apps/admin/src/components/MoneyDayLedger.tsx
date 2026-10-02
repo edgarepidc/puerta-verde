@@ -150,9 +150,15 @@ function DayAudit({
   );
 }
 
-export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
+export function MoneyDayLedger({
+  ledger,
+  focusYmd,
+}: {
+  ledger: MoneyLedger | null;
+  focusYmd?: string;
+}) {
   const [open, setOpen] = useState(false);
-  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(focusYmd ?? null);
   const days = useMemo(
     () =>
       ledger
@@ -162,8 +168,8 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
   );
 
   useEffect(() => {
-    setReviewing(null);
-  }, [ledger?.from, ledger?.to]);
+    setReviewing(focusYmd ?? null);
+  }, [ledger?.from, ledger?.to, focusYmd]);
 
   if (!ledger) return null;
 

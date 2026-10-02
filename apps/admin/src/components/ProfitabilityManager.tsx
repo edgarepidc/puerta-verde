@@ -25,7 +25,6 @@ import {
   parseOperatingCostCategory,
   pocketTotal,
   type IncomeEntryType,
-  type MoneyLedger,
   type MoneyPocket,
   type MoneyPositionView,
   type OperatingCostCategory,
@@ -37,7 +36,6 @@ import {
 } from '@puertaverde/shared';
 
 import { ActionChip, ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
-import { MoneyDayLedger } from '@/components/MoneyDayLedger';
 import { MoneyPocketField } from '@/components/MoneyPocketField';
 import {
   PeriodSalesCharts,
@@ -553,7 +551,6 @@ export function ProfitabilityManager({
   initialWasteCost,
   initialZeroCostSold,
   initialMoneyPosition,
-  initialMoneyLedger,
   initialSummary,
   initialCategories,
 }: {
@@ -568,7 +565,6 @@ export function ProfitabilityManager({
   initialWasteCost: number;
   initialZeroCostSold: Array<{ name: string; revenue: number }>;
   initialMoneyPosition: MoneyPositionView | null;
-  initialMoneyLedger: MoneyLedger | null;
   initialSummary: ProfitSummary | null;
   initialCategories: CategoryProfitRow[];
 }) {
@@ -609,7 +605,6 @@ export function ProfitabilityManager({
   const [topWeekdays, setTopWeekdays] = useState<WeekdayRow[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentRow[]>([]);
   const [moneyPosition, setMoneyPosition] = useState<MoneyPositionView | null>(initialMoneyPosition);
-  const [moneyLedger, setMoneyLedger] = useState<MoneyLedger | null>(initialMoneyLedger);
   const [editVisit, setEditVisit] = useState<{
     id: string;
     concept: string;
@@ -767,7 +762,6 @@ export function ProfitabilityManager({
       setVisitExpenses(expensesPayload.expenses ?? []);
       setIncomes(incomesPayload.incomes ?? []);
       setMoneyPosition(moneyPayload.position ?? null);
-      setMoneyLedger(moneyPayload.ledger ?? null);
       setFrom(profitPayload.from ?? nextFrom);
       setTo(profitPayload.to ?? nextTo);
       setActivePeriodLabel(profitPayload.periodLabel ?? activePeriodLabel);
@@ -2043,8 +2037,6 @@ export function ProfitabilityManager({
         </details>
 
       </details>
-
-      <MoneyDayLedger ledger={moneyLedger} />
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
