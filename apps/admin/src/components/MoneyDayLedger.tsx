@@ -151,7 +151,7 @@ function DayAudit({
 }
 
 export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const days = useMemo(
     () =>
@@ -181,12 +181,6 @@ export function MoneyDayLedger({ ledger }: { ledger: MoneyLedger | null }) {
         emoji="🏦"
         iconClass="bg-sky-100"
       />
-
-      <p className="text-sm text-slate-600">
-        Tienes arranca del último cierre. Cada venta, gasto, renta, compra y depósito mueve efectivo o
-        cuenta. Si un día el banco no se mueve y aquí sí (o al revés), ahí está el desfase: el TPV a
-        veces entra al día siguiente y las comisiones del banco no están registradas.
-      </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Stat label="Efectivo" value={formatMoney(ledger.totals.cashSales)} hint="Ventas cobradas en caja" />
