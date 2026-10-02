@@ -13,7 +13,7 @@ import {
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
-import { PillField, PILL_INPUT_CLASS } from '@/components/PillField';
+import { PillField, pillInputClass } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday, yesterdayMexicoYmd } from '@/lib/mexico-date';
 
 interface ChannelTotals {
@@ -369,11 +369,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
             <PillField
               label="Fondo inicial"
               icon="$"
+              tone="slate"
               className="w-[9.75rem] shrink-0"
               disabled={Boolean(summary.closing)}
             >
               <DecimalInput
-                className={PILL_INPUT_CLASS}
+                className={pillInputClass('slate')}
                 value={openingFloat}
                 onChange={setOpeningFloat}
                 disabled={Boolean(summary.closing)}
@@ -383,11 +384,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
             <PillField
               label="Efectivo contado"
               icon="$"
+              tone="emerald"
               className="w-[9.75rem] shrink-0"
               disabled={Boolean(summary.closing)}
             >
               <DecimalInput
-                className={PILL_INPUT_CLASS}
+                className={pillInputClass('emerald')}
                 value={countedCash}
                 onChange={setCountedCash}
                 disabled={Boolean(summary.closing)}
@@ -397,18 +399,30 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
             <PillField
               label="Notas del cierre"
               icon="📝"
-              className="min-w-[12rem] flex-1"
+              tone="sky"
+              className="min-w-[10rem] flex-1"
               disabled={!canManage || Boolean(summary.closing)}
             >
               <input
                 type="text"
-                className={PILL_INPUT_CLASS}
+                className={pillInputClass('sky')}
                 value={notes}
                 disabled={!canManage || Boolean(summary.closing)}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
               />
             </PillField>
+            {canManage ? (
+              <ActionChip
+                className="shrink-0"
+                emoji="💰"
+                tone={summary.closing ? 'slate' : 'amber'}
+                disabled={closing || Boolean(summary.closing) || closeBlocked}
+                onClick={closeDay}
+              >
+                {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
+              </ActionChip>
+            ) : null}
           </div>
           {countedCash !== '' || (summary.cashLines?.length ?? 0) > 0 ? (
             <CashCloseExpected
@@ -423,17 +437,6 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
             <p className="text-xs text-slate-500">
               El conteo es obligatorio. Si no cuadra, anota por qué.
             </p>
-          ) : null}
-          {canManage ? (
-            <ActionChip
-              size="lg"
-              emoji="💰"
-              tone={summary.closing ? 'slate' : 'emerald'}
-              disabled={closing || Boolean(summary.closing) || closeBlocked}
-              onClick={closeDay}
-            >
-              {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
-            </ActionChip>
           ) : null}
         </div>
       </details>
@@ -471,42 +474,35 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         />
         <div className="mt-4 space-y-4">
           {canManage ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-medium text-slate-700">
-                Monto
+            <div className="flex flex-wrap items-end gap-2">
+              <PillField label="Monto" icon="$" tone="amber" className="w-[9.75rem] shrink-0">
                 <DecimalInput
                   placeholder="0"
-                  className="pv-input mt-2"
+                  className={pillInputClass('amber')}
                   value={withdrawalAmount}
                   onChange={setWithdrawalAmount}
                 />
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Notas (opcional)
+              </PillField>
+              <PillField label="Notas (opcional)" icon="📝" tone="slate" className="min-w-[10rem] flex-1">
                 <input
                   type="text"
-                  className="pv-input mt-2"
+                  className={pillInputClass('slate')}
                   placeholder="Ej. depósito o central"
                   value={withdrawalNotes}
                   onChange={(e) => setWithdrawalNotes(e.target.value)}
                 />
-              </label>
-            </div>
-          ) : null}
-          {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
-          {canManage ? (
-            <div className="flex flex-wrap gap-3">
+              </PillField>
               <ActionChip
-                size="lg"
+                className="shrink-0"
                 emoji="💸"
-                tone="slate"
+                tone="sky"
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('account')}
               >
                 {savingWithdrawal ? 'Guardando…' : 'Registrar retiro'}
               </ActionChip>
               <ActionChip
-                size="lg"
+                className="shrink-0"
                 emoji="💵"
                 tone="emerald"
                 disabled={savingWithdrawal || !withdrawalAmount}
@@ -516,6 +512,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               </ActionChip>
             </div>
           ) : null}
+          {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
           {canManage ? (
             <p className="text-xs text-slate-500">
               Retiro: caja → cuenta. Traer: cuenta → caja, para comprar en la central.
