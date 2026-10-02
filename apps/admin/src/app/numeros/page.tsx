@@ -5,10 +5,10 @@ import { AdminShell } from '@/components/AdminShell';
 import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
-import { fetchMoneyLedger, fetchMoneyPosition } from '@/lib/money-position';
+import { fetchMoneyPosition } from '@/lib/money-position';
 import { emptyPeriodProfitExtras, fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
-import { alignLedgerClosing, type OperatingCostPeriod, type OperatingCostType, type ProductUnit } from '@puertaverde/shared';
+import { type OperatingCostPeriod, type OperatingCostType, type ProductUnit } from '@puertaverde/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +23,7 @@ export default async function NumerosPage() {
   const range = currentMexicoMonthRange();
   const periodLabel = formatMexicoPeriodLabel(range.start, range.end);
 
-  const [profitBundle, moneyPosition, moneyLedger, profitExtras] = await Promise.all([
+  const [profitBundle, moneyPosition, profitExtras] = await Promise.all([
     canViewProfit
       ? Promise.all([
           supabase.rpc('get_product_margins', { p_branch_id: tenant.branchId }),
@@ -65,9 +65,6 @@ export default async function NumerosPage() {
       : Promise.resolve(null),
     canViewProfit
       ? fetchMoneyPosition(tenant.branchId, range.start, range.end).catch(() => null)
-      : Promise.resolve(null),
-    canViewProfit
-      ? fetchMoneyLedger(tenant.branchId, range.start, range.end).catch(() => null)
       : Promise.resolve(null),
     canViewProfit
       ? fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end).catch(() =>
@@ -139,9 +136,6 @@ export default async function NumerosPage() {
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
             initialZeroCostSold={profitExtras.zeroCostSold ?? []}
             initialMoneyPosition={moneyPosition}
-            initialMoneyLedger={
-              moneyLedger && moneyPosition ? alignLedgerClosing(moneyLedger, moneyPosition) : moneyLedger
-            }
             initialSummary={(summaryRows?.data?.[0] as {
               period_days: number;
               revenue: number;

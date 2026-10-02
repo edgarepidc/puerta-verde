@@ -39,6 +39,15 @@ export function currentMexicoMonthLabel(date = new Date()): string {
   return formatMexicoPeriodLabel(start, end);
 }
 
+/** Inclusive YYYY-MM-DD range for the Mexico calendar month that contains `ymd`. Caps at today. */
+export function mexicoCalendarMonthRange(ymd: string): { start: string; end: string } {
+  const day = isValidYmd(ymd) ? ymd : todayMexicoYmd();
+  const { year, month } = mexicoYmdParts(day);
+  const monthEnd = `${year}-${pad2(month)}-${pad2(daysInMonth(year, month))}`;
+  const today = todayMexicoYmd();
+  return { start: `${year}-${pad2(month)}-01`, end: monthEnd > today ? today : monthEnd };
+}
+
 function mexicoYmdParts(ymd: string): { year: number; month: number; day: number } {
   const [year, month, day] = ymd.split('-').map(Number);
   return { year, month, day };

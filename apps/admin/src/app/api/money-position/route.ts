@@ -2,25 +2,31 @@ import { NextResponse } from 'next/server';
 
 import { alignLedgerClosing } from '@puertaverde/shared';
 
-import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
+import {
+  forbiddenPermissionResponse,
+  loadPermissionMatrix,
+  requireStaffApi,
+  staffHasPermission,
+} from '@/lib/auth';
 import { fetchMoneyLedger, fetchMoneyPosition } from '@/lib/money-position';
 import { resolveProfitDateRange } from '@/lib/mexico-date';
 import { getDefaultTenant } from '@/lib/tenant';
 
-async function requireProfit() {
+async function requireMoneyRead() {
   const auth = await requireStaffApi();
   if (auth instanceof NextResponse) return { auth };
-  const denied = await requireStaffPermission(
-    auth,
-    'profit.view',
-    'No tienes permiso para ver utilidades',
-  );
-  if (denied) return { auth: denied };
+  const matrix = await loadPermissionMatrix(auth.organizationId);
+  const allowed =
+    staffHasPermission(auth, 'profit.view', matrix) ||
+    staffHasPermission(auth, 'cash.closing', matrix);
+  if (!allowed) {
+    return { auth: forbiddenPermissionResponse('No tienes permiso para ver caja y cuenta') };
+  }
   return { auth };
 }
 
 export async function GET(request: Request) {
-  const gate = await requireProfit();
+  const gate = await requireMoneyRead();
   if (gate.auth instanceof NextResponse) return gate.auth;
 
   try {

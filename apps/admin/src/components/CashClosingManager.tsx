@@ -8,13 +8,20 @@ import {
   formatMoney,
   todayMexicoYmd,
   type CashDrawerLine,
+  type MoneyLedger,
 } from '@puertaverde/shared';
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
+import { MoneyDayLedger } from '@/components/MoneyDayLedger';
 import { PillField, pillInputClass } from '@/components/PillField';
-import { formatMexicoSpokenDay, formatMexicoWeekday, yesterdayMexicoYmd } from '@/lib/mexico-date';
+import {
+  formatMexicoSpokenDay,
+  formatMexicoWeekday,
+  mexicoCalendarMonthRange,
+  yesterdayMexicoYmd,
+} from '@/lib/mexico-date';
 
 interface ChannelTotals {
   cash: number;
@@ -65,7 +72,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openCaja, setOpenCaja] = useState(true);
-  const [openDesglose, setOpenDesglose] = useState(false);
+  const [moneyLedger, setMoneyLedger] = useState<MoneyLedger | null>(null);
   // Withdrawals
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
@@ -78,10 +85,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     setLoading(true);
     setError(null);
     const d = date ?? selectedDate;
+    const month = mexicoCalendarMonthRange(d);
     try {
-      const [cashRes, wdRes] = await Promise.all([
+      const [cashRes, wdRes, moneyRes] = await Promise.all([
         fetch(`/api/cash-closing?date=${d}`),
         fetch(`/api/cash-withdrawals?date=${d}`),
+        fetch(`/api/money-position?from=${month.start}&to=${month.end}`),
       ]);
       const payload = await cashRes.json();
       if (!cashRes.ok) throw new Error(payload.error ?? 'No se pudo cargar la caja');
@@ -99,6 +108,12 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       );
       const wdPayload = await wdRes.json();
       setWithdrawals(wdPayload.withdrawals ?? []);
+      if (moneyRes.ok) {
+        const moneyPayload = await moneyRes.json();
+        setMoneyLedger(moneyPayload.ledger ?? null);
+      } else {
+        setMoneyLedger(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -207,11 +222,6 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
       cashLines: summary?.cashLines,
     }),
   );
-
-  const channelCards = [
-    { label: 'Mostrador', emoji: '🛒', iconClass: 'bg-emerald-100', value: summary?.channels?.pos },
-    { label: 'Tienda web', emoji: '🌐', iconClass: 'bg-sky-100', value: summary?.channels?.web },
-  ];
 
   const toAccountTotal = withdrawals
     .filter((w) => w.destination !== 'cash')
@@ -551,50 +561,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         </div>
       </details>
 
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openDesglose}
-        onToggle={(event) => setOpenDesglose(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Desglose"
-          hint="Mostrador y tienda web"
-          emoji="📊"
-          iconClass="bg-violet-100"
-        />
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {channelCards.map((channel) => (
-            <div key={channel.label} className="rounded-xl border border-slate-100 bg-white p-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${channel.iconClass}`}
-                  aria-hidden
-                >
-                  {channel.emoji}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">{channel.label}</h3>
-                  <p className="text-sm text-slate-500">
-                    {channel.value?.orderCount ?? 0} venta
-                    {(channel.value?.orderCount ?? 0) === 1 ? '' : 's'} ·{' '}
-                    {formatMoney(channel.value?.total ?? 0)}
-                  </p>
-                </div>
-              </div>
-              <ul className="mt-3 space-y-1 text-sm text-slate-700">
-                {METHOD_KEYS.map((method) => (
-                  <li key={method} className="flex justify-between gap-3">
-                    <span>{PAYMENT_METHOD_LABELS[method]}</span>
-                    <span className="font-medium tabular-nums">
-                      {formatMoney(channel.value?.[method] ?? 0)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </details>
+      <MoneyDayLedger ledger={moneyLedger} focusYmd={selectedDate} />
       </>) : null}
     </div>
   );
