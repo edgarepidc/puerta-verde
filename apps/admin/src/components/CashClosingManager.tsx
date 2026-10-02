@@ -13,6 +13,7 @@ import {
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
+import { PillField, PILL_INPUT_CLASS } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday, yesterdayMexicoYmd } from '@/lib/mexico-date';
 
 interface ChannelTotals {
@@ -364,27 +365,50 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
         />
 
         <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="block text-sm font-medium text-slate-700">
-              Fondo inicial
+          <div className="flex flex-wrap items-end gap-2">
+            <PillField
+              label="Fondo inicial"
+              icon="$"
+              className="w-[9.75rem] shrink-0"
+              disabled={Boolean(summary.closing)}
+            >
               <DecimalInput
-                className="pv-input mt-1 w-36"
+                className={PILL_INPUT_CLASS}
                 value={openingFloat}
                 onChange={setOpeningFloat}
                 disabled={Boolean(summary.closing)}
                 groupThousands
               />
-            </label>
-            <label className="block text-sm font-medium text-slate-700">
-              Efectivo contado
+            </PillField>
+            <PillField
+              label="Efectivo contado"
+              icon="$"
+              className="w-[9.75rem] shrink-0"
+              disabled={Boolean(summary.closing)}
+            >
               <DecimalInput
-                className="pv-input mt-1 w-36"
+                className={PILL_INPUT_CLASS}
                 value={countedCash}
                 onChange={setCountedCash}
                 disabled={Boolean(summary.closing)}
                 groupThousands
               />
-            </label>
+            </PillField>
+            <PillField
+              label="Notas del cierre"
+              icon="📝"
+              className="min-w-[12rem] flex-1"
+              disabled={!canManage || Boolean(summary.closing)}
+            >
+              <input
+                type="text"
+                className={PILL_INPUT_CLASS}
+                value={notes}
+                disabled={!canManage || Boolean(summary.closing)}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
+              />
+            </PillField>
           </div>
           {countedCash !== '' || (summary.cashLines?.length ?? 0) > 0 ? (
             <CashCloseExpected
@@ -394,17 +418,6 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               countedCash={countedCash === '' ? null : Number(countedCash)}
             />
           ) : null}
-          <label className="block text-sm font-medium text-slate-700">
-            Notas del cierre
-            <textarea
-              className="pv-input mt-2"
-              rows={3}
-              value={notes}
-              disabled={!canManage || Boolean(summary.closing)}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
-            />
-          </label>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           {canManage && !summary.closing ? (
             <p className="text-xs text-slate-500">

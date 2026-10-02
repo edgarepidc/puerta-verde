@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import {
   cashCloseValidationError,
-  expectedCashOnHandForCount,
   formatMoney,
   type CashDrawerLine,
 } from '@puertaverde/shared';
@@ -14,6 +13,7 @@ import { ActionChip } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
 import { LogoutButton } from '@/components/LogoutButton';
+import { PillField, PILL_INPUT_CLASS } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
 const SNOOZE_MS = 5 * 60 * 1000;
@@ -192,13 +192,6 @@ export function PendingCashCloseGate({
   if (!visible) return null;
 
   const cashLines = summary?.cashLines ?? [];
-  const expected = expectedCashOnHandForCount(
-    openingFloat === '' ? 0 : Number(openingFloat),
-    summary?.totals.cash ?? 0,
-    cashLines,
-    countedCash === '' ? null : Number(countedCash),
-  );
-  const cashDiff = countedCash === '' ? null : Number(countedCash) - expected;
   const spoken = formatMexicoSpokenDay(date);
   const weekday = formatMexicoWeekday(date);
 
@@ -254,25 +247,32 @@ export function PendingCashCloseGate({
 
         {canClose && summary ? (
           <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Fondo inicial
+            <div className="flex flex-wrap items-end gap-2">
+              <PillField label="Fondo inicial" icon="$" className="w-[9.75rem] shrink-0">
                 <DecimalInput
-                  className="pv-input mt-1 w-36"
+                  className={PILL_INPUT_CLASS}
                   value={openingFloat}
                   onChange={setOpeningFloat}
                   groupThousands
                 />
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Efectivo contado
+              </PillField>
+              <PillField label="Efectivo contado" icon="$" className="w-[9.75rem] shrink-0">
                 <DecimalInput
-                  className="pv-input mt-1 w-36"
+                  className={PILL_INPUT_CLASS}
                   value={countedCash}
                   onChange={setCountedCash}
                   groupThousands
                 />
-              </label>
+              </PillField>
+              <PillField label="Notas del cierre" icon="📝" className="min-w-[12rem] flex-1">
+                <input
+                  type="text"
+                  className={PILL_INPUT_CLASS}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Ej. faltante de $20 en caja chica"
+                />
+              </PillField>
             </div>
             {countedCash !== '' || cashLines.length > 0 ? (
               <CashCloseExpected
@@ -284,16 +284,6 @@ export function PendingCashCloseGate({
             ) : (
               <p className="text-sm text-slate-500">Cuenta el efectivo de la caja para poder cerrar.</p>
             )}
-            <label className="block text-sm font-medium text-slate-700">
-              Notas {cashDiff != null && Math.abs(cashDiff) >= 0.009 ? '(obligatorias si no cuadra)' : '(si hay diferencia)'}
-              <textarea
-                className="pv-input mt-2"
-                rows={2}
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Ej. faltante de $20 en caja chica"
-              />
-            </label>
           </div>
         ) : null}
 
