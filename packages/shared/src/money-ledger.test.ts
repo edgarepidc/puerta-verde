@@ -19,9 +19,14 @@ test('eachInclusiveYmd walks calendar days', () => {
   ]);
 });
 
-test('moneyLedgerRowYmd keeps date-only values and converts timestamps', () => {
+test('moneyLedgerRowYmd uses the Mexico City calendar day for every payment', () => {
   assert.equal(moneyLedgerRowYmd('2026-09-15'), '2026-09-15');
   assert.equal(moneyLedgerRowYmd('2026-09-15T22:30:00-06:00'), '2026-09-15');
+  assert.equal(moneyLedgerRowYmd('2026-10-03T18:45:48-06:00'), '2026-10-03');
+  // 18:45 CDMX is already the next UTC date; it still belongs to the sale day.
+  assert.equal(moneyLedgerRowYmd('2026-10-04T00:45:48+00:00'), '2026-10-03');
+  assert.equal(moneyLedgerRowYmd('2026-10-04T05:59:59.461726+00:00'), '2026-10-03');
+  assert.equal(moneyLedgerRowYmd('2026-10-04T06:00:00+00:00'), '2026-10-04');
 });
 
 test('addCollectedTicketMethods splits cash and TPV', () => {
