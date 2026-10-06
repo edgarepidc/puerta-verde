@@ -1181,14 +1181,6 @@ export function ProfitabilityManager({
             totalPositive={leftoverPositive}
             position={moneyPosition}
           />
-          {contributionsTotal > 0 ? (
-            <MetricCard
-              emoji="💵"
-              tone="green"
-              label="Aportaste"
-              value={formatMoney(contributionsTotal)}
-            />
-          ) : null}
       </div>
 
       <details
