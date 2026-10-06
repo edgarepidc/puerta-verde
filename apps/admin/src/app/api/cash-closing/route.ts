@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 
-import { cashCloseValidationError, parseOptionalMoney } from '@puertaverde/shared';
+import { cashCloseValidationError, cashPositionCloseError, parseOptionalMoney } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { loadCashDay } from '@/lib/cash-day';
 import { isValidYmd, todayMexicoYmd } from '@/lib/mexico-date';
-import { syncTienesFromCashClose } from '@/lib/money-position';
+import { fetchMoneyPosition, syncTienesFromCashClose } from '@/lib/money-position';
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -15,10 +15,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawDate = searchParams.get('date')?.trim() ?? '';
   const closingDate = isValidYmd(rawDate) ? rawDate : todayMexicoYmd();
-  const summary = await loadCashDay(auth.branchId, closingDate);
+  const [summary, position] = await Promise.all([
+    loadCashDay(auth.branchId, closingDate),
+    fetchMoneyPosition(auth.branchId, closingDate, closingDate),
+  ]);
 
   return NextResponse.json({
     ...summary,
+    expectedCash: position.cash,
+    expectedAccount: position.account,
     branchName: auth.branchName,
   });
 }
@@ -39,6 +44,7 @@ export async function POST(request: Request) {
     notes?: string;
     openingFloat?: number | null;
     countedCash?: number | null;
+    confirmDrawer?: boolean;
   };
 
   const today = todayMexicoYmd();
@@ -54,13 +60,22 @@ export async function POST(request: Request) {
   const notes = body.notes?.trim() || null;
   const countedCash = parseOptionalMoney(body.countedCash);
   const openingFloat = parseOptionalMoney(body.openingFloat);
-  const validation = cashCloseValidationError({
-    countedCash: body.countedCash,
-    openingFloat: body.openingFloat,
-    cashSales: summary.totals.cash,
-    notes,
-    cashLines: summary.cashLines,
-  });
+  const position = body.confirmDrawer
+    ? await fetchMoneyPosition(auth.branchId, requested, requested)
+    : null;
+  const validation = position
+    ? cashPositionCloseError({
+        countedCash: body.countedCash,
+        expectedCash: position.cash,
+        notes,
+      })
+    : cashCloseValidationError({
+        countedCash: body.countedCash,
+        openingFloat: body.openingFloat,
+        cashSales: summary.totals.cash,
+        notes,
+        cashLines: summary.cashLines,
+      });
   if (validation) {
     return NextResponse.json({ error: validation }, { status: 400 });
   }
