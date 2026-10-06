@@ -35,6 +35,7 @@ export {
 
 export {
   cashCloseValidationError,
+  cashPositionCloseError,
   expectedCashOnHand,
   expectedCashOnHandForCount,
   parseOptionalMoney,

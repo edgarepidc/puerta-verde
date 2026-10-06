@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildCashDrawerLines,
   cashCloseValidationError,
+  cashPositionCloseError,
   expectedCashOnHand,
   expectedCashOnHandForCount,
 } from './cash-closing';
@@ -95,6 +96,25 @@ test('cashCloseValidationError requires a note when the count does not match', (
       cashSales: 320,
       notes: 'faltante de $20',
     }),
+    null,
+  );
+});
+
+test('cashPositionCloseError freezes yesterday when the drawer matches', () => {
+  assert.equal(
+    cashPositionCloseError({ countedCash: 2091.61, expectedCash: 2091.61, notes: '' }),
+    null,
+  );
+  assert.equal(
+    cashPositionCloseError({ countedCash: '', expectedCash: 2091.61, notes: '' }),
+    'Cuenta el efectivo para cuadrar la caja',
+  );
+  assert.equal(
+    cashPositionCloseError({ countedCash: 2000, expectedCash: 2091.61, notes: '  ' }),
+    'Si el efectivo no cuadra, anota por qué para poder cerrar',
+  );
+  assert.equal(
+    cashPositionCloseError({ countedCash: 2000, expectedCash: 2091.61, notes: 'faltan $91.61' }),
     null,
   );
 });

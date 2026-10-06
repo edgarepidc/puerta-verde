@@ -124,6 +124,22 @@ export function buildCashDrawerLines(input: {
   return lines;
 }
 
+/** Morning check: the drawer should match yesterday's efectivo. A note explains any gap. */
+export function cashPositionCloseError(input: {
+  countedCash: unknown;
+  expectedCash: number;
+  notes: string | null | undefined;
+}): string | null {
+  const counted = parseOptionalMoney(input.countedCash);
+  if (counted == null || counted < 0) {
+    return 'Cuenta el efectivo para cuadrar la caja';
+  }
+  if (Math.abs(counted - input.expectedCash) > MONEY_EPS && !(input.notes ?? '').trim()) {
+    return 'Si el efectivo no cuadra, anota por qué para poder cerrar';
+  }
+  return null;
+}
+
 /** Error message if the close is not ready; null when it can be saved. */
 export function cashCloseValidationError(input: {
   countedCash: unknown;
