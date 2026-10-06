@@ -11,7 +11,7 @@ import { LogoutButton } from '@/components/LogoutButton';
 import { PillField, pillInputClass } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
-const SNOOZE_MS = 2 * 60 * 1000;
+const SNOOZE_MS = 4 * 60 * 1000;
 
 type PendingSummary = {
   closingDate: string;
@@ -262,7 +262,7 @@ export function PendingCashCloseGate({
         {!canClose ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Pide a quien cierra caja que confirme el efectivo de ayer. Si hay un cliente en el
-            mostrador, el aviso vuelve en 2 minutos.
+            mostrador, el aviso vuelve en 4 minutos.
           </p>
         ) : null}
 
