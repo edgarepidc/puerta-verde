@@ -51,7 +51,7 @@ export async function fetchMoneyPosition(
   const [{ data: snapshotRow }, { data: costRows }] = await Promise.all([
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount, notes')
+      .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
       .eq('branch_id', branchId)
       .lte('as_of_date', to)
       .order('as_of_date', { ascending: false })
@@ -197,6 +197,92 @@ export async function fetchMoneyPosition(
     );
   }
 
+  const countedAt = snapshotRow?.updated_at || snapshotRow?.created_at;
+  const afterCount: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+  if (snapshot && countedAt) {
+    const dayBounds = mexicoYmdBoundsIso(snapshot.asOfDate);
+    const [lateOrders, latePurchases, lateExpenses, lateIncomes, lateTransfers] = await Promise.all([
+      fetchPaged((rangeFrom, rangeTo) =>
+        supabase
+          .from('orders')
+          .select(
+            'status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee, total',
+          )
+          .eq('branch_id', branchId)
+          .eq('payment_status', 'paid')
+          .neq('status', 'cancelled')
+          .gte('paid_at', dayBounds.start)
+          .lt('paid_at', dayBounds.end)
+          .gt('created_at', countedAt)
+          .range(rangeFrom, rangeTo),
+      ),
+      fetchPaged((rangeFrom, rangeTo) =>
+        supabase
+          .from('purchases')
+          .select('total_amount, paid_from')
+          .eq('branch_id', branchId)
+          .eq('purchased_at', snapshot.asOfDate)
+          .gt('created_at', countedAt)
+          .range(rangeFrom, rangeTo),
+      ),
+      fetchPaged((rangeFrom, rangeTo) =>
+        supabase
+          .from('expenses')
+          .select('amount, paid_from')
+          .eq('branch_id', branchId)
+          .eq('expense_date', snapshot.asOfDate)
+          .gt('created_at', countedAt)
+          .range(rangeFrom, rangeTo),
+      ),
+      fetchPaged((rangeFrom, rangeTo) =>
+        supabase
+          .from('income_entries')
+          .select('entry_type, amount, paid_from')
+          .eq('branch_id', branchId)
+          .eq('entry_date', snapshot.asOfDate)
+          .gt('created_at', countedAt)
+          .range(rangeFrom, rangeTo),
+      ),
+      fetchPaged<{ amount: number; destination: string | null }>((rangeFrom, rangeTo) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('cash_withdrawals')
+          .select('amount, destination')
+          .eq('branch_id', branchId)
+          .eq('withdrawal_date', snapshot.asOfDate)
+          .gt('created_at', countedAt)
+          .range(rangeFrom, rangeTo),
+      ),
+    ]);
+
+    for (const order of lateOrders) {
+      addCollectedTicket(afterCount, order);
+      addCollectedTicket(ticketFlows, order);
+    }
+    for (const row of latePurchases) {
+      addPocketOutflow(afterCount, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
+    }
+    for (const row of lateExpenses) {
+      addPocketOutflow(afterCount, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
+    }
+    for (const row of lateIncomes) {
+      addPocketInflow(
+        afterCount,
+        parseIncomePocket(row.paid_from, row.entry_type),
+        Number(row.amount ?? 0),
+      );
+    }
+    pockets.cash = roundMoney(pockets.cash + afterCount.cashIn - afterCount.cashOut);
+    pockets.account = roundMoney(pockets.account + afterCount.accountIn - afterCount.accountOut);
+    for (const row of lateTransfers) {
+      applyCashPocketTransfer(
+        pockets,
+        parseMoneyPocket(row.destination, 'account'),
+        Number(row.amount ?? 0),
+      );
+    }
+  }
+
   const ticketInCash = roundMoney(ticketFlows.cashIn);
   const ticketInAccount = roundMoney(ticketFlows.accountIn);
 
@@ -208,8 +294,8 @@ export async function fetchMoneyPosition(
     notes: snapshot && snapshot.asOfDate >= to ? (snapshotRow?.notes ?? null) : null,
     openingTotal: snapshot ? pocketTotal(snapshot) : 0,
     openingAsOf: snapshot?.asOfDate ?? null,
-    periodIn: roundMoney(roundedFlows.cashIn + roundedFlows.accountIn),
-    periodOut: roundMoney(roundedFlows.cashOut + roundedFlows.accountOut),
+    periodIn: roundMoney(roundedFlows.cashIn + roundedFlows.accountIn + afterCount.cashIn + afterCount.accountIn),
+    periodOut: roundMoney(roundedFlows.cashOut + roundedFlows.accountOut + afterCount.cashOut + afterCount.accountOut),
     ticketIn: roundMoney(ticketInCash + ticketInAccount),
     ticketInCash,
     ticketInAccount,
@@ -292,7 +378,7 @@ export async function fetchMoneyLedger(
     fetchMoneyPosition(branchId, dayBefore, dayBefore),
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount')
+      .select('as_of_date, cash_amount, account_amount, created_at, updated_at')
       .eq('branch_id', branchId)
       .gte('as_of_date', from)
       .lte('as_of_date', to)
@@ -305,7 +391,7 @@ export async function fetchMoneyLedger(
       supabase
         .from('orders')
         .select(
-          'paid_at, status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee',
+          'paid_at, created_at, status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee',
         )
         .eq('branch_id', branchId)
         .eq('payment_status', 'paid')
@@ -317,7 +403,7 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('purchases')
-        .select('notes, total_amount, paid_from, purchased_at')
+        .select('notes, total_amount, paid_from, purchased_at, created_at')
         .eq('branch_id', branchId)
         .gte('purchased_at', from)
         .lte('purchased_at', to)
@@ -326,7 +412,7 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('expenses')
-        .select('concept, amount, paid_from, expense_date')
+        .select('concept, amount, paid_from, expense_date, created_at')
         .eq('branch_id', branchId)
         .gte('expense_date', from)
         .lte('expense_date', to)
@@ -335,7 +421,7 @@ export async function fetchMoneyLedger(
     fetchPaged((rangeFrom, rangeTo) =>
       supabase
         .from('income_entries')
-        .select('entry_type, concept, amount, paid_from, entry_date')
+        .select('entry_type, concept, amount, paid_from, entry_date, created_at')
         .eq('branch_id', branchId)
         .gte('entry_date', from)
         .lte('entry_date', to)
@@ -346,13 +432,14 @@ export async function fetchMoneyLedger(
       destination: string | null;
       notes: string | null;
       withdrawal_date: string;
+      created_at: string;
     }>(
       (rangeFrom, rangeTo) =>
         // Table is not in generated types yet.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from('cash_withdrawals')
-          .select('amount, destination, notes, withdrawal_date')
+          .select('amount, destination, notes, withdrawal_date, created_at')
           .eq('branch_id', branchId)
           .gte('withdrawal_date', from)
           .lte('withdrawal_date', to)
@@ -387,9 +474,11 @@ export async function fetchMoneyLedger(
       asOfDate: row.as_of_date,
       cash: Number(row.cash_amount),
       account: Number(row.account_amount),
+      countedAt: row.updated_at || row.created_at,
     })),
     tickets: tickets.map((row) => ({
       ymd: moneyLedgerRowYmd(row.paid_at),
+      recordedAt: row.created_at,
       status: row.status,
       payment_status: row.payment_status,
       payment_method: row.payment_method,
@@ -400,18 +489,21 @@ export async function fetchMoneyLedger(
     })),
     purchases: purchases.map((row) => ({
       ymd: moneyLedgerRowYmd(row.purchased_at),
+      recordedAt: row.created_at,
       amount: Number(row.total_amount ?? 0),
       paidFrom: row.paid_from,
       label: row.notes,
     })),
     expenses: expenses.map((row) => ({
       ymd: moneyLedgerRowYmd(row.expense_date),
+      recordedAt: row.created_at,
       amount: Number(row.amount ?? 0),
       paidFrom: row.paid_from,
       label: row.concept,
     })),
     incomes: incomes.map((row) => ({
       ymd: moneyLedgerRowYmd(row.entry_date),
+      recordedAt: row.created_at,
       amount: Number(row.amount ?? 0),
       paidFrom: row.paid_from,
       entryType: isIncomeEntryType(row.entry_type) ? row.entry_type : 'operating',
@@ -419,6 +511,7 @@ export async function fetchMoneyLedger(
     })),
     transfers: transfers.map((row) => ({
       ymd: moneyLedgerRowYmd(row.withdrawal_date),
+      recordedAt: row.created_at,
       amount: Number(row.amount ?? 0),
       destination: row.destination,
       label: row.notes,

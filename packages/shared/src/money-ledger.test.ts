@@ -259,3 +259,54 @@ test('a short cash close shows the missing amount as Faltante de caja', () => {
   const faltante = moneyDayAuditMovements(day).find((row) => row.label === 'Faltante de caja');
   assert.deepEqual(faltante, { label: 'Faltante de caja', cash: -50, account: 0 });
 });
+
+test('money registered after the cash count is added on top of the count', () => {
+  const ledger = buildMoneyLedger({
+    from: '2026-10-05',
+    to: '2026-10-05',
+    opening: { asOfDate: '2026-10-04', cash: 2000, account: 4000 },
+    counts: [
+      {
+        asOfDate: '2026-10-05',
+        cash: 2000,
+        account: 5287,
+        countedAt: '2026-10-06T05:31:19.325+00:00',
+      },
+    ],
+    tickets: [],
+    purchases: [],
+    expenses: [],
+    incomes: [
+      {
+        ymd: '2026-10-05',
+        recordedAt: '2026-10-06T05:24:36.630+00:00',
+        amount: 1287,
+        paidFrom: 'account',
+        entryType: 'operating',
+        label: 'ingreso',
+      },
+      {
+        ymd: '2026-10-05',
+        recordedAt: '2026-10-06T05:37:34.405+00:00',
+        amount: 3507,
+        paidFrom: 'account',
+        entryType: 'contribution',
+        label: 'Acompletar renta',
+      },
+    ],
+    transfers: [],
+  });
+  const day = ledger.days[0]!;
+  assert.equal(day.otherInAccount, 4794);
+  assert.equal(day.countAdjustAccount, 0);
+  assert.equal(day.runningAccount, 8794);
+  const lines = moneyDayAuditMovements(day);
+  assert.deepEqual(
+    lines.find((row) => row.label === 'Acompletar renta'),
+    { label: 'Acompletar renta', cash: 0, account: 3507 },
+  );
+  assert.equal(
+    lines.some((row) => row.label === 'Faltante de cuenta'),
+    false,
+  );
+});
