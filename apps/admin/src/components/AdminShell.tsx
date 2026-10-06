@@ -5,9 +5,11 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { AdminNav } from '@/components/AdminNav';
 import { BranchSwitcher } from '@/components/BranchSwitcher';
 import { LogoutButton } from '@/components/LogoutButton';
+import { MorningOpenNotice } from '@/components/MorningOpenNotice';
 import { PendingCashCloseGate } from '@/components/PendingCashCloseGate';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
-import { mexicoDayGreeting, yesterdayMexicoYmd } from '@/lib/mexico-date';
+import { fetchMoneyPosition } from '@/lib/money-position';
+import { mexicoDayGreeting, todayMexicoYmd, yesterdayMexicoYmd } from '@/lib/mexico-date';
 import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 import { STATUS_LABELS, isSubscriptionUsable } from '@puertaverde/shared';
@@ -68,6 +70,9 @@ export async function AdminShell({
   ]);
   const needsYesterdayClose = !pendingClosing.error && !pendingClosing.data;
   const canCloseCaja = staffHasPermission(staff, 'cash.closing', permissionMatrix);
+  const opening = needsYesterdayClose
+    ? null
+    : await fetchMoneyPosition(staff.branchId, yesterday, yesterday).catch(() => null);
 
   const org = orgResult.data;
   const subscriptionOk = org
@@ -83,6 +88,13 @@ export async function AdminShell({
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
       {needsYesterdayClose ? (
         <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} />
+      ) : opening ? (
+        <MorningOpenNotice
+          today={todayMexicoYmd()}
+          yesterday={yesterday}
+          cash={opening.cash}
+          account={opening.account}
+        />
       ) : null}
       <main className="relative flex min-h-screen flex-col">
         <header className="pv-glass-header relative z-40">
