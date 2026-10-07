@@ -71,13 +71,6 @@ export async function POST(request: Request) {
         ? body.storefrontSlug.trim().toLowerCase()
         : null;
 
-    if (storefrontSlug && body.fulfillmentType !== 'delivery') {
-      return NextResponse.json(
-        { error: 'Esta tienda solo entrega a domicilio.' },
-        { status: 400 },
-      );
-    }
-
     const { data, error } = await supabase.rpc('place_guest_order', {
       p_branch_slug: body.branchSlug,
       p_customer_name: body.customerName,
