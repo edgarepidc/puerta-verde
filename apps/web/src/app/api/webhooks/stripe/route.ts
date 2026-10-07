@@ -58,7 +58,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (session.mode === 'payment') {
     const orderId = session.metadata?.order_id;
-    if (!orderId) return;
+    if (!orderId || session.payment_status !== 'paid') return;
 
     await supabase
       .from('orders')
