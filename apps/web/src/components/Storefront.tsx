@@ -18,6 +18,7 @@ import {
   getQuantityStep,
   getStockStatus,
   isValidMexicanPhone,
+  markedUpUnitPrice,
   maxPiecesFromStock,
   orderStatusLabel,
   PRODUCT_UNIT_LABELS,
@@ -53,6 +54,10 @@ interface BranchInfo {
   opening_hours?: string | null;
   fulfillment_mode?: 'pickup' | 'delivery' | 'both' | null;
   org_name: string;
+  /** When set, prices include this percent and the order is tagged to the mirror. */
+  markupPercent?: number | null;
+  storefrontSlug?: string | null;
+  shippingIncluded?: boolean;
 }
 
 interface Promotion {
@@ -239,7 +244,10 @@ export function Storefront({
       id: product.product.id,
       category_id: product.product.category_id,
     });
-    return applyDiscount(Number(product.price), discount);
+    const discounted = applyDiscount(Number(product.price), discount);
+    const markup = Number(branch.markupPercent ?? 0);
+    if (markup <= 0) return discounted;
+    return markedUpUnitPrice(discounted, markup);
   }
 
   function productStatus(product: StorefrontProduct) {
@@ -487,6 +495,7 @@ export function Storefront({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           branchSlug: branch.slug,
+          ...(branch.storefrontSlug ? { storefrontSlug: branch.storefrontSlug } : {}),
           customerName,
           customerPhone,
           fulfillmentType,
@@ -627,9 +636,11 @@ export function Storefront({
               </div>
               <p className="text-sm text-slate-600">
                 Mínimo {formatMoney(Number(branch.minimum_order_amount))}
-                {Number(branch.delivery_fee) > 0
-                  ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
-                  : ' · Entrega a vecinos'}
+                {branch.shippingIncluded
+                  ? ' · Envío incluido'
+                  : Number(branch.delivery_fee) > 0
+                    ? ` · Envío ${formatMoney(Number(branch.delivery_fee))}`
+                    : ' · Entrega a vecinos'}
                 {branch.opening_hours ? ` · ${branch.opening_hours}` : ''}
                 {branch.whatsapp_phone ? ` · WhatsApp ${branch.whatsapp_phone}` : ''}
               </p>
@@ -969,21 +980,25 @@ export function Storefront({
                   placeholder="Tu nombre"
                   autoComplete="name"
                 />
-                <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {fulfillmentOptions.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setFulfillmentType(type)}
-                      className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        fulfillmentType === type ? 'pv-pill--active' : 'pv-pill--inactive'
-                      }`}
-                    >
-                      {FULFILLMENT_LABELS[type]}
-                    </button>
-                  ))}
-                </div>
+                {fulfillmentOptions.length > 1 ? (
+                  <>
+                    <label className="block text-sm font-medium">¿Cómo lo recibes?</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {fulfillmentOptions.map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setFulfillmentType(type)}
+                          className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                            fulfillmentType === type ? 'pv-pill--active' : 'pv-pill--inactive'
+                          }`}
+                        >
+                          {FULFILLMENT_LABELS[type]}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
                 {fulfillmentType === 'delivery' ? (
                   <>
                     <label className="block text-sm font-medium">Domicilio</label>

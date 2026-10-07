@@ -10,6 +10,7 @@ import { ConfiguracionTabs } from '@/components/ConfiguracionTabs';
 import { PermissionsManager } from '@/components/PermissionsManager';
 import { PlatformManager } from '@/components/PlatformManager';
 import { SettingsManager } from '@/components/SettingsManager';
+import type { MirrorStorefront } from '@/components/MirrorStorefrontCard';
 import { WhatsAppInbox } from '@/components/WhatsAppInbox';
 import {
   canEditPermissions,
@@ -52,6 +53,7 @@ export default async function ConfiguracionPage({
     { data: organization },
     { data: memberships },
     { data: whatsappMessages },
+    { data: storefront },
     platformOrgsResult,
     platformBranchesResult,
   ] = await Promise.all([
@@ -78,6 +80,11 @@ export default async function ConfiguracionPage({
       .eq('organization_id', tenant.organizationId)
       .order('created_at', { ascending: false })
       .limit(30),
+    supabase
+      .from('storefronts')
+      .select('id, name, slug, markup_percent, is_active')
+      .eq('branch_id', tenant.branchId)
+      .maybeSingle(),
     isPlatformAdmin
       ? supabase
           .from('organizations')
@@ -141,6 +148,7 @@ export default async function ConfiguracionPage({
                 ...branch!,
                 usb_scale_enabled: parseBranchSettingsFlags(branch?.settings).usbScaleEnabled,
               }}
+              initialStorefront={storefront as MirrorStorefront | null}
               initialStaff={staffRows}
               canManage={canEditBranch}
               currentUserId={staff.userId}

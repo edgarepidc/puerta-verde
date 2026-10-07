@@ -333,6 +333,12 @@ export {
 } from './storefront';
 
 export {
+  markedUpUnitPrice,
+  normalizeStorefrontSlug,
+  storefrontInputError,
+} from './storefront-mirror';
+
+export {
   buildPtiLabelString,
   formatGtin14,
   parseScaleWeightLine,
