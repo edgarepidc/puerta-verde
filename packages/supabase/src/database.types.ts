@@ -830,6 +830,8 @@ export interface Database {
           minimum_order_amount: number;
           whatsapp_phone: string | null;
           opening_hours: string | null;
+          delivery_fee: number;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
           org_name: string;
           org_slug: string;
         }>;

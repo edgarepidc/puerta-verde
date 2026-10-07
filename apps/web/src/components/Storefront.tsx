@@ -565,7 +565,11 @@ export function Storefront({
       <div className="relative min-h-screen">
         <header className="pv-store-nav relative z-40">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-3 py-2 sm:max-w-4xl sm:gap-3 sm:px-4 sm:py-2.5">
-            <BrandLogo href={`/${branch.slug}`} imageClassName="h-12 w-auto sm:h-16 md:h-20" priority />
+            <BrandLogo
+              href={`/${branch.storefrontSlug || branch.slug}`}
+              imageClassName="h-12 w-auto sm:h-16 md:h-20"
+              priority
+            />
             <div className="flex items-center gap-2">
               <a
                 href="#pedido"
@@ -629,10 +633,15 @@ export function Storefront({
           <section id="inicio" className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
+                {branch.storefrontSlug ? null : (
+                  <p className="text-sm font-medium text-[var(--pv-green-600)]">{branch.org_name}</p>
+                )}
                 <h1 className="text-2xl font-bold text-[var(--pv-green-900)] sm:text-3xl">
                   {branch.name}
                 </h1>
+                {branch.pickup_instructions && branch.fulfillment_mode !== 'delivery' ? (
+                  <p className="mt-1 text-sm text-slate-600">{branch.pickup_instructions}</p>
+                ) : null}
               </div>
               <p className="text-sm text-slate-600">
                 Mínimo {formatMoney(Number(branch.minimum_order_amount))}
@@ -1090,8 +1099,10 @@ export function Storefront({
         <footer className="mt-10 border-t border-slate-200 bg-white">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold text-[var(--pv-green-900)]">{branch.org_name}</p>
-              <p>{branch.name}</p>
+              <p className="font-semibold text-[var(--pv-green-900)]">
+                {branch.storefrontSlug ? branch.name : branch.org_name}
+              </p>
+              {branch.storefrontSlug ? null : <p>{branch.name}</p>}
             </div>
             <div className="flex flex-wrap gap-4">
               <a href="#catalogo" className="hover:text-[var(--pv-green-700)]">

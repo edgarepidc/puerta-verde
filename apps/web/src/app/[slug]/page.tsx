@@ -86,15 +86,15 @@ export default async function BranchStorePage({
         name: mirror.name,
         slug: mirror.branch_slug,
         pickup_instructions: mirror.pickup_instructions,
-        delivery_fee: 0,
+        delivery_fee: Number(mirror.delivery_fee),
         minimum_order_amount: Number(mirror.minimum_order_amount),
         whatsapp_phone: mirror.whatsapp_phone,
         opening_hours: mirror.opening_hours,
-        fulfillment_mode: 'delivery',
+        fulfillment_mode: mirror.fulfillment_mode,
         org_name: mirror.org_name,
         markupPercent: Number(mirror.markup_percent),
         storefrontSlug: mirror.slug,
-        shippingIncluded: true,
+        shippingIncluded: Number(mirror.delivery_fee) <= 0,
       }}
       products={catalog.products}
       promotions={catalog.promotions}
