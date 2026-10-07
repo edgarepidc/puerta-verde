@@ -125,7 +125,7 @@ export function Storefront({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [paymentPreference, setPaymentPreference] = useState<'on_delivery' | 'online'>('on_delivery');
   const [pickerProduct, setPickerProduct] = useState<StorefrontProduct | null>(null);
-  const [pickerQty, setPickerQty] = useState(1);
+  const [pickerQty, setPickerQty] = useState('1');
   const [pickerOrderBy, setPickerOrderBy] = useState<'kg' | 'piece'>('kg');
   const [pickerMode, setPickerMode] = useState<'add' | 'edit'>('add');
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -265,7 +265,7 @@ export function Storefront({
     setPickerMode('add');
     setPickerProduct(product);
     setPickerOrderBy(byPiece ? 'piece' : 'kg');
-    setPickerQty(byPiece ? 1 : getDefaultQuantity(unit));
+    setPickerQty(String(byPiece ? 1 : getDefaultQuantity(unit)));
   }
 
   function openEditCartItem(item: CartItem) {
@@ -275,7 +275,7 @@ export function Storefront({
     setPickerProduct(product);
     setPickerOrderBy(item.orderBy);
     setPickerQty(
-      item.orderBy === 'piece' ? Number(item.orderedQuantity ?? 1) : item.quantity,
+      String(item.orderBy === 'piece' ? Number(item.orderedQuantity ?? 1) : item.quantity),
     );
   }
 
@@ -330,7 +330,7 @@ export function Storefront({
   function confirmPicker() {
     if (!pickerProduct) return;
     const unit = pickerProduct.product.unit as ProductUnit;
-    const qty = Number(pickerQty);
+    const qty = roundToDecimals(Number(pickerQty));
     if (!Number.isFinite(qty) || qty <= 0) return;
     const byPiece = pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct);
     const stockKg = Number(pickerProduct.stock);
@@ -1149,7 +1149,7 @@ export function Storefront({
                   }`}
                   onClick={() => {
                     setPickerOrderBy('piece');
-                    setPickerQty(1);
+                    setPickerQty('1');
                   }}
                 >
                   Por pieza
@@ -1163,7 +1163,7 @@ export function Storefront({
                   }`}
                   onClick={() => {
                     setPickerOrderBy('kg');
-                    setPickerQty(getDefaultQuantity('kg'));
+                    setPickerQty(String(getDefaultQuantity('kg')));
                   }}
                 >
                   Por kg
@@ -1185,10 +1185,10 @@ export function Storefront({
                 onClick={() => {
                   const byPiece = pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct);
                   const step = byPiece ? 1 : getQuantityStep(pickerProduct.product.unit as ProductUnit);
-                  const min = 1;
+                  const min = byPiece ? 1 : 0.001;
                   setPickerQty((current) => {
                     const next = Number((Number(current) - step).toFixed(3));
-                    return next < min ? min : next;
+                    return String(next < min ? min : next);
                   });
                 }}
               >
@@ -1200,15 +1200,23 @@ export function Storefront({
                   ? INTEGER_FIELD_PROPS
                   : DECIMAL_FIELD_PROPS)}
                 className="pv-input text-center text-base font-semibold tabular-nums"
-                value={Number.isFinite(pickerQty) && pickerQty > 0 ? pickerQty : ''}
+                value={pickerQty}
                 onChange={(e) => {
                   const raw = e.target.value.replace(',', '.');
+                  const integer =
+                    (pickerOrderBy === 'piece' && canOrderByPiece(pickerProduct)) ||
+                    (pickerProduct.product.unit !== 'kg' && pickerProduct.product.unit !== 'liter');
                   if (raw === '') {
-                    setPickerQty(0);
+                    setPickerQty('');
                     return;
                   }
-                  const next = Number(raw);
-                  setPickerQty(Number.isFinite(next) ? roundToDecimals(next) : 0);
+                  if (integer) {
+                    if (!/^\d+$/.test(raw)) return;
+                    setPickerQty(raw.replace(/^0+(?=\d)/, ''));
+                    return;
+                  }
+                  if (!/^\d*\.?\d{0,3}$/.test(raw)) return;
+                  setPickerQty(raw);
                 }}
               />
               <button
@@ -1223,7 +1231,7 @@ export function Storefront({
                     : Number(pickerProduct.stock);
                   setPickerQty((current) => {
                     const next = Number((Number(current) + step).toFixed(3));
-                    return next > max ? max : next;
+                    return String(next > max ? max : next);
                   });
                 }}
               >
