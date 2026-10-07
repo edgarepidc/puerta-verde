@@ -1798,10 +1798,17 @@ function OrderCard({
           <span className="shrink-0 text-sm font-medium">{formatMoney(Number(order.total))}</span>
         </div>
         <p className="mt-1.5 line-clamp-2 text-xs text-slate-600">{itemsPreview}</p>
-        <p className="mt-1 text-xs text-slate-500">
-          {showBranchName && branch?.name ? `${branch.name} · ` : ''}
-          {fulfillmentLabel(order)}
-          {!unpaid ? ' · Pagado' : ''}
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+          <span>
+            {showBranchName && branch?.name ? `${branch.name} · ` : ''}
+            {fulfillmentLabel(order)}
+            {!unpaid && order.payment_method !== 'online' ? ' · Pagado' : ''}
+          </span>
+          {!unpaid && order.payment_method === 'online' ? (
+            <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+              Pagado en línea
+            </span>
+          ) : null}
         </p>
       </button>
       <div className="mt-3 flex flex-wrap gap-2">
