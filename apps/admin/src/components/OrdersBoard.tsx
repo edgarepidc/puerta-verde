@@ -1118,14 +1118,23 @@ export function OrdersBoard({
                 Cerrar
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              {orderStatusLabel(selected.status)} · {fulfillmentLabel(selected)} ·{' '}
-              {orderPaymentLabel(selected)}
+            <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-slate-600">
+              <span>
+                {orderStatusLabel(selected.status)} · {fulfillmentLabel(selected)}
+              </span>
+              {!detailEditing &&
+              selected.payment_method === 'online' &&
+              !isUnpaidOrder(selected) ? (
+                <span className="rounded-full bg-sky-600 px-2 py-0.5 text-xs font-semibold text-white">
+                  Pagado en línea
+                </span>
+              ) : (
+                <span>· {orderPaymentLabel(selected)}</span>
+              )}
               {!detailEditing ? (
-                <>
-                  {' '}
+                <span>
                   · {mexicoYmdFromIso(selected.created_at) || formatOrderBoardTime(selected.created_at)}
-                </>
+                </span>
               ) : null}
             </p>
             {detailEditing && canEditOrders ? (
@@ -1140,13 +1149,13 @@ export function OrdersBoard({
                 />
               </label>
             ) : null}
-            {canEditPayment ? (
+            {detailEditing && canEditPayment ? (
               <PaymentMethodSelect
                 order={selected}
                 disabled={updatingId === selected.id}
                 onSelect={(method) => void setPayment(selected.id, method)}
               />
-            ) : isUnpaidOrder(selected) ? (
+            ) : detailEditing && isUnpaidOrder(selected) ? (
               <PaymentMethodSelect
                 order={selected}
                 collectOnly
