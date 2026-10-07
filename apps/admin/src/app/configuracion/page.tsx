@@ -82,7 +82,9 @@ export default async function ConfiguracionPage({
       .limit(30),
     supabase
       .from('storefronts')
-      .select('id, name, slug, markup_percent, is_active')
+      .select(
+        'id, name, slug, markup_percent, is_active, pickup_instructions, fulfillment_mode, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours',
+      )
       .eq('branch_id', tenant.branchId)
       .maybeSingle(),
     isPlatformAdmin

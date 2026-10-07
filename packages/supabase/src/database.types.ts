@@ -183,6 +183,12 @@ export interface Database {
           slug: string;
           markup_percent: number;
           is_active: boolean;
+          pickup_instructions: string | null;
+          fulfillment_mode: 'pickup' | 'delivery' | 'both';
+          delivery_fee: number;
+          minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
           created_at: string;
           updated_at: string;
         };
