@@ -13,6 +13,12 @@ export interface MirrorStorefront {
   slug: string;
   markup_percent: number;
   is_active: boolean;
+  pickup_instructions: string | null;
+  fulfillment_mode: 'pickup' | 'delivery' | 'both';
+  delivery_fee: number;
+  minimum_order_amount: number;
+  whatsapp_phone: string | null;
+  opening_hours: string | null;
 }
 
 export function MirrorStorefrontCard({
@@ -26,6 +32,16 @@ export function MirrorStorefrontCard({
   const [name, setName] = useState(initial?.name ?? '');
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [markupText, setMarkupText] = useState(decimalFromNumber(initial?.markup_percent ?? 0));
+  const [pickupInstructions, setPickupInstructions] = useState(initial?.pickup_instructions ?? '');
+  const [fulfillmentMode, setFulfillmentMode] = useState<'pickup' | 'delivery' | 'both'>(
+    initial?.fulfillment_mode ?? 'both',
+  );
+  const [deliveryFeeText, setDeliveryFeeText] = useState(decimalFromNumber(initial?.delivery_fee ?? 0));
+  const [minimumOrderText, setMinimumOrderText] = useState(
+    decimalFromNumber(initial?.minimum_order_amount ?? 0),
+  );
+  const [whatsappPhone, setWhatsappPhone] = useState(initial?.whatsapp_phone ?? '');
+  const [openingHours, setOpeningHours] = useState(initial?.opening_hours ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [savedSlug, setSavedSlug] = useState(initial?.slug ?? '');
   const [savedActive, setSavedActive] = useState(initial?.is_active ?? false);
@@ -52,6 +68,12 @@ export function MirrorStorefrontCard({
           slug,
           markupPercent: markup,
           isActive,
+          pickupInstructions,
+          fulfillmentMode,
+          deliveryFee: parseDecimal(deliveryFeeText),
+          minimumOrderAmount: parseDecimal(minimumOrderText),
+          whatsappPhone,
+          openingHours,
         }),
       });
       const result = await response.json();
@@ -63,6 +85,12 @@ export function MirrorStorefrontCard({
       setSavedActive(next.is_active);
       setIsActive(next.is_active);
       setMarkupText(decimalFromNumber(Number(next.markup_percent)));
+      setPickupInstructions(next.pickup_instructions ?? '');
+      setFulfillmentMode(next.fulfillment_mode ?? 'both');
+      setDeliveryFeeText(decimalFromNumber(Number(next.delivery_fee)));
+      setMinimumOrderText(decimalFromNumber(Number(next.minimum_order_amount)));
+      setWhatsappPhone(next.whatsapp_phone ?? '');
+      setOpeningHours(next.opening_hours ?? '');
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -79,7 +107,7 @@ export function MirrorStorefrontCard({
     >
       <FoldableSummary
         title="Otra zona"
-        hint="Misma mercancía. El porcentaje va incluido en el precio, sin cobro de envío."
+        hint="Misma mercancía. El porcentaje va en el precio. Estos datos salen en su página."
         emoji="🚚"
         iconClass="bg-amber-100"
         actions={
@@ -119,6 +147,73 @@ export function MirrorStorefrontCard({
             value={markupText}
             disabled={!canManage}
             onChange={setMarkupText}
+          />
+        </label>
+        <label className="block text-sm md:col-span-3">
+          <span className="font-medium text-slate-700">Instrucciones de recolección</span>
+          <textarea
+            className="pv-input mt-1"
+            rows={2}
+            value={pickupInstructions}
+            disabled={!canManage}
+            onChange={(event) => setPickupInstructions(event.target.value)}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Modo de venta</span>
+          <select
+            className="pv-input mt-1 py-1.5 text-sm"
+            value={fulfillmentMode}
+            disabled={!canManage}
+            onChange={(event) =>
+              setFulfillmentMode(event.target.value as 'pickup' | 'delivery' | 'both')
+            }
+          >
+            <option value="both">Recoger y domicilio</option>
+            <option value="pickup">Solo recoger</option>
+            <option value="delivery">Solo domicilio</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Costo de envío</span>
+          <DecimalInput
+            placeholder="0"
+            className="pv-input mt-1"
+            groupThousands
+            value={deliveryFeeText}
+            disabled={!canManage}
+            onChange={setDeliveryFeeText}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Pedido mínimo</span>
+          <DecimalInput
+            placeholder="0"
+            className="pv-input mt-1"
+            groupThousands
+            value={minimumOrderText}
+            disabled={!canManage}
+            onChange={setMinimumOrderText}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">WhatsApp</span>
+          <input
+            className="pv-input mt-1"
+            value={whatsappPhone}
+            disabled={!canManage}
+            placeholder="5512345678"
+            onChange={(event) => setWhatsappPhone(event.target.value)}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Horario</span>
+          <input
+            className="pv-input mt-1"
+            value={openingHours}
+            disabled={!canManage}
+            placeholder="Lun–Sáb 8:00–20:00"
+            onChange={(event) => setOpeningHours(event.target.value)}
           />
         </label>
         <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/60 p-3 text-sm md:col-span-4">
