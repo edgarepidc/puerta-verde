@@ -756,7 +756,7 @@ export function Storefront({
                                   </span>
                                 </>
                               ) : (
-                                <span className="font-semibold">{formatMoney(basePrice)}</span>
+                                <span className="font-semibold">{formatMoney(salePrice)}</span>
                               )}{' '}
                               / {PRODUCT_UNIT_LABELS[unit]}
                             </p>
