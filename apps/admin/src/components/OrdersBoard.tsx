@@ -89,8 +89,11 @@ function isCounterSale(order: Pick<OrderRow, 'source' | 'delivery_notes'>): bool
   return (order.delivery_notes ?? '').startsWith('[mostrador]');
 }
 
-function fulfillmentLabel(order: Pick<OrderRow, 'fulfillment_type' | 'source' | 'delivery_notes'>): string {
+function fulfillmentLabel(
+  order: Pick<OrderRow, 'fulfillment_type' | 'source' | 'delivery_notes' | 'storefront_name'>,
+): string {
   if (isCounterSale(order)) return 'Venta mostrador';
+  if (order.storefront_name) return `Domicilio · ${order.storefront_name}`;
   return FULFILLMENT_LABELS[order.fulfillment_type];
 }
 
@@ -1715,10 +1718,14 @@ function OrderLogRow({
           </p>
           <span
             className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-              counterSale ? 'bg-slate-100 text-slate-700' : 'bg-sky-100 text-sky-800'
+              counterSale
+                ? 'bg-slate-100 text-slate-700'
+                : order.storefront_name
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-sky-100 text-sky-800'
             }`}
           >
-            {counterSale ? 'Mostrador' : 'En línea'}
+            {counterSale ? 'Mostrador' : order.storefront_name ?? 'En línea'}
           </span>
         </div>
       </div>

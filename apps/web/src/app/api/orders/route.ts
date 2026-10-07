@@ -66,6 +66,18 @@ export async function POST(request: Request) {
         )
       : [];
 
+    const storefrontSlug =
+      typeof body.storefrontSlug === 'string' && body.storefrontSlug.trim()
+        ? body.storefrontSlug.trim().toLowerCase()
+        : null;
+
+    if (storefrontSlug && body.fulfillmentType !== 'delivery') {
+      return NextResponse.json(
+        { error: 'Esta tienda solo entrega a domicilio.' },
+        { status: 400 },
+      );
+    }
+
     const { data, error } = await supabase.rpc('place_guest_order', {
       p_branch_slug: body.branchSlug,
       p_customer_name: body.customerName,
@@ -74,6 +86,7 @@ export async function POST(request: Request) {
       p_unit_id: unitId,
       p_delivery_notes: body.deliveryNotes ?? null,
       p_items: items,
+      ...(storefrontSlug ? { p_storefront_slug: storefrontSlug } : {}),
     });
 
     if (error || !data?.[0]) {

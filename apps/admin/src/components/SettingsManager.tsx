@@ -10,6 +10,7 @@ import {
 
 import { ActionChip, FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
+import { MirrorStorefrontCard, type MirrorStorefront } from '@/components/MirrorStorefrontCard';
 import { PasswordInput } from '@/components/PasswordInput';
 
 interface BranchSettings {
@@ -39,12 +40,14 @@ interface StaffRow {
 export function SettingsManager({
   initialBranch,
   initialStaff,
+  initialStorefront = null,
   canManage,
   currentUserId,
   section = 'all',
 }: {
   initialBranch: BranchSettings;
   initialStaff: StaffRow[];
+  initialStorefront?: MirrorStorefront | null;
   canManage: boolean;
   currentUserId: string;
   section?: 'all' | 'branch' | 'staff';
@@ -300,6 +303,10 @@ export function SettingsManager({
             <p className="text-sm text-slate-500">Solo lectura · no tienes permiso para editar la sucursal.</p>
           ) : null}
         </details>
+      ) : null}
+
+      {showBranch ? (
+        <MirrorStorefrontCard initial={initialStorefront} canManage={canManage} />
       ) : null}
 
       {showStaff ? (

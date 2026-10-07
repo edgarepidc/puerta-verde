@@ -17,6 +17,7 @@ const ORDER_BOARD_SELECT = `
   payment_method,
   payment_splits,
   source,
+  storefront_id,
   delivery_notes,
   created_at,
   order_items ( product_name, quantity )
@@ -40,6 +41,7 @@ export interface OrderBoardRow {
   payment_method?: string | null;
   payment_splits?: unknown;
   source?: string | null;
+  storefront_name?: string | null;
   delivery_notes?: string | null;
   created_at: string;
   items: OrderBoardItemPreview[];
@@ -95,6 +97,19 @@ export async function loadOrdersBoard(
       .order('created_at', { ascending: false }),
   ]);
 
+  const storefrontIds = [
+    ...(openOrders ?? []),
+    ...(deliveredOrders ?? []),
+  ].flatMap((order) => (order.storefront_id ? [order.storefront_id] : []));
+  const storefrontName = new Map<string, string>();
+  if (storefrontIds.length > 0) {
+    const { data: storefronts } = await supabase
+      .from('storefronts')
+      .select('id, name')
+      .in('id', [...new Set(storefrontIds)]);
+    for (const row of storefronts ?? []) storefrontName.set(row.id, row.name);
+  }
+
   const seen = new Set<string>();
   return [...(openOrders ?? []), ...(deliveredOrders ?? [])]
     .filter((order) => {
@@ -116,6 +131,9 @@ export async function loadOrdersBoard(
       payment_method: order.payment_method,
       payment_splits: order.payment_splits,
       source: order.source,
+      storefront_name: order.storefront_id
+        ? (storefrontName.get(order.storefront_id) ?? null)
+        : null,
       delivery_notes: order.delivery_notes,
       created_at: order.created_at,
       items: normalizeItems(order.order_items),

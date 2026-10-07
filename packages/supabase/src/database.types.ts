@@ -107,6 +107,7 @@ export interface Database {
           paid_by: string | null;
           stripe_checkout_session_id: string | null;
           source: 'web' | 'pos';
+          storefront_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -172,6 +173,25 @@ export interface Database {
           slug: string;
         };
         Update: Partial<Database['public']['Tables']['branches']['Row']>;
+        Relationships: [];
+      };
+      storefronts: {
+        Row: {
+          id: string;
+          branch_id: string;
+          name: string;
+          slug: string;
+          markup_percent: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['storefronts']['Row']> & {
+          branch_id: string;
+          name: string;
+          slug: string;
+        };
+        Update: Partial<Database['public']['Tables']['storefronts']['Row']>;
         Relationships: [];
       };
       branch_products: {
@@ -795,6 +815,25 @@ export interface Database {
           org_slug: string;
         }>;
       };
+      get_public_storefront: {
+        Args: { target_slug: string };
+        Returns: Array<{
+          id: string;
+          branch_id: string;
+          name: string;
+          slug: string;
+          markup_percent: number;
+          branch_slug: string;
+          organization_id: string;
+          address: string | null;
+          pickup_instructions: string | null;
+          minimum_order_amount: number;
+          whatsapp_phone: string | null;
+          opening_hours: string | null;
+          org_name: string;
+          org_slug: string;
+        }>;
+      };
       place_guest_order: {
         Args: {
           p_branch_slug: string;
@@ -804,6 +843,7 @@ export interface Database {
           p_unit_id: string | null;
           p_delivery_notes: string | null;
           p_items: Json;
+          p_storefront_slug?: string | null;
         };
         Returns: Array<{
           order_id: string;
