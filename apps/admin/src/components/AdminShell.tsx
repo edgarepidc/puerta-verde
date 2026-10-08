@@ -5,6 +5,7 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { AdminNav } from '@/components/AdminNav';
 import { BranchSwitcher } from '@/components/BranchSwitcher';
 import { LogoutButton } from '@/components/LogoutButton';
+import { CashDayRefresh } from '@/components/CashDayRefresh';
 import { MorningOpenNotice } from '@/components/MorningOpenNotice';
 import { PendingCashCloseGate } from '@/components/PendingCashCloseGate';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
@@ -51,6 +52,7 @@ export async function AdminShell({
   const storeUrl =
     process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app';
 
+  const today = todayMexicoYmd();
   const yesterday = yesterdayMexicoYmd();
   const admin = createAdminClient();
   const [branches, orgResult, pendingClosing, permissionMatrix] = await Promise.all([
@@ -86,11 +88,12 @@ export async function AdminShell({
   return (
     <>
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
+      <CashDayRefresh today={today} />
       {needsYesterdayClose ? (
         <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} />
       ) : opening ? (
         <MorningOpenNotice
-          today={todayMexicoYmd()}
+          today={today}
           yesterday={yesterday}
           cash={opening.cash}
           account={opening.account}
