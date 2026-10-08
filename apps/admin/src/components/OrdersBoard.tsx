@@ -1822,7 +1822,7 @@ function OrderCard({
             ← {ORDER_STATUS_LABELS[prevStatus]}
           </button>
         ) : null}
-        {nextStatus ? (
+        {nextStatus && nextStatus !== 'delivered' ? (
           <button
             type="button"
             disabled={updatingId === order.id}
@@ -1830,6 +1830,17 @@ function OrderCard({
             className="pv-btn-primary px-3 py-1 text-xs disabled:opacity-50"
           >
             → {ORDER_STATUS_LABELS[nextStatus]}
+          </button>
+        ) : null}
+        {normalizeOrderStatus(order.status) !== 'delivered' &&
+        normalizeOrderStatus(order.status) !== 'cancelled' ? (
+          <button
+            type="button"
+            disabled={updatingId === order.id}
+            onClick={() => onUpdateStatus(order.id, 'delivered')}
+            className="pv-btn-primary px-3 py-1 text-xs disabled:opacity-50"
+          >
+            Entregado
           </button>
         ) : null}
         {unpaid ? (

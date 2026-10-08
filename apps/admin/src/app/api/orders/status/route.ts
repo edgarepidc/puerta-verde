@@ -43,29 +43,33 @@ export async function PATCH(request: Request) {
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
     if (whatsappToken && phoneNumberId && branch) {
-      const message = buildOrderStatusMessage({
-        orderNumber: Number(order.order_number),
-        status,
-        branchName: branch.name,
-        trackingUrl,
-      });
+      try {
+        const message = buildOrderStatusMessage({
+          orderNumber: Number(order.order_number),
+          status,
+          branchName: branch.name,
+          trackingUrl,
+        });
 
-      const result = await sendTextMessage(
-        { phoneNumberId, accessToken: whatsappToken },
-        { to: order.customer_phone, body: message },
-      );
+        const result = await sendTextMessage(
+          { phoneNumberId, accessToken: whatsappToken },
+          { to: order.customer_phone, body: message },
+        );
 
-      await supabase.from('whatsapp_message_logs').insert({
-        organization_id: order.organization_id,
-        order_id: order.id,
-        recipient_phone: order.customer_phone,
-        template_key: 'order_status',
-        body: message,
-        external_message_id: result.messageId ?? null,
-        status: result.ok ? 'sent' : 'failed',
-        error_message: result.error ?? null,
-        direction: 'outbound',
-      });
+        await supabase.from('whatsapp_message_logs').insert({
+          organization_id: order.organization_id,
+          order_id: order.id,
+          recipient_phone: order.customer_phone,
+          template_key: 'order_status',
+          body: message,
+          external_message_id: result.messageId ?? null,
+          status: result.ok ? 'sent' : 'failed',
+          error_message: result.error ?? null,
+          direction: 'outbound',
+        });
+      } catch {
+        // The status already changed. A failed notice should not keep the card stuck.
+      }
     }
 
     return NextResponse.json({ ok: true });
