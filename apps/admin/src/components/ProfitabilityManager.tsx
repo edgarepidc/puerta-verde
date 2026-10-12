@@ -23,7 +23,9 @@ import {
   operatingCostAmountForRange,
   parseMoneyPocket,
   parseOperatingCostCategory,
+  pocketOutflows,
   pocketTotal,
+  type MoneyLedgerTotals,
   type IncomeEntryType,
   type MoneyPocket,
   type MoneyPositionView,
@@ -299,6 +301,12 @@ function MetricCard({
   );
 }
 
+function outflowHint(parts: Array<{ label: string; amount: number }>) {
+  const shown = parts.filter((part) => part.amount > 0.009);
+  if (!shown.length) return undefined;
+  return shown.map((part) => `${part.label} ${formatMoney(part.amount)}`).join(' · ');
+}
+
 function TeQuedoCard({
   total,
   totalPositive,
@@ -548,8 +556,7 @@ export function ProfitabilityManager({
   initialVisitExpenses,
   initialIncomes,
   initialPurchasesTotal,
-  initialPurchasesCash,
-  initialPurchasesAccount,
+  initialLedgerTotals,
   initialWasteCost,
   initialZeroCostSold,
   initialMoneyPosition,
@@ -564,8 +571,7 @@ export function ProfitabilityManager({
   initialVisitExpenses: VisitExpenseRow[];
   initialIncomes: IncomeRow[];
   initialPurchasesTotal: number;
-  initialPurchasesCash: number;
-  initialPurchasesAccount: number;
+  initialLedgerTotals: MoneyLedgerTotals;
   initialWasteCost: number;
   initialZeroCostSold: Array<{ name: string; revenue: number }>;
   initialMoneyPosition: MoneyPositionView | null;
@@ -577,8 +583,7 @@ export function ProfitabilityManager({
   const [visitExpenses, setVisitExpenses] = useState(initialVisitExpenses);
   const [incomes, setIncomes] = useState(initialIncomes);
   const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
-  const [purchasesCash, setPurchasesCash] = useState(initialPurchasesCash);
-  const [purchasesAccount, setPurchasesAccount] = useState(initialPurchasesAccount);
+  const [ledgerTotals, setLedgerTotals] = useState(initialLedgerTotals);
   const [wasteCost, setWasteCost] = useState(initialWasteCost);
   const [zeroCostSold, setZeroCostSold] = useState(initialZeroCostSold);
   const [summary, setSummary] = useState(initialSummary);
@@ -762,8 +767,7 @@ export function ProfitabilityManager({
       setCosts(costsPayload.costs);
       setSummary(profitPayload.summary);
       setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
-      setPurchasesCash(Number(profitPayload.purchasesCash ?? profitPayload.purchasesTotal ?? 0));
-      setPurchasesAccount(Number(profitPayload.purchasesAccount ?? 0));
+      if (moneyPayload.ledger?.totals) setLedgerTotals(moneyPayload.ledger.totals);
       setWasteCost(Number(profitPayload.wasteCost ?? 0));
       setZeroCostSold(profitPayload.zeroCostSold ?? []);
       setCategories(categoriesPayload.categories);
@@ -1012,7 +1016,7 @@ export function ProfitabilityManager({
 
   const revenue = Number(summary?.revenue ?? 0);
   const cogs = Number(summary?.cogs ?? 0);
-  const cashOut = purchasesCash + Number(summary?.operating_costs_total ?? 0);
+  const outflows = pocketOutflows(ledgerTotals);
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
@@ -1169,12 +1173,23 @@ export function ProfitabilityManager({
             emoji="🧾"
             tone="slate"
             label="Salió de caja"
-            value={formatMoney(cashOut)}
-            hint={
-              purchasesAccount > 0
-                ? `Cuenta ${formatMoney(purchasesAccount)} no entra`
-                : undefined
-            }
+            value={formatMoney(outflows.cash)}
+            hint={outflowHint([
+              { label: 'Compras', amount: ledgerTotals.purchasesCash },
+              { label: 'Gastos', amount: ledgerTotals.expensesCash },
+              { label: 'A cuenta', amount: ledgerTotals.toAccount },
+            ])}
+          />
+          <MetricCard
+            emoji="🏦"
+            tone="blue"
+            label="Salió de cuenta"
+            value={formatMoney(outflows.account)}
+            hint={outflowHint([
+              { label: 'Compras', amount: ledgerTotals.purchasesAccount },
+              { label: 'Gastos', amount: ledgerTotals.expensesAccount },
+              { label: 'A efectivo', amount: ledgerTotals.toCash },
+            ])}
           />
           <MetricCard
             emoji="🏷️"

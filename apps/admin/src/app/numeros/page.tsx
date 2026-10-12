@@ -5,11 +5,10 @@ import { AdminShell } from '@/components/AdminShell';
 import { ProfitabilityManager } from '@/components/ProfitabilityManager';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
 import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-date';
-import { fetchMoneyPosition } from '@/lib/money-position';
+import { fetchMoneyLedger, fetchMoneyPosition } from '@/lib/money-position';
 import { emptyPeriodProfitExtras, fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
 import {
-  sumByMoneyPocket,
   type OperatingCostPeriod,
   type OperatingCostType,
   type ProductUnit,
@@ -28,7 +27,7 @@ export default async function NumerosPage() {
   const range = currentMexicoMonthRange();
   const periodLabel = formatMexicoPeriodLabel(range.start, range.end);
 
-  const [profitBundle, moneyPosition, profitExtras] = await Promise.all([
+  const [profitBundle, moneyPosition, moneyLedger, profitExtras] = await Promise.all([
     canViewProfit
       ? Promise.all([
           supabase.rpc('get_product_margins', { p_branch_id: tenant.branchId }),
@@ -61,7 +60,7 @@ export default async function NumerosPage() {
             .limit(200),
           supabase
             .from('purchases')
-            .select('total_amount, paid_from')
+            .select('total_amount')
             .eq('branch_id', tenant.branchId)
             .gte('purchased_at', range.start)
             .lte('purchased_at', range.end)
@@ -70,6 +69,9 @@ export default async function NumerosPage() {
       : Promise.resolve(null),
     canViewProfit
       ? fetchMoneyPosition(tenant.branchId, range.start, range.end).catch(() => null)
+      : Promise.resolve(null),
+    canViewProfit
+      ? fetchMoneyLedger(tenant.branchId, range.start, range.end)
       : Promise.resolve(null),
     canViewProfit
       ? fetchPeriodProfitExtras(supabase, tenant.branchId, range.start, range.end).catch(() =>
@@ -81,11 +83,9 @@ export default async function NumerosPage() {
   const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
     profitBundle ?? [];
 
-  const initialPurchases = sumByMoneyPocket(
-    (purchaseRows?.data ?? []).map((row) => ({
-      amount: Number(row.total_amount ?? 0),
-      paidFrom: row.paid_from,
-    })),
+  const initialPurchasesTotal = (purchaseRows?.data ?? []).reduce(
+    (sum, row) => sum + Number(row.total_amount ?? 0),
+    0,
   );
 
   return (
@@ -139,9 +139,25 @@ export default async function NumerosPage() {
               notes: string | null;
               paid_from?: 'cash' | 'account' | null;
             }>}
-            initialPurchasesTotal={initialPurchases.total}
-            initialPurchasesCash={initialPurchases.cash}
-            initialPurchasesAccount={initialPurchases.account}
+            initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
+            initialLedgerTotals={
+              moneyLedger?.totals ?? {
+                cashSales: 0,
+                cardSales: 0,
+                transferSales: 0,
+                onlineSales: 0,
+                otherInCash: 0,
+                otherInAccount: 0,
+                purchasesCash: 0,
+                purchasesAccount: 0,
+                expensesCash: 0,
+                expensesAccount: 0,
+                toAccount: 0,
+                toCash: 0,
+                netCash: 0,
+                netAccount: 0,
+              }
+            }
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
             initialZeroCostSold={profitExtras.zeroCostSold ?? []}
             initialMoneyPosition={moneyPosition}
