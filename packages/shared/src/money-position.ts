@@ -17,6 +17,25 @@ export function parseMoneyPocket(value: unknown, fallback: MoneyPocket = 'cash')
   return isMoneyPocket(value) ? value : fallback;
 }
 
+/** Splits amounts by the pocket they left. Missing pocket counts as cash. */
+export function sumByMoneyPocket(
+  rows: Array<{ amount: number; paidFrom?: unknown }>,
+  fallback: MoneyPocket = 'cash',
+): { cash: number; account: number; total: number } {
+  let cash = 0;
+  let account = 0;
+  for (const row of rows) {
+    const amount = Number(row.amount) || 0;
+    if (parseMoneyPocket(row.paidFrom, fallback) === 'account') account += amount;
+    else cash += amount;
+  }
+  return {
+    cash: roundMoney(cash),
+    account: roundMoney(account),
+    total: roundMoney(cash + account),
+  };
+}
+
 export function addPocketOutflow(flows: MoneyPositionFlows, pocket: MoneyPocket, amount: number) {
   if (!(amount > 0)) return;
   if (pocket === 'account') flows.accountOut += amount;
