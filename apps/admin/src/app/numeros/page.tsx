@@ -8,7 +8,12 @@ import { currentMexicoMonthRange, formatMexicoPeriodLabel } from '@/lib/mexico-d
 import { fetchMoneyPosition } from '@/lib/money-position';
 import { emptyPeriodProfitExtras, fetchPeriodProfitExtras } from '@/lib/profit-extras';
 import { getDefaultTenant } from '@/lib/tenant';
-import { type OperatingCostPeriod, type OperatingCostType, type ProductUnit } from '@puertaverde/shared';
+import {
+  sumByMoneyPocket,
+  type OperatingCostPeriod,
+  type OperatingCostType,
+  type ProductUnit,
+} from '@puertaverde/shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,7 +61,7 @@ export default async function NumerosPage() {
             .limit(200),
           supabase
             .from('purchases')
-            .select('total_amount')
+            .select('total_amount, paid_from')
             .eq('branch_id', tenant.branchId)
             .gte('purchased_at', range.start)
             .lte('purchased_at', range.end)
@@ -76,9 +81,11 @@ export default async function NumerosPage() {
   const [margins, costs, summaryRows, categoryRows, visitExpenses, incomeEntries, purchaseRows] =
     profitBundle ?? [];
 
-  const initialPurchasesTotal = (purchaseRows?.data ?? []).reduce(
-    (sum, row) => sum + Number(row.total_amount ?? 0),
-    0,
+  const initialPurchases = sumByMoneyPocket(
+    (purchaseRows?.data ?? []).map((row) => ({
+      amount: Number(row.total_amount ?? 0),
+      paidFrom: row.paid_from,
+    })),
   );
 
   return (
@@ -132,7 +139,9 @@ export default async function NumerosPage() {
               notes: string | null;
               paid_from?: 'cash' | 'account' | null;
             }>}
-            initialPurchasesTotal={Number(initialPurchasesTotal.toFixed(2))}
+            initialPurchasesTotal={initialPurchases.total}
+            initialPurchasesCash={initialPurchases.cash}
+            initialPurchasesAccount={initialPurchases.account}
             initialWasteCost={Number(profitExtras.wasteCost ?? 0)}
             initialZeroCostSold={profitExtras.zeroCostSold ?? []}
             initialMoneyPosition={moneyPosition}

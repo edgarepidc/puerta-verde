@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { sumByMoneyPocket } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
       }),
       supabase
         .from('purchases')
-        .select('total_amount')
+        .select('total_amount, paid_from')
         .eq('branch_id', tenant.branchId)
         .gte('purchased_at', range.start)
         .lte('purchased_at', range.end)
@@ -50,14 +51,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: purchaseError.message }, { status: 400 });
     }
 
-    const purchasesTotal = (purchaseRows ?? []).reduce(
-      (sum, row) => sum + Number(row.total_amount ?? 0),
-      0,
+    const purchases = sumByMoneyPocket(
+      (purchaseRows ?? []).map((row) => ({
+        amount: Number(row.total_amount ?? 0),
+        paidFrom: row.paid_from,
+      })),
     );
 
     return NextResponse.json({
       summary: data?.[0] ?? null,
-      purchasesTotal: Number(purchasesTotal.toFixed(2)),
+      purchasesTotal: purchases.total,
+      purchasesCash: purchases.cash,
+      purchasesAccount: purchases.account,
       wasteCost: extras.wasteCost,
       zeroCostSold: extras.zeroCostSold,
       unpaidRevenue: extras.unpaidRevenue,

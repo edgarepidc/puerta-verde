@@ -421,6 +421,7 @@ export {
   pocketTotal,
   isMoneyPocket,
   parseMoneyPocket,
+  sumByMoneyPocket,
   resolveMoneyPosition,
   validateMoneyPositionInput,
   type MoneyPocket,

@@ -548,6 +548,8 @@ export function ProfitabilityManager({
   initialVisitExpenses,
   initialIncomes,
   initialPurchasesTotal,
+  initialPurchasesCash,
+  initialPurchasesAccount,
   initialWasteCost,
   initialZeroCostSold,
   initialMoneyPosition,
@@ -562,6 +564,8 @@ export function ProfitabilityManager({
   initialVisitExpenses: VisitExpenseRow[];
   initialIncomes: IncomeRow[];
   initialPurchasesTotal: number;
+  initialPurchasesCash: number;
+  initialPurchasesAccount: number;
   initialWasteCost: number;
   initialZeroCostSold: Array<{ name: string; revenue: number }>;
   initialMoneyPosition: MoneyPositionView | null;
@@ -573,6 +577,8 @@ export function ProfitabilityManager({
   const [visitExpenses, setVisitExpenses] = useState(initialVisitExpenses);
   const [incomes, setIncomes] = useState(initialIncomes);
   const [purchasesTotal, setPurchasesTotal] = useState(initialPurchasesTotal);
+  const [purchasesCash, setPurchasesCash] = useState(initialPurchasesCash);
+  const [purchasesAccount, setPurchasesAccount] = useState(initialPurchasesAccount);
   const [wasteCost, setWasteCost] = useState(initialWasteCost);
   const [zeroCostSold, setZeroCostSold] = useState(initialZeroCostSold);
   const [summary, setSummary] = useState(initialSummary);
@@ -756,6 +762,8 @@ export function ProfitabilityManager({
       setCosts(costsPayload.costs);
       setSummary(profitPayload.summary);
       setPurchasesTotal(Number(profitPayload.purchasesTotal ?? 0));
+      setPurchasesCash(Number(profitPayload.purchasesCash ?? profitPayload.purchasesTotal ?? 0));
+      setPurchasesAccount(Number(profitPayload.purchasesAccount ?? 0));
       setWasteCost(Number(profitPayload.wasteCost ?? 0));
       setZeroCostSold(profitPayload.zeroCostSold ?? []);
       setCategories(categoriesPayload.categories);
@@ -1004,8 +1012,7 @@ export function ProfitabilityManager({
 
   const revenue = Number(summary?.revenue ?? 0);
   const cogs = Number(summary?.cogs ?? 0);
-  const cashOut =
-    purchasesTotal + Number(summary?.operating_costs_total ?? 0);
+  const cashOut = purchasesCash + Number(summary?.operating_costs_total ?? 0);
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
     .reduce((sum, row) => sum + Number(row.amount), 0);
@@ -1163,6 +1170,11 @@ export function ProfitabilityManager({
             tone="slate"
             label="Salió de caja"
             value={formatMoney(cashOut)}
+            hint={
+              purchasesAccount > 0
+                ? `Cuenta ${formatMoney(purchasesAccount)} no entra`
+                : undefined
+            }
           />
           <MetricCard
             emoji="🏷️"

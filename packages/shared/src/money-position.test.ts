@@ -9,6 +9,7 @@ import {
   isCollectedTicket,
   pocketTotal,
   resolveMoneyPosition,
+  sumByMoneyPocket,
   ticketCollectedAmount,
   ticketMoneyPocket,
   validateMoneyPositionInput,
@@ -82,6 +83,17 @@ test('resolveMoneyPosition without a snapshot is just the period flow', () => {
   assert.equal(result.source, 'period');
   assert.equal(result.cash, 60);
   assert.equal(result.account, 70);
+});
+
+test('sumByMoneyPocket keeps account purchases out of the cash sum', () => {
+  const split = sumByMoneyPocket([
+    { amount: 100, paidFrom: 'cash' },
+    { amount: 40, paidFrom: 'account' },
+    { amount: 10 },
+  ]);
+  assert.equal(split.cash, 110);
+  assert.equal(split.account, 40);
+  assert.equal(split.total, 150);
 });
 
 test('addPocketOutflow sends cash and account to different pockets', () => {
