@@ -440,6 +440,7 @@ export {
   emptyMoneyDay,
   moneyDayAuditMovements,
   moneyDayHasActivity,
+  pocketOutflows,
   isRecordedAfterCount,
   moneyLedgerRowYmd,
   type MoneyDayDetail,

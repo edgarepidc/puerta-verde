@@ -201,6 +201,24 @@ export function addCollectedTicketMethods(
   addSaleMethod(day, order.payment_method, ticketCollectedAmount(order));
 }
 
+/** Money that left each pocket. A transfer counts only on the pocket it left. */
+export function pocketOutflows(
+  totals: Pick<
+    MoneyLedgerTotals,
+    | 'purchasesCash'
+    | 'purchasesAccount'
+    | 'expensesCash'
+    | 'expensesAccount'
+    | 'toAccount'
+    | 'toCash'
+  >,
+): { cash: number; account: number } {
+  return {
+    cash: roundMoney(totals.purchasesCash + totals.expensesCash + totals.toAccount),
+    account: roundMoney(totals.purchasesAccount + totals.expensesAccount + totals.toCash),
+  };
+}
+
 export function applyMoneyDayNets(day: MoneyDayRow): void {
   const cashIn = day.cashSales + day.otherInCash + day.toCash;
   const cashOut = day.purchasesCash + day.expensesCash + day.toAccount;

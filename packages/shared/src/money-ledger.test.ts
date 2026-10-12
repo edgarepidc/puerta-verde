@@ -9,7 +9,21 @@ import {
   moneyDayAuditMovements,
   moneyDayHasActivity,
   moneyLedgerRowYmd,
+  pocketOutflows,
 } from './money-ledger';
+
+test('pocketOutflows counts a deposit only as cash leaving the drawer', () => {
+  const out = pocketOutflows({
+    purchasesCash: 5863.94,
+    purchasesAccount: 7363.98,
+    expensesCash: 550,
+    expensesAccount: 9845,
+    toAccount: 1775,
+    toCash: 0,
+  });
+  assert.equal(out.cash, 8188.94);
+  assert.equal(out.account, 17208.98);
+});
 
 test('eachInclusiveYmd walks calendar days', () => {
   assert.deepEqual(eachInclusiveYmd('2026-09-29', '2026-10-01'), [
