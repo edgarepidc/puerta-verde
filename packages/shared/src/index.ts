@@ -441,7 +441,6 @@ export {
   moneyDayAuditMovements,
   moneyDayHasActivity,
   pocketOutflows,
-  isRecordedAfterCount,
   moneyLedgerRowYmd,
   type MoneyDayDetail,
   type MoneyDayRow,

@@ -61,7 +61,13 @@ interface Withdrawal {
   destination?: 'cash' | 'account' | null;
 }
 
-export function CashClosingManager({ canManage = true }: { canManage?: boolean }) {
+export function CashClosingManager({
+  canManage = true,
+  canRevise = false,
+}: {
+  canManage?: boolean;
+  canRevise?: boolean;
+}) {
   const todayYmd = todayMexicoYmd();
   const [selectedDate, setSelectedDate] = useState(todayYmd);
   const [summary, setSummary] = useState<CashSummary | null>(null);
@@ -171,8 +177,13 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
   }, [selectedDate]);
 
   async function closeDay() {
-    if (!canManage) {
-      setError('No tienes permiso para cerrar caja');
+    const revising = Boolean(summary?.closing);
+    if (revising ? !canRevise : !canManage) {
+      setError(
+        revising
+          ? 'Solo un administrador puede corregir un día ya cerrado'
+          : 'No tienes permiso para cerrar caja',
+      );
       return;
     }
     const validation = cashCloseValidationError({
@@ -231,6 +242,8 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
     .reduce((sum, w) => sum + Number(w.amount), 0);
 
   const isToday = selectedDate === todayYmd;
+  const dayClosed = Boolean(summary?.closing);
+  const canEditClose = dayClosed ? canRevise : canManage;
 
   return (
     <div className="space-y-6">
@@ -360,7 +373,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           title="Cerrar caja"
           hint={
             summary.closing
-              ? `Cerrado · ${summary.branchName}`
+              ? `Historial del día · ${summary.branchName}`
               : `Fondo, conteo y notas · ${summary.branchName}`
           }
           emoji="🧾"
@@ -368,7 +381,7 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
           actions={
             summary.closing ? (
               <ActionChip as="span" emoji="✅" elevated={false}>
-                Cerrado
+                Guardado
               </ActionChip>
             ) : undefined
           }
@@ -381,13 +394,13 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               icon="$"
               tone="slate"
               className="w-[9.75rem] shrink-0"
-              disabled={Boolean(summary.closing)}
+              disabled={!canEditClose}
             >
               <DecimalInput
                 className={pillInputClass('slate')}
                 value={openingFloat}
                 onChange={setOpeningFloat}
-                disabled={Boolean(summary.closing)}
+                disabled={!canEditClose}
                 groupThousands
               />
             </PillField>
@@ -396,13 +409,13 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               icon="$"
               tone="emerald"
               className="w-[9.75rem] shrink-0"
-              disabled={Boolean(summary.closing)}
+              disabled={!canEditClose}
             >
               <DecimalInput
                 className={pillInputClass('emerald')}
                 value={countedCash}
                 onChange={setCountedCash}
-                disabled={Boolean(summary.closing)}
+                disabled={!canEditClose}
                 groupThousands
               />
             </PillField>
@@ -411,26 +424,32 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
               icon="📝"
               tone="sky"
               className="min-w-[10rem] flex-1"
-              disabled={!canManage || Boolean(summary.closing)}
+              disabled={!canEditClose}
             >
               <input
                 type="text"
                 className={pillInputClass('sky')}
                 value={notes}
-                disabled={!canManage || Boolean(summary.closing)}
+                disabled={!canEditClose}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
               />
             </PillField>
-            {canManage ? (
+            {canEditClose ? (
               <ActionChip
                 className="shrink-0"
                 emoji="💰"
-                tone={summary.closing ? 'slate' : 'amber'}
-                disabled={closing || Boolean(summary.closing) || closeBlocked}
+                tone={summary.closing ? 'sky' : 'amber'}
+                disabled={closing || closeBlocked}
                 onClick={closeDay}
               >
-                {summary.closing ? 'Caja cerrada' : closing ? 'Cerrando…' : 'Cerrar caja del día'}
+                {summary.closing
+                  ? closing
+                    ? 'Guardando…'
+                    : 'Guardar cambio'
+                  : closing
+                    ? 'Cerrando…'
+                    : 'Cerrar caja del día'}
               </ActionChip>
             ) : null}
           </div>
@@ -443,9 +462,19 @@ export function CashClosingManager({ canManage = true }: { canManage?: boolean }
             />
           ) : null}
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {canManage && !summary.closing ? (
+          {canEditClose && !summary.closing ? (
             <p className="text-xs text-slate-500">
-              El conteo es obligatorio. Si no cuadra, anota por qué.
+              El conteo es obligatorio. Si no cuadra, anota por qué. Queda como historial del día y no cambia el total.
+            </p>
+          ) : null}
+          {summary.closing && canRevise ? (
+            <p className="text-xs text-slate-500">
+              Puedes corregir el conteo o las notas de este día. Caja y cuenta siguen las ventas y compras actuales.
+            </p>
+          ) : null}
+          {summary.closing && !canRevise ? (
+            <p className="text-xs text-slate-500">
+              Este día ya quedó registrado. Solo un administrador puede corregirlo.
             </p>
           ) : null}
         </div>

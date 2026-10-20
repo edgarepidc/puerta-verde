@@ -57,7 +57,7 @@ export async function PUT() {
   return NextResponse.json(
     {
       error:
-        'Tienes ya no se ajusta a mano. Cada venta, gasto, renta, compra, depósito o cierre de caja lo mueve.',
+        'Tienes sigue las ventas, compras y gastos con su forma de pago. El cierre solo guarda el conteo del día.',
     },
     { status: 403 },
   );

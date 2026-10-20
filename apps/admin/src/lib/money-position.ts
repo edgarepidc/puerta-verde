@@ -5,13 +5,10 @@ import {
   applyOperatingCostsToPockets,
   buildMoneyLedger,
   isIncomeEntryType,
-  isRecordedAfterCount,
   moneyLedgerRowYmd,
   parseIncomePocket,
   parseMoneyPocket,
-  pocketTotal,
   roundMoney,
-  validateMoneyPositionInput,
   type MoneyLedger,
   type MoneyPositionFlows,
   type MoneyPositionView,
@@ -66,18 +63,10 @@ export async function fetchMoneyPosition(
   to: string,
 ): Promise<MoneyPositionView> {
   const supabase = createAdminClient();
-  const [{ data: snapshotRow }, { data: baselineRow }, { data: costRows }] = await Promise.all([
+  const [{ data: baselineRow }, { data: costRows }] = await Promise.all([
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
-      .eq('branch_id', branchId)
-      .lte('as_of_date', to)
-      .order('as_of_date', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('branch_money_positions')
-      .select('as_of_date, account_amount')
+      .select('as_of_date, cash_amount, account_amount, notes')
       .eq('branch_id', branchId)
       .lte('as_of_date', to)
       .order('as_of_date', { ascending: true })
@@ -89,11 +78,12 @@ export async function fetchMoneyPosition(
       .eq('branch_id', branchId),
   ]);
 
-  const snapshot = snapshotRow
+  const baseline = baselineRow
     ? {
-        asOfDate: snapshotRow.as_of_date,
-        cash: Number(snapshotRow.cash_amount),
-        account: Number(snapshotRow.account_amount),
+        asOfDate: baselineRow.as_of_date,
+        cash: Number(baselineRow.cash_amount),
+        account: Number(baselineRow.account_amount),
+        notes: baselineRow.notes,
       }
     : null;
 
@@ -106,32 +96,16 @@ export async function fetchMoneyPosition(
     terms: row.terms ?? [],
   }));
 
-  const accountBaseline = baselineRow
-    ? {
-        asOfDate: baselineRow.as_of_date,
-        account: Number(baselineRow.account_amount),
-      }
-    : null;
-  const cashStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
-  const accountStart = accountBaseline ? addMexicoDays(accountBaseline.asOfDate, 1) : from;
-  const movementStart = cashStart < accountStart ? cashStart : accountStart;
-  const countedAt = snapshotRow?.updated_at || snapshotRow?.created_at || null;
-
+  const movementStart = baseline ? addMexicoDays(baseline.asOfDate, 1) : from;
   const flows = emptyFlows();
   const ticketFlows = emptyFlows();
   const inRange = (ymd: string) => ymd >= from && ymd <= to;
-  const affectsCash = (ymd: string, recordedAt?: string | null) => {
-    if (!snapshot) return inRange(ymd);
-    if (ymd > snapshot.asOfDate && ymd <= to) return true;
-    return ymd === snapshot.asOfDate && isRecordedAfterCount(recordedAt, countedAt);
-  };
-  const affectsAccount = (ymd: string) => {
-    if (!accountBaseline) return inRange(ymd);
-    return ymd > accountBaseline.asOfDate && ymd <= to;
+  const affects = (ymd: string) => {
+    if (!baseline) return inRange(ymd);
+    return ymd > baseline.asOfDate && ymd <= to;
   };
 
-  let cashOrderCount = 0;
-  let accountOrderCount = 0;
+  let orderCount = 0;
 
   if (movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
@@ -198,53 +172,45 @@ export async function fetchMoneyPosition(
 
     for (const order of orders) {
       const ymd = moneyLedgerRowYmd(order.paid_at);
-      const sides = { cash: affectsCash(ymd, order.created_at), account: affectsAccount(ymd) };
-      if (!sides.cash && !sides.account) continue;
+      if (!affects(ymd)) continue;
       const ticket = emptyFlows();
       addCollectedTicket(ticket, order);
-      addSelectedPockets(flows, ticket, sides);
-      if (!snapshot || ymd > snapshot.asOfDate || isRecordedAfterCount(order.created_at, countedAt)) {
-        addCollectedTicket(ticketFlows, order);
-      }
-      if (sides.cash && (!snapshot || ymd > snapshot.asOfDate)) cashOrderCount += 1;
-      if (sides.account) accountOrderCount += 1;
+      addSelectedPockets(flows, ticket, { cash: true, account: true });
+      addCollectedTicket(ticketFlows, order);
+      orderCount += 1;
     }
 
     for (const row of purchases) {
       const ymd = moneyLedgerRowYmd(row.purchased_at);
-      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
-      if (!sides.cash && !sides.account) continue;
+      if (!affects(ymd)) continue;
       const purchase = emptyFlows();
       addPocketOutflow(purchase, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
-      addSelectedPockets(flows, purchase, sides);
+      addSelectedPockets(flows, purchase, { cash: true, account: true });
     }
 
     for (const row of expenses) {
       const ymd = moneyLedgerRowYmd(row.expense_date);
-      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
-      if (!sides.cash && !sides.account) continue;
+      if (!affects(ymd)) continue;
       const expense = emptyFlows();
       addPocketOutflow(expense, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
-      addSelectedPockets(flows, expense, sides);
+      addSelectedPockets(flows, expense, { cash: true, account: true });
     }
 
     for (const row of incomes) {
       const ymd = moneyLedgerRowYmd(row.entry_date);
-      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
-      if (!sides.cash && !sides.account) continue;
+      if (!affects(ymd)) continue;
       const income = emptyFlows();
       addPocketInflow(
         income,
         parseIncomePocket(row.paid_from, row.entry_type),
         Number(row.amount ?? 0),
       );
-      addSelectedPockets(flows, income, sides);
+      addSelectedPockets(flows, income, { cash: true, account: true });
     }
 
     for (const row of transferRows) {
       const ymd = moneyLedgerRowYmd(row.withdrawal_date);
-      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
-      if (!sides.cash && !sides.account) continue;
+      if (!affects(ymd)) continue;
       const transfer = emptyFlows();
       const amount = Number(row.amount ?? 0);
       if (parseMoneyPocket(row.destination, 'account') === 'cash') {
@@ -254,30 +220,17 @@ export async function fetchMoneyPosition(
         transfer.cashOut += amount;
         transfer.accountIn += amount;
       }
-      addSelectedPockets(flows, transfer, sides);
+      addSelectedPockets(flows, transfer, { cash: true, account: true });
     }
 
-    if (accountStart <= to) {
-      const accountCosts = emptyFlows();
-      applyOperatingCostsToPockets(accountCosts, costs, {
-        from: accountStart,
+    if (movementStart <= to) {
+      applyOperatingCostsToPockets(flows, costs, {
+        from: movementStart,
         to,
-        dayBeforeFrom: addMexicoDays(accountStart, -1),
-        orderCount: accountOrderCount,
+        dayBeforeFrom: addMexicoDays(movementStart, -1),
+        orderCount,
         mode: 'outflow',
       });
-      addSelectedPockets(flows, accountCosts, { cash: false, account: true });
-    }
-    if (cashStart <= to) {
-      const cashCosts = emptyFlows();
-      applyOperatingCostsToPockets(cashCosts, costs, {
-        from: cashStart,
-        to,
-        dayBeforeFrom: addMexicoDays(cashStart, -1),
-        orderCount: cashOrderCount,
-        mode: 'outflow',
-      });
-      addSelectedPockets(flows, cashCosts, { cash: true, account: false });
     }
   }
 
@@ -287,22 +240,20 @@ export async function fetchMoneyPosition(
     cashOut: roundMoney(flows.cashOut),
     accountOut: roundMoney(flows.accountOut),
   };
-  const cash = roundMoney((snapshot?.cash ?? 0) + roundedFlows.cashIn - roundedFlows.cashOut);
-  const account = roundMoney(
-    (accountBaseline?.account ?? 0) + roundedFlows.accountIn - roundedFlows.accountOut,
-  );
+  const cash = roundMoney((baseline?.cash ?? 0) + roundedFlows.cashIn - roundedFlows.cashOut);
+  const account = roundMoney((baseline?.account ?? 0) + roundedFlows.accountIn - roundedFlows.accountOut);
   const ticketInCash = roundMoney(ticketFlows.cashIn);
   const ticketInAccount = roundMoney(ticketFlows.accountIn);
 
   return {
     cash,
     account,
-    source: snapshot ? 'projected' : 'period',
-    snapshotAsOf: snapshot?.asOfDate ?? null,
+    source: baseline ? 'projected' : 'period',
+    snapshotAsOf: baseline?.asOfDate ?? null,
     asOfDate: to,
-    notes: snapshot && snapshot.asOfDate >= to ? (snapshotRow?.notes ?? null) : null,
-    openingTotal: snapshot ? pocketTotal(snapshot) : 0,
-    openingAsOf: snapshot?.asOfDate ?? null,
+    notes: baseline && baseline.asOfDate >= to ? (baseline.notes ?? null) : null,
+    openingTotal: baseline ? roundMoney(baseline.cash + baseline.account) : 0,
+    openingAsOf: baseline?.asOfDate ?? null,
     periodIn: roundMoney(roundedFlows.cashIn + roundedFlows.accountIn),
     periodOut: roundMoney(roundedFlows.cashOut + roundedFlows.accountOut),
     ticketIn: roundMoney(ticketInCash + ticketInAccount),
@@ -310,58 +261,6 @@ export async function fetchMoneyPosition(
     ticketInAccount,
     pausedIn: 0,
   };
-}
-
-export async function saveMoneyPositionSnapshot(input: {
-  branchId: string;
-  cashAmount: number;
-  accountAmount: number;
-  asOfDate: string;
-  notes?: string | null;
-  userId: string | null;
-}): Promise<MoneyPositionView> {
-  const validationError = validateMoneyPositionInput({
-    cashAmount: input.cashAmount,
-    accountAmount: input.accountAmount,
-    asOfDate: input.asOfDate,
-    notes: input.notes ?? null,
-  });
-  if (validationError) throw new Error(validationError);
-
-  const supabase = createAdminClient();
-  const { error } = await supabase.from('branch_money_positions').upsert(
-    {
-      branch_id: input.branchId,
-      as_of_date: input.asOfDate,
-      cash_amount: input.cashAmount,
-      account_amount: input.accountAmount,
-      notes: input.notes?.trim() ? input.notes.trim() : null,
-      created_by: input.userId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'branch_id,as_of_date' },
-  );
-  if (error) throw new Error(error.message);
-
-  return fetchMoneyPosition(input.branchId, input.asOfDate, input.asOfDate);
-}
-
-/** Closing caja writes Tienes cash so efectivo and cuenta stay one book. */
-export async function syncTienesFromCashClose(input: {
-  branchId: string;
-  closingDate: string;
-  countedCash: number;
-  userId: string | null;
-}): Promise<MoneyPositionView> {
-  const current = await fetchMoneyPosition(input.branchId, input.closingDate, input.closingDate);
-  return saveMoneyPositionSnapshot({
-    branchId: input.branchId,
-    cashAmount: input.countedCash,
-    accountAmount: current.account,
-    asOfDate: input.closingDate,
-    notes: current.notes?.trim() || 'Cierre de caja',
-    userId: input.userId,
-  });
 }
 
 export async function fetchMoneyLedger(
@@ -376,7 +275,8 @@ export async function fetchMoneyLedger(
 
   const [
     openingView,
-    { data: countRows },
+    { data: baselineRow },
+    { data: closingRows },
     { data: costRows },
     tickets,
     purchases,
@@ -387,11 +287,19 @@ export async function fetchMoneyLedger(
     fetchMoneyPosition(branchId, dayBefore, dayBefore),
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount, created_at, updated_at')
+      .select('as_of_date, cash_amount, account_amount')
       .eq('branch_id', branchId)
-      .gte('as_of_date', from)
       .lte('as_of_date', to)
-      .order('as_of_date', { ascending: true }),
+      .order('as_of_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('daily_cash_closings')
+      .select('closing_date, counted_cash')
+      .eq('branch_id', branchId)
+      .gte('closing_date', from)
+      .lte('closing_date', to)
+      .order('closing_date', { ascending: true }),
     supabase
       .from('branch_operating_costs')
       .select('name, category, cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
@@ -456,13 +364,21 @@ export async function fetchMoneyLedger(
     ),
   ]);
 
-  const opening = openingView.openingAsOf
+  const baseline = baselineRow
     ? {
-        asOfDate: openingView.openingAsOf,
-        cash: openingView.cash,
-        account: openingView.account,
+        asOfDate: baselineRow.as_of_date,
+        cash: Number(baselineRow.cash_amount),
+        account: Number(baselineRow.account_amount),
       }
     : null;
+  const opening =
+    baseline && baseline.asOfDate <= dayBefore
+      ? {
+          asOfDate: dayBefore,
+          cash: openingView.cash,
+          account: openingView.account,
+        }
+      : baseline;
 
   const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
     name: row.name,
@@ -479,11 +395,11 @@ export async function fetchMoneyLedger(
     from,
     to,
     opening,
-    counts: (countRows ?? []).map((row) => ({
-      asOfDate: row.as_of_date,
-      cash: Number(row.cash_amount),
-      account: Number(row.account_amount),
-      countedAt: row.updated_at || row.created_at,
+    counts: (closingRows ?? []).map((row) => ({
+      asOfDate: row.closing_date,
+      cash: row.counted_cash == null ? 0 : Number(row.counted_cash),
+      account: 0,
+      countedCash: row.counted_cash == null ? null : Number(row.counted_cash),
     })),
     tickets: tickets.map((row) => ({
       ymd: moneyLedgerRowYmd(row.paid_at),

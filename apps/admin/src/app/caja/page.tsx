@@ -11,10 +11,11 @@ export default async function CajaPage() {
 
   const permissionMatrix = await loadPermissionMatrix(staff.organizationId);
   const canManage = staffHasPermission(staff, 'cash.closing', permissionMatrix);
+  const canRevise = staffHasPermission(staff, 'cash.revise', permissionMatrix);
 
   return (
     <AdminShell title="Caja" subtitle={`${staff.branchName} · Pagos del día`}>
-      <CashClosingManager canManage={canManage} />
+      <CashClosingManager canManage={canManage} canRevise={canRevise} />
     </AdminShell>
   );
 }
