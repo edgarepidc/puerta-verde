@@ -461,13 +461,14 @@ export function buildMoneyLedger(input: {
     if (count) {
       day.counted = true;
       const netCashForCount = day.netCash - extra.cash;
-      const netAccountForCount = day.netAccount - extra.account;
       if (tracking) {
         day.countAdjustCash = roundMoney(count.cash - roundMoney(cash + netCashForCount));
-        day.countAdjustAccount = roundMoney(count.account - roundMoney(account + netAccountForCount));
+        // Account follows the current tag (efectivo, TPV, compra de cuenta).
+        // The saved count is not a bank recount, so a later correction must move the total.
+        day.countAdjustAccount = 0;
       }
       cash = roundMoney(count.cash + extra.cash);
-      account = roundMoney(count.account + extra.account);
+      account = roundMoney(account + day.netAccount);
       tracking = true;
       pendingPausedCash = count.asOfDate < input.to ? roundMoney(count.pausedCash ?? 0) : 0;
       pendingPausedAccount = count.asOfDate < input.to ? roundMoney(count.pausedAccount ?? 0) : 0;
