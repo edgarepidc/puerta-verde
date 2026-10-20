@@ -2,15 +2,14 @@ import {
   addCollectedTicket,
   addPocketInflow,
   addPocketOutflow,
-  applyCashPocketTransfer,
   applyOperatingCostsToPockets,
   buildMoneyLedger,
   isIncomeEntryType,
+  isRecordedAfterCount,
   moneyLedgerRowYmd,
   parseIncomePocket,
   parseMoneyPocket,
   pocketTotal,
-  resolveMoneyPosition,
   roundMoney,
   validateMoneyPositionInput,
   type MoneyLedger,
@@ -42,19 +41,46 @@ async function fetchPaged<T>(
   return rows;
 }
 
+function emptyFlows(): MoneyPositionFlows {
+  return { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
+}
+
+function addSelectedPockets(
+  target: MoneyPositionFlows,
+  source: MoneyPositionFlows,
+  sides: { cash: boolean; account: boolean },
+) {
+  if (sides.cash) {
+    target.cashIn += source.cashIn;
+    target.cashOut += source.cashOut;
+  }
+  if (sides.account) {
+    target.accountIn += source.accountIn;
+    target.accountOut += source.accountOut;
+  }
+}
+
 export async function fetchMoneyPosition(
   branchId: string,
   from: string,
   to: string,
 ): Promise<MoneyPositionView> {
   const supabase = createAdminClient();
-  const [{ data: snapshotRow }, { data: costRows }] = await Promise.all([
+  const [{ data: snapshotRow }, { data: baselineRow }, { data: costRows }] = await Promise.all([
     supabase
       .from('branch_money_positions')
       .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
       .eq('branch_id', branchId)
       .lte('as_of_date', to)
       .order('as_of_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('branch_money_positions')
+      .select('as_of_date, account_amount')
+      .eq('branch_id', branchId)
+      .lte('as_of_date', to)
+      .order('as_of_date', { ascending: true })
       .limit(1)
       .maybeSingle(),
     supabase
@@ -80,14 +106,34 @@ export async function fetchMoneyPosition(
     terms: row.terms ?? [],
   }));
 
-  const closesThisPeriod = Boolean(snapshot && snapshot.asOfDate >= to);
-  const movementStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
+  const accountBaseline = baselineRow
+    ? {
+        asOfDate: baselineRow.as_of_date,
+        account: Number(baselineRow.account_amount),
+      }
+    : null;
+  const cashStart = snapshot ? addMexicoDays(snapshot.asOfDate, 1) : from;
+  const accountStart = accountBaseline ? addMexicoDays(accountBaseline.asOfDate, 1) : from;
+  const movementStart = cashStart < accountStart ? cashStart : accountStart;
+  const countedAt = snapshotRow?.updated_at || snapshotRow?.created_at || null;
 
-  const flows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-  const ticketFlows: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-  let transfers: Array<{ amount: number; destination: string | null }> = [];
+  const flows = emptyFlows();
+  const ticketFlows = emptyFlows();
+  const inRange = (ymd: string) => ymd >= from && ymd <= to;
+  const affectsCash = (ymd: string, recordedAt?: string | null) => {
+    if (!snapshot) return inRange(ymd);
+    if (ymd > snapshot.asOfDate && ymd <= to) return true;
+    return ymd === snapshot.asOfDate && isRecordedAfterCount(recordedAt, countedAt);
+  };
+  const affectsAccount = (ymd: string) => {
+    if (!accountBaseline) return inRange(ymd);
+    return ymd > accountBaseline.asOfDate && ymd <= to;
+  };
 
-  if (!closesThisPeriod && movementStart <= to) {
+  let cashOrderCount = 0;
+  let accountOrderCount = 0;
+
+  if (movementStart <= to) {
     const saleStart = mexicoYmdBoundsIso(movementStart).start;
     const saleEnd = mexicoYmdBoundsIso(to).end;
 
@@ -96,7 +142,7 @@ export async function fetchMoneyPosition(
         supabase
           .from('orders')
           .select(
-            'status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee, total',
+            'paid_at, created_at, status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee',
           )
           .eq('branch_id', branchId)
           .eq('payment_status', 'paid')
@@ -108,7 +154,7 @@ export async function fetchMoneyPosition(
       fetchPaged((rangeFrom, rangeTo) =>
         supabase
           .from('purchases')
-          .select('total_amount, paid_from')
+          .select('purchased_at, created_at, total_amount, paid_from')
           .eq('branch_id', branchId)
           .gte('purchased_at', movementStart)
           .lte('purchased_at', to)
@@ -117,7 +163,7 @@ export async function fetchMoneyPosition(
       fetchPaged((rangeFrom, rangeTo) =>
         supabase
           .from('expenses')
-          .select('amount, paid_from')
+          .select('expense_date, created_at, amount, paid_from')
           .eq('branch_id', branchId)
           .gte('expense_date', movementStart)
           .lte('expense_date', to)
@@ -126,53 +172,113 @@ export async function fetchMoneyPosition(
       fetchPaged((rangeFrom, rangeTo) =>
         supabase
           .from('income_entries')
-          .select('entry_type, amount, paid_from')
+          .select('entry_date, created_at, entry_type, amount, paid_from')
           .eq('branch_id', branchId)
           .gte('entry_date', movementStart)
           .lte('entry_date', to)
           .range(rangeFrom, rangeTo),
       ),
-      fetchPaged<{ amount: number; destination: string | null }>((rangeFrom, rangeTo) =>
+      fetchPaged<{
+        withdrawal_date: string;
+        created_at: string;
+        amount: number;
+        destination: string | null;
+      }>((rangeFrom, rangeTo) =>
         // Table is not in generated types yet.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from('cash_withdrawals')
-          .select('amount, destination')
+          .select('withdrawal_date, created_at, amount, destination')
           .eq('branch_id', branchId)
           .gte('withdrawal_date', movementStart)
           .lte('withdrawal_date', to)
           .range(rangeFrom, rangeTo),
       ),
     ]);
-    transfers = transferRows;
 
     for (const order of orders) {
-      addCollectedTicket(flows, order);
-      addCollectedTicket(ticketFlows, order);
+      const ymd = moneyLedgerRowYmd(order.paid_at);
+      const sides = { cash: affectsCash(ymd, order.created_at), account: affectsAccount(ymd) };
+      if (!sides.cash && !sides.account) continue;
+      const ticket = emptyFlows();
+      addCollectedTicket(ticket, order);
+      addSelectedPockets(flows, ticket, sides);
+      if (!snapshot || ymd > snapshot.asOfDate || isRecordedAfterCount(order.created_at, countedAt)) {
+        addCollectedTicket(ticketFlows, order);
+      }
+      if (sides.cash && (!snapshot || ymd > snapshot.asOfDate)) cashOrderCount += 1;
+      if (sides.account) accountOrderCount += 1;
     }
 
     for (const row of purchases) {
-      addPocketOutflow(flows, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
+      const ymd = moneyLedgerRowYmd(row.purchased_at);
+      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
+      if (!sides.cash && !sides.account) continue;
+      const purchase = emptyFlows();
+      addPocketOutflow(purchase, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
+      addSelectedPockets(flows, purchase, sides);
     }
+
     for (const row of expenses) {
-      addPocketOutflow(flows, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
+      const ymd = moneyLedgerRowYmd(row.expense_date);
+      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
+      if (!sides.cash && !sides.account) continue;
+      const expense = emptyFlows();
+      addPocketOutflow(expense, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
+      addSelectedPockets(flows, expense, sides);
     }
 
     for (const row of incomes) {
+      const ymd = moneyLedgerRowYmd(row.entry_date);
+      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
+      if (!sides.cash && !sides.account) continue;
+      const income = emptyFlows();
       addPocketInflow(
-        flows,
+        income,
         parseIncomePocket(row.paid_from, row.entry_type),
         Number(row.amount ?? 0),
       );
+      addSelectedPockets(flows, income, sides);
     }
 
-    applyOperatingCostsToPockets(flows, costs, {
-      from: movementStart,
-      to,
-      dayBeforeFrom: addMexicoDays(movementStart, -1),
-      orderCount: orders.length,
-      mode: 'outflow',
-    });
+    for (const row of transferRows) {
+      const ymd = moneyLedgerRowYmd(row.withdrawal_date);
+      const sides = { cash: affectsCash(ymd, row.created_at), account: affectsAccount(ymd) };
+      if (!sides.cash && !sides.account) continue;
+      const transfer = emptyFlows();
+      const amount = Number(row.amount ?? 0);
+      if (parseMoneyPocket(row.destination, 'account') === 'cash') {
+        transfer.accountOut += amount;
+        transfer.cashIn += amount;
+      } else {
+        transfer.cashOut += amount;
+        transfer.accountIn += amount;
+      }
+      addSelectedPockets(flows, transfer, sides);
+    }
+
+    if (accountStart <= to) {
+      const accountCosts = emptyFlows();
+      applyOperatingCostsToPockets(accountCosts, costs, {
+        from: accountStart,
+        to,
+        dayBeforeFrom: addMexicoDays(accountStart, -1),
+        orderCount: accountOrderCount,
+        mode: 'outflow',
+      });
+      addSelectedPockets(flows, accountCosts, { cash: false, account: true });
+    }
+    if (cashStart <= to) {
+      const cashCosts = emptyFlows();
+      applyOperatingCostsToPockets(cashCosts, costs, {
+        from: cashStart,
+        to,
+        dayBeforeFrom: addMexicoDays(cashStart, -1),
+        orderCount: cashOrderCount,
+        mode: 'outflow',
+      });
+      addSelectedPockets(flows, cashCosts, { cash: true, account: false });
+    }
   }
 
   const roundedFlows = {
@@ -181,121 +287,24 @@ export async function fetchMoneyPosition(
     cashOut: roundMoney(flows.cashOut),
     accountOut: roundMoney(flows.accountOut),
   };
-
-  const resolved = resolveMoneyPosition({
-    snapshot,
-    periodEnd: to,
-    flows: roundedFlows,
-  });
-
-  const pockets = { cash: resolved.cash, account: resolved.account };
-  for (const row of transfers) {
-    applyCashPocketTransfer(
-      pockets,
-      parseMoneyPocket(row.destination, 'account'),
-      Number(row.amount ?? 0),
-    );
-  }
-
-  const countedAt = snapshotRow?.updated_at || snapshotRow?.created_at;
-  const afterCount: MoneyPositionFlows = { cashIn: 0, accountIn: 0, cashOut: 0, accountOut: 0 };
-  if (snapshot && countedAt) {
-    const dayBounds = mexicoYmdBoundsIso(snapshot.asOfDate);
-    const [lateOrders, latePurchases, lateExpenses, lateIncomes, lateTransfers] = await Promise.all([
-      fetchPaged((rangeFrom, rangeTo) =>
-        supabase
-          .from('orders')
-          .select(
-            'status, payment_status, payment_method, payment_splits, subtotal, discount_amount, delivery_fee, total',
-          )
-          .eq('branch_id', branchId)
-          .eq('payment_status', 'paid')
-          .neq('status', 'cancelled')
-          .gte('paid_at', dayBounds.start)
-          .lt('paid_at', dayBounds.end)
-          .gt('created_at', countedAt)
-          .range(rangeFrom, rangeTo),
-      ),
-      fetchPaged((rangeFrom, rangeTo) =>
-        supabase
-          .from('purchases')
-          .select('total_amount, paid_from')
-          .eq('branch_id', branchId)
-          .eq('purchased_at', snapshot.asOfDate)
-          .gt('created_at', countedAt)
-          .range(rangeFrom, rangeTo),
-      ),
-      fetchPaged((rangeFrom, rangeTo) =>
-        supabase
-          .from('expenses')
-          .select('amount, paid_from')
-          .eq('branch_id', branchId)
-          .eq('expense_date', snapshot.asOfDate)
-          .gt('created_at', countedAt)
-          .range(rangeFrom, rangeTo),
-      ),
-      fetchPaged((rangeFrom, rangeTo) =>
-        supabase
-          .from('income_entries')
-          .select('entry_type, amount, paid_from')
-          .eq('branch_id', branchId)
-          .eq('entry_date', snapshot.asOfDate)
-          .gt('created_at', countedAt)
-          .range(rangeFrom, rangeTo),
-      ),
-      fetchPaged<{ amount: number; destination: string | null }>((rangeFrom, rangeTo) =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any)
-          .from('cash_withdrawals')
-          .select('amount, destination')
-          .eq('branch_id', branchId)
-          .eq('withdrawal_date', snapshot.asOfDate)
-          .gt('created_at', countedAt)
-          .range(rangeFrom, rangeTo),
-      ),
-    ]);
-
-    for (const order of lateOrders) {
-      addCollectedTicket(afterCount, order);
-      addCollectedTicket(ticketFlows, order);
-    }
-    for (const row of latePurchases) {
-      addPocketOutflow(afterCount, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
-    }
-    for (const row of lateExpenses) {
-      addPocketOutflow(afterCount, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
-    }
-    for (const row of lateIncomes) {
-      addPocketInflow(
-        afterCount,
-        parseIncomePocket(row.paid_from, row.entry_type),
-        Number(row.amount ?? 0),
-      );
-    }
-    pockets.cash = roundMoney(pockets.cash + afterCount.cashIn - afterCount.cashOut);
-    pockets.account = roundMoney(pockets.account + afterCount.accountIn - afterCount.accountOut);
-    for (const row of lateTransfers) {
-      applyCashPocketTransfer(
-        pockets,
-        parseMoneyPocket(row.destination, 'account'),
-        Number(row.amount ?? 0),
-      );
-    }
-  }
-
+  const cash = roundMoney((snapshot?.cash ?? 0) + roundedFlows.cashIn - roundedFlows.cashOut);
+  const account = roundMoney(
+    (accountBaseline?.account ?? 0) + roundedFlows.accountIn - roundedFlows.accountOut,
+  );
   const ticketInCash = roundMoney(ticketFlows.cashIn);
   const ticketInAccount = roundMoney(ticketFlows.accountIn);
 
   return {
-    ...resolved,
-    cash: pockets.cash,
-    account: pockets.account,
+    cash,
+    account,
+    source: snapshot ? 'projected' : 'period',
+    snapshotAsOf: snapshot?.asOfDate ?? null,
     asOfDate: to,
     notes: snapshot && snapshot.asOfDate >= to ? (snapshotRow?.notes ?? null) : null,
     openingTotal: snapshot ? pocketTotal(snapshot) : 0,
     openingAsOf: snapshot?.asOfDate ?? null,
-    periodIn: roundMoney(roundedFlows.cashIn + roundedFlows.accountIn + afterCount.cashIn + afterCount.accountIn),
-    periodOut: roundMoney(roundedFlows.cashOut + roundedFlows.accountOut + afterCount.cashOut + afterCount.accountOut),
+    periodIn: roundMoney(roundedFlows.cashIn + roundedFlows.accountIn),
+    periodOut: roundMoney(roundedFlows.cashOut + roundedFlows.accountOut),
     ticketIn: roundMoney(ticketInCash + ticketInAccount),
     ticketInCash,
     ticketInAccount,

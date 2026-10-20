@@ -143,7 +143,7 @@ test('buildMoneyLedger charges rent on the chosen day', () => {
   assert.equal(ledger.days[1]!.runningAccount, 1800);
 });
 
-test('a mid-period count resets running Tienes and leaves that day’s sales visible', () => {
+test('a mid-period count resets cash and keeps account on the current tags', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-03',
@@ -173,8 +173,10 @@ test('a mid-period count resets running Tienes and leaves that day’s sales vis
   const counted = ledger.days[1]!;
   assert.equal(counted.counted, true);
   assert.equal(counted.transferSales, 90);
-  assert.equal(counted.runningAccount, 800);
-  assert.equal(ledger.days[2]!.runningAccount, 840);
+  assert.equal(counted.runningCash, 50);
+  assert.equal(counted.runningAccount, 1090);
+  assert.equal(counted.countAdjustAccount, 0);
+  assert.equal(ledger.days[2]!.runningAccount, 1130);
   assert.equal(moneyDayHasActivity(counted), true);
 });
 
@@ -198,8 +200,8 @@ test('paused rent after a mid-period count enters the following day, like Tienes
     incomes: [],
     transfers: [],
   });
-  assert.equal(ledger.days[1]!.runningAccount, 800);
-  assert.equal(ledger.days[2]!.runningAccount, 940);
+  assert.equal(ledger.days[1]!.runningAccount, 1000);
+  assert.equal(ledger.days[2]!.runningAccount, 1140);
 });
 
 test('audit lines name visit, expense and rent instead of lumping them', () => {
@@ -272,6 +274,34 @@ test('a short cash close shows the missing amount as Faltante de caja', () => {
   assert.equal(day.runningCash, 1050);
   const faltante = moneyDayAuditMovements(day).find((row) => row.label === 'Faltante de caja');
   assert.deepEqual(faltante, { label: 'Faltante de caja', cash: -50, account: 0 });
+});
+
+test('a sale retagged to TPV and a purchase retagged to cuenta move the account after the count', () => {
+  const ledger = buildMoneyLedger({
+    from: '2026-10-12',
+    to: '2026-10-12',
+    opening: { asOfDate: '2026-10-11', cash: 2000, account: 9000 },
+    counts: [{ asOfDate: '2026-10-12', cash: 2500, account: 9000 }],
+    tickets: [
+      {
+        ymd: '2026-10-12',
+        status: 'delivered',
+        payment_status: 'paid',
+        payment_method: 'card_terminal',
+        subtotal: 180,
+      },
+    ],
+    purchases: [{ ymd: '2026-10-12', amount: 70, paidFrom: 'account' }],
+    expenses: [],
+    incomes: [],
+    transfers: [],
+  });
+  const day = ledger.days[0]!;
+  assert.equal(day.runningCash, 2500);
+  assert.equal(day.cardSales, 180);
+  assert.equal(day.purchasesAccount, 70);
+  assert.equal(day.runningAccount, 9110);
+  assert.equal(day.countAdjustAccount, 0);
 });
 
 test('money registered after the cash count is added on top of the count', () => {
