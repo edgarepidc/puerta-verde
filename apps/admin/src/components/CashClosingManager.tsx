@@ -54,15 +54,13 @@ interface CashSummary {
 const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
 const dayButtonOff =
   'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
-const formulaCard =
-  'min-w-[9.5rem] flex-1 rounded-[1.75rem] border border-black/10 bg-[#f6f1e8] px-5 py-5';
-const formulaLabel = 'text-sm text-slate-600';
-const formulaValue =
-  'mt-3 text-[1.7rem] font-semibold leading-none tracking-tight text-slate-950 tabular-nums';
+const formulaCard = 'min-w-[8.75rem] flex-1 pv-glass-card px-4 py-4';
+const formulaLabel = 'text-xs text-slate-500';
+const formulaValue = 'mt-1 text-xl font-semibold tabular-nums text-slate-900';
 const formulaInput =
-  'w-full bg-transparent text-[1.7rem] font-semibold leading-none tracking-tight tabular-nums text-slate-950 outline-none disabled:cursor-not-allowed';
+  'w-full bg-transparent text-xl font-semibold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
 const editableTotal =
-  'mt-3 w-full rounded-full border border-black/10 bg-white px-4 py-2.5 text-[1.7rem] font-semibold leading-none tracking-tight tabular-nums text-slate-950 outline-none focus:border-[var(--pv-green-700)] disabled:cursor-not-allowed disabled:bg-[#f6f1e8]';
+  'pv-input mt-1 text-xl font-semibold tabular-nums text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50';
 
 interface Withdrawal {
   id: string;
@@ -332,12 +330,12 @@ export function CashClosingManager({
           <p className={`${formulaValue} leading-snug`}>
             {formatMexicoSpokenDay(summary.closingDate)}
           </p>
-          <p className="mt-2 text-sm text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
+          <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
         </div>
         <div className={formulaCard}>
           <p className={formulaLabel}>Fondo inicial</p>
           <DecimalInput
-            className={`${formulaInput} mt-3`}
+            className={`${formulaInput} mt-1`}
             value={openingFloat}
             onChange={setOpeningFloat}
             disabled={!canEditClose}
@@ -369,13 +367,13 @@ export function CashClosingManager({
             disabled={!canEditClose}
             groupThousands
           />
-          <div className="mt-3 flex items-baseline justify-between gap-3">
-            <p className="text-sm text-slate-600">Esperado {formatMoney(shownExpected)}</p>
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <p className="text-xs text-slate-500">Esperado {formatMoney(shownExpected)}</p>
             {cashDiff == null ? (
-              <p className="text-right text-sm text-slate-500">Cuenta el efectivo</p>
+              <p className="text-right text-xs text-slate-500">Cuenta el efectivo</p>
             ) : (
               <p
-                className={`text-right text-sm font-semibold ${countMatches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}
+                className={`text-right text-xs font-semibold ${countMatches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}
               >
                 {countMatches ? 'Cuadra' : `Diferencia ${formatMoney(cashDiff)}`}
               </p>
@@ -397,7 +395,7 @@ export function CashClosingManager({
           <span className="text-sm text-slate-600">Notas</span>
           <input
             type="text"
-            className="mt-1 w-full rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm text-slate-950 outline-none focus:border-[var(--pv-green-700)] disabled:bg-[#f6f1e8]"
+            className="pv-input mt-1 text-sm disabled:bg-slate-50"
             value={notes}
             disabled={!canEditClose}
             onChange={(e) => setNotes(e.target.value)}
@@ -407,7 +405,7 @@ export function CashClosingManager({
         {canEditClose ? (
           <button
             type="button"
-            className="rounded-full bg-[var(--pv-green-700)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--pv-green-800)] disabled:opacity-50"
+            className="pv-btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
             disabled={closing || closeBlocked}
             onClick={closeDay}
           >
