@@ -2,6 +2,7 @@ import {
   expectedCashOnHand,
   expectedCashOnHandForCount,
   formatMoney,
+  roundMoney,
   type CashDrawerLine,
 } from '@puertaverde/shared';
 
@@ -71,14 +72,11 @@ export function CashCloseExpected({
             </div>
           ) : null}
           {accountOnly.length > 0 ? (
-            <div className="space-y-0.5">
-              <p className="text-slate-500">En Gastos, pagado por cuenta (no sale de caja):</p>
-              {accountOnly.map((line, index) => (
-                <p key={`acc-${index}`} className="pl-3 text-slate-500">
-                  {line.label} {formatMoney(line.amount)}
-                </p>
-              ))}
-            </div>
+            <p className="max-w-sm text-slate-500">
+              De la cuenta salieron{' '}
+              {formatMoney(roundMoney(accountOnly.reduce((sum, line) => sum + line.amount, 0)))}. No se
+              restan del efectivo.
+            </p>
           ) : null}
           {linesOnly ? null : <p className="font-medium text-slate-900">En caja {formatMoney(expected)}</p>}
         </>
