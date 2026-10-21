@@ -125,6 +125,21 @@ export interface MoneyLedgerCount extends MoneyPositionSnapshot {
   resetsBalance?: boolean;
 }
 
+/**
+ * Saldo of the manual adjustment saved on 2 Oct 2026 (Central purchases
+ * moved to the account). Days through this date keep that saved balance.
+ * Cash closes after it stay as history and do not replace caja or cuenta.
+ */
+export const MANUAL_SALDO_AS_OF = '2026-09-30';
+
+export function positionResetsBalance(
+  asOfDate: string,
+  notes: string | null | undefined,
+): boolean {
+  if (asOfDate <= MANUAL_SALDO_AS_OF) return true;
+  return /ajuste/i.test(notes ?? '');
+}
+
 /** True when the entry was saved after the cash count on that same day. */
 export function isRecordedAfterCount(
   recordedAt: string | null | undefined,

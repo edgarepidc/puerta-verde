@@ -442,6 +442,8 @@ export {
   moneyDayHasActivity,
   pocketOutflows,
   isRecordedAfterCount,
+  MANUAL_SALDO_AS_OF,
+  positionResetsBalance,
   moneyLedgerRowYmd,
   type MoneyDayDetail,
   type MoneyDayRow,
