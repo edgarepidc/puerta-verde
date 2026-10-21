@@ -54,13 +54,13 @@ interface CashSummary {
 const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
 const dayButtonOff =
   'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
-const formulaCard = 'flex min-w-[12rem] flex-1 items-center gap-3 pv-glass-card p-4';
+const formulaCard = 'flex min-w-[12rem] flex-1 items-center gap-2.5 pv-glass-card px-3 py-2.5';
 const formulaLabel = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
-const formulaValue = 'mt-0.5 text-xl font-bold tabular-nums text-slate-900';
+const formulaValue = 'text-lg font-bold tabular-nums text-slate-900';
 const formulaInput =
-  'mt-0.5 w-full bg-transparent text-xl font-bold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
+  'w-full bg-transparent text-lg font-bold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
 const editableTotal =
-  'mt-0.5 w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xl font-bold tabular-nums text-slate-900 outline-none focus:border-[#15803d] disabled:cursor-not-allowed disabled:bg-slate-50';
+  'w-full rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-lg font-bold tabular-nums text-slate-900 outline-none focus:border-[#15803d] disabled:cursor-not-allowed disabled:bg-slate-50';
 const actionGlow = '!border-emerald-200 !shadow-[0_4px_16px_rgba(21,128,61,0.22)]';
 
 const CARD_MARK = {
@@ -73,7 +73,7 @@ const CARD_MARK = {
 function CardMark({ emoji, tone }: { emoji: string; tone: keyof typeof CARD_MARK }) {
   return (
     <span
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${CARD_MARK[tone]}`}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${CARD_MARK[tone]}`}
       aria-hidden
     >
       {emoji}
@@ -357,13 +357,16 @@ export function CashClosingManager({
           <CardMark emoji="💵" tone="amber" />
           <div className="min-w-0 flex-1">
             <p className={formulaLabel}>Fondo inicial</p>
-            <DecimalInput
-              className={formulaInput}
-              value={openingFloat}
-              onChange={setOpeningFloat}
-              disabled={!canEditClose}
-              groupThousands
-            />
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-lg font-bold text-slate-400">$</span>
+              <DecimalInput
+                className={formulaInput}
+                value={openingFloat}
+                onChange={setOpeningFloat}
+                disabled={!canEditClose}
+                groupThousands
+              />
+            </div>
           </div>
         </div>
         <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
@@ -385,17 +388,20 @@ export function CashClosingManager({
             <label className={formulaLabel} htmlFor="drawer-count">
               Debería haber
             </label>
-            <DecimalInput
-              id="drawer-count"
-              className={editableTotal}
-              value={drawer.countValue}
-              onChange={(value) => {
-                setCountEdited(true);
-                setCountedCash(value);
-              }}
-              disabled={!canEditClose}
-              groupThousands
-            />
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-lg font-bold text-slate-400">$</span>
+              <DecimalInput
+                id="drawer-count"
+                className={editableTotal}
+                value={drawer.countValue}
+                onChange={(value) => {
+                  setCountEdited(true);
+                  setCountedCash(value);
+                }}
+                disabled={!canEditClose}
+                groupThousands
+              />
+            </div>
             <div className="mt-1 flex items-baseline justify-between gap-3">
               <p className="text-xs text-slate-500">Esperado {formatMoney(shownExpected)}</p>
               {cashDiff == null ? (
