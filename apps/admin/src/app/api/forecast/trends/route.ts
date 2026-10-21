@@ -133,8 +133,7 @@ export async function GET(request: Request) {
         amount: Number(row.amount.toFixed(2)),
         average: Number((row.amount / Math.max(row.days, 1)).toFixed(2)),
       }))
-      .sort((a, b) => b.average - a.average || a.days - b.days)
-      .slice(0, 3);
+      .sort((a, b) => b.average - a.average || a.days - b.days);
 
     const paymentTotal = [...byPayment.values()].reduce((sum, value) => sum + value, 0);
     const paymentBreakdown = PAYMENT_METHODS.map((method: PaymentMethod) => {

@@ -50,9 +50,9 @@ const PRODUCT_RANK_MODES: Array<{
   label: string;
   hint: string;
 }> = [
-  { id: 'quantity', label: 'Unidades', hint: 'Prioriza comprar lo que rota' },
-  { id: 'revenue', label: 'Venta', hint: 'Lo que más cobras en caja' },
   { id: 'profit', label: 'Utilidad', hint: 'Lo que más deja después del costo' },
+  { id: 'revenue', label: 'Venta', hint: 'Lo que más cobras en caja' },
+  { id: 'quantity', label: 'Unidades', hint: 'Prioriza comprar lo que rota' },
 ];
 
 function productRankValue(product: TopProduct, mode: ProductRankMode) {
@@ -237,7 +237,35 @@ function ProductBarChart({
   );
 }
 
+function WeekdayLine({ row, mark }: { row: WeekdayRow; mark: string }) {
+  return (
+    <li className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="min-w-0">
+        <span className="inline-block w-5 text-center" aria-hidden>
+          {mark}
+        </span>
+        <span className="ml-1.5 font-medium text-slate-800">{row.label}</span>
+        <span className="ml-1.5 text-xs text-slate-400">
+          {row.days} día{row.days === 1 ? '' : 's'}
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block font-semibold tabular-nums text-slate-900">{formatMoney(row.average)}</span>
+        <span className="text-[11px] font-normal text-slate-400">promedio / día</span>
+      </span>
+    </li>
+  );
+}
+
 function WeekdayTop({ rows }: { rows: WeekdayRow[] }) {
+  const ranked = [...rows].sort((a, b) => b.average - a.average || a.days - b.days);
+  const best = ranked.slice(0, 3);
+  const bestIds = new Set(best.map((row) => row.weekday));
+  const worst = ranked
+    .filter((row) => !bestIds.has(row.weekday))
+    .sort((a, b) => b.average - a.average)
+    .slice(-2);
+
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
       <p className="text-sm font-medium text-slate-700">Mejor promedio por día</p>
@@ -245,24 +273,21 @@ function WeekdayTop({ rows }: { rows: WeekdayRow[] }) {
         Top 3 · cuánto venden en promedio ese día, no el total del periodo
       </p>
       <ol className="mt-2 space-y-2">
-        {rows.map((row, index) => (
-          <li key={row.weekday} className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0">
-              <span aria-hidden>{WEEKDAY_MEDALS[index] ?? `${index + 1}.`}</span>
-              <span className="ml-1.5 font-medium text-slate-800">{row.label}</span>
-              <span className="ml-1.5 text-xs text-slate-400">
-                {row.days} día{row.days === 1 ? '' : 's'}
-              </span>
-            </span>
-            <span className="shrink-0 text-right">
-              <span className="block font-semibold tabular-nums text-slate-900">
-                {formatMoney(row.average)}
-              </span>
-              <span className="text-[11px] font-normal text-slate-400">promedio / día</span>
-            </span>
-          </li>
+        {best.map((row, index) => (
+          <WeekdayLine key={row.weekday} row={row} mark={WEEKDAY_MEDALS[index] ?? `${index + 1}.`} />
         ))}
       </ol>
+      {worst.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-slate-700">Peor promedio por día</p>
+          <p className="text-xs text-slate-500">Los días que menos venden en promedio</p>
+          <ol className="mt-2 space-y-2">
+            {worst.map((row) => (
+              <WeekdayLine key={row.weekday} row={row} mark="↓" />
+            ))}
+          </ol>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -336,7 +361,7 @@ export function PeriodSalesCharts({
   paymentBreakdown: PaymentRow[];
   status?: 'loading' | 'ready' | 'error';
 }) {
-  const [rankMode, setRankMode] = useState<ProductRankMode>('quantity');
+  const [rankMode, setRankMode] = useState<ProductRankMode>('profit');
   const rankedProducts = useMemo(() => {
     return [...topProducts]
       .sort((a, b) => productRankValue(b, rankMode) - productRankValue(a, rankMode))
