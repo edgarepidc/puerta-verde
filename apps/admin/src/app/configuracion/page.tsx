@@ -53,7 +53,7 @@ export default async function ConfiguracionPage({
     { data: organization },
     { data: memberships },
     { data: whatsappMessages },
-    { data: storefront },
+    { data: storefronts },
     platformOrgsResult,
     platformBranchesResult,
   ] = await Promise.all([
@@ -86,7 +86,7 @@ export default async function ConfiguracionPage({
         'id, name, slug, markup_percent, is_active, pickup_instructions, fulfillment_mode, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours',
       )
       .eq('branch_id', tenant.branchId)
-      .maybeSingle(),
+      .order('created_at', { ascending: true }),
     isPlatformAdmin
       ? supabase
           .from('organizations')
@@ -150,7 +150,7 @@ export default async function ConfiguracionPage({
                 ...branch!,
                 usb_scale_enabled: parseBranchSettingsFlags(branch?.settings).usbScaleEnabled,
               }}
-              initialStorefront={storefront as MirrorStorefront | null}
+              initialStorefronts={(storefronts ?? []) as MirrorStorefront[]}
               initialStaff={staffRows}
               canManage={canEditBranch}
               currentUserId={staff.userId}
