@@ -11,7 +11,11 @@ import {
   type SubscriptionStatus,
 } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
+
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
 
 export function BillingManager({
   organization,
@@ -98,10 +102,9 @@ export function BillingManager({
                   ? '1 sucursal, tienda web y panel admin.'
                   : 'Multi-sucursal, reportes avanzados y soporte prioritario.'}
               </p>
-              <ActionChip
-                className="mt-4"
-                tone={organization.subscription_plan === plan ? 'slate' : 'emerald'}
-                emoji={organization.subscription_plan === plan ? '✅' : '💳'}
+              <button
+                type="button"
+                className={`mt-4 ${organization.subscription_plan === plan ? menuButtonOff : menuAction}`}
                 disabled={loading !== null || organization.subscription_plan === plan}
                 onClick={() => void startCheckout(plan)}
               >
@@ -110,16 +113,16 @@ export function BillingManager({
                   : organization.subscription_plan === plan
                     ? 'Plan actual'
                     : 'Elegir plan'}
-              </ActionChip>
+              </button>
             </div>
           ))}
         </div>
       ) : null}
 
       {canManage && organization.stripe_customer_id ? (
-        <ActionChip emoji="🧾" disabled={loading !== null} onClick={() => void openPortal()}>
+        <button type="button" className={menuAction} disabled={loading !== null} onClick={() => void openPortal()}>
           {loading === 'portal' ? 'Abriendo…' : 'Administrar facturación'}
-        </ActionChip>
+        </button>
       ) : null}
     </details>
   );

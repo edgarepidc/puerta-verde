@@ -90,11 +90,11 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
           Solo tú (super admin) puedes crear tenants. Se crea la organización, la sucursal y el usuario owner.
         </p>
 
-        <form onSubmit={createOrg} className="mt-6 grid min-w-0 gap-4 md:grid-cols-4">
-          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
-            Nombre de la verdulería
+        <form onSubmit={createOrg} className="mt-6 flex flex-wrap items-end gap-2">
+          <label className="block min-w-[12rem] flex-1 text-sm">
+            <span className="text-slate-600">Nombre de la verdulería</span>
             <input
-              className="pv-input mt-1"
+              className="pv-input mt-1 text-sm"
               value={organizationName}
               onChange={(e) => {
                 setOrganizationName(e.target.value);
@@ -103,22 +103,22 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
-            Nombre de la sucursal
+          <label className="block min-w-[12rem] flex-1 text-sm">
+            <span className="text-slate-600">Nombre de la sucursal</span>
             <input
-              className="pv-input mt-1"
+              className="pv-input mt-1 text-sm"
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
               placeholder="Misma que la verdulería si lo dejas vacío"
             />
           </label>
-          <label className="block min-w-0 text-sm font-medium text-slate-700 md:col-span-4">
-            Slug de la tienda pública
+          <label className="block min-w-[12rem] flex-[1_1_100%] text-sm">
+            <span className="text-slate-600">Slug de la tienda pública</span>
             <div className="mt-1 flex min-w-0 items-center gap-2">
               <span className="shrink-0 text-xs text-slate-400">{webUrl}/</span>
               <div className="min-w-0 flex-1">
                 <input
-                  className="pv-input"
+                  className="pv-input text-sm"
                   value={branchSlug}
                   onChange={(e) => {
                     setSlugTouched(true);
@@ -129,29 +129,29 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
               </div>
             </div>
           </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Nombre del owner
+          <label className="block min-w-[12rem] flex-1 text-sm">
+            <span className="text-slate-600">Nombre del owner</span>
             <input
-              className="pv-input mt-1"
+              className="pv-input mt-1 text-sm"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700 md:col-span-2">
-            Correo del owner
+          <label className="block min-w-[12rem] flex-1 text-sm">
+            <span className="text-slate-600">Correo del owner</span>
             <input
               type="email"
-              className="pv-input mt-1"
+              className="pv-input mt-1 text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </label>
-          <label className="block text-sm font-medium text-slate-700">
-            Contraseña temporal
+          <label className="block min-w-[12rem] flex-1 text-sm">
+            <span className="text-slate-600">Contraseña temporal</span>
             <PasswordInput
-              className="pv-input"
+              className="pv-input text-sm"
               wrapperClassName="mt-1"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -160,10 +160,10 @@ export function PlatformManager({ initialOrganizations }: { initialOrganizations
             />
           </label>
 
-          {error && <p className="text-sm text-red-600 md:col-span-4">{error}</p>}
-          {success && <p className="text-sm text-[var(--pv-green-700)] md:col-span-4">{success}</p>}
+          {error && <p className="w-full text-sm text-red-600">{error}</p>}
+          {success && <p className="w-full text-sm text-[var(--pv-green-700)]">{success}</p>}
 
-          <button type="submit" disabled={saving} className="pv-btn-primary px-5 py-2.5 text-sm md:col-span-4">
+          <button type="submit" disabled={saving} className="pv-btn-account px-5 py-2.5 text-sm">
             {saving ? 'Creando...' : 'Crear verdulería'}
           </button>
         </form>

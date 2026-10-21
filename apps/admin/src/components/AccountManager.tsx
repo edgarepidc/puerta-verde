@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
 import { PasswordInput } from '@/components/PasswordInput';
+
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800';
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
 
 export function AccountManager({
   initialEmail,
@@ -70,53 +74,45 @@ export function AccountManager({
         iconClass="bg-sky-100"
         actions={
           saved ? (
-            <ActionChip as="span" emoji="✅" elevated={false}>
-              Guardado
-            </ActionChip>
+            <span className={menuButtonOff}>Guardado</span>
           ) : undefined
         }
       />
 
-      <div className="grid min-w-0 gap-4 md:grid-cols-4">
-        <label className="block text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Nombre</span>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Nombre</span>
           <input
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             autoComplete="name"
           />
         </label>
-        <label className="block text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Usuario</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Usuario</span>
           <input
             type="email"
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
           />
-          <span className="mt-1 block text-xs text-slate-500">
-            El correo con el que entras al panel.
-          </span>
         </label>
-        <label className="block text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Contraseña actual</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Contraseña actual</span>
           <PasswordInput
-            className="pv-input"
+            className="pv-input text-sm"
             wrapperClassName="mt-1"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             autoComplete="current-password"
           />
-          <span className="mt-1 block text-xs text-slate-500">
-            Necesaria si cambias el usuario o la contraseña.
-          </span>
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Contraseña nueva</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Contraseña nueva</span>
           <PasswordInput
-            className="pv-input"
+            className="pv-input text-sm"
             wrapperClassName="mt-1"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -124,23 +120,25 @@ export function AccountManager({
             placeholder="Mínimo 8"
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Confirmar contraseña</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Confirmar contraseña</span>
           <PasswordInput
-            className="pv-input"
+            className="pv-input text-sm"
             wrapperClassName="mt-1"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
           />
         </label>
+        <button type="button" className={menuAction} disabled={saving} onClick={() => void save()}>
+          {saving ? 'Guardando…' : 'Guardar acceso'}
+        </button>
       </div>
+      <p className="text-xs text-slate-500">
+        El usuario es el correo con el que entras. La contraseña actual hace falta si cambias el usuario o la contraseña.
+      </p>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-      <ActionChip size="lg" tone="emerald" emoji="✅" disabled={saving} onClick={() => void save()}>
-        {saving ? 'Guardando…' : 'Guardar acceso'}
-      </ActionChip>
     </details>
   );
 }

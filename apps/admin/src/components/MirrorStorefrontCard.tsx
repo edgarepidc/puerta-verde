@@ -4,8 +4,11 @@ import { useState } from 'react';
 
 import { formatMoney, markedUpUnitPrice, normalizeStorefrontSlug } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
+import { PillField, pillInputClass } from '@/components/PillField';
+
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
 
 export interface MirrorStorefront {
   id: string;
@@ -112,57 +115,57 @@ export function MirrorStorefrontCard({
         iconClass="bg-amber-100"
         actions={
           canManage ? (
-            <ActionChip emoji="✅" disabled={saving} onClick={() => void save()}>
+            <button type="button" className={menuAction} disabled={saving} onClick={() => void save()}>
               {saving ? 'Guardando…' : 'Guardar zona'}
-            </ActionChip>
+            </button>
           ) : undefined
         }
       />
-      <div className="grid gap-4 md:grid-cols-4">
-        <label className="block text-sm md:col-span-2">
-          <span className="font-medium text-slate-700">Nombre</span>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Nombre</span>
           <input
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={name}
             disabled={!canManage}
             placeholder="Roma"
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Liga</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Liga</span>
           <input
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={slug}
             disabled={!canManage}
             placeholder="roma"
             onChange={(event) => setSlug(event.target.value)}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Porcentaje sobre el precio</span>
+        <label className="block w-[9.75rem] shrink-0 text-sm">
+          <span className="text-slate-600">Porcentaje</span>
           <DecimalInput
             placeholder="0"
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={markupText}
             disabled={!canManage}
             onChange={setMarkupText}
           />
         </label>
-        <label className="block text-sm md:col-span-3">
-          <span className="font-medium text-slate-700">Instrucciones de recolección</span>
+        <label className="block min-w-[12rem] flex-[1_1_18rem] text-sm">
+          <span className="text-slate-600">Instrucciones de recolección</span>
           <textarea
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             rows={2}
             value={pickupInstructions}
             disabled={!canManage}
             onChange={(event) => setPickupInstructions(event.target.value)}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Modo de venta</span>
+        <label className="block w-[14rem] shrink-0 text-sm">
+          <span className="text-slate-600">Modo de venta</span>
           <select
-            className="pv-input mt-1 py-1.5 text-sm"
+            className="pv-input mt-1 block text-sm"
             value={fulfillmentMode}
             disabled={!canManage}
             onChange={(event) =>
@@ -174,49 +177,47 @@ export function MirrorStorefrontCard({
             <option value="delivery">Solo domicilio</option>
           </select>
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Costo de envío</span>
+        <PillField label="Costo de envío" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
           <DecimalInput
             placeholder="0"
-            className="pv-input mt-1"
+            className={pillInputClass('emerald')}
             groupThousands
             value={deliveryFeeText}
             disabled={!canManage}
             onChange={setDeliveryFeeText}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Pedido mínimo</span>
+        </PillField>
+        <PillField label="Pedido mínimo" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
           <DecimalInput
             placeholder="0"
-            className="pv-input mt-1"
+            className={pillInputClass('emerald')}
             groupThousands
             value={minimumOrderText}
             disabled={!canManage}
             onChange={setMinimumOrderText}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">WhatsApp</span>
+        </PillField>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">WhatsApp</span>
           <input
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={whatsappPhone}
             disabled={!canManage}
             placeholder="5512345678"
             onChange={(event) => setWhatsappPhone(event.target.value)}
           />
         </label>
-        <label className="block text-sm">
-          <span className="font-medium text-slate-700">Horario</span>
+        <label className="block min-w-[12rem] flex-1 text-sm">
+          <span className="text-slate-600">Horario</span>
           <input
-            className="pv-input mt-1"
+            className="pv-input mt-1 text-sm"
             value={openingHours}
             disabled={!canManage}
             placeholder="Lun–Sáb 8:00–20:00"
             onChange={(event) => setOpeningHours(event.target.value)}
           />
         </label>
-        <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/60 p-3 text-sm md:col-span-4">
+        <label className="flex min-w-[12rem] flex-[1_1_100%] items-start gap-3 rounded-xl border border-slate-200 bg-white/60 p-3 text-sm">
           <input
             type="checkbox"
             className="mt-0.5"

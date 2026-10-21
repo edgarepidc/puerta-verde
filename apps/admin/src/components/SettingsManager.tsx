@@ -8,10 +8,17 @@ import {
   type StaffRole,
 } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 import { MirrorStorefrontCard, type MirrorStorefront } from '@/components/MirrorStorefrontCard';
 import { PasswordInput } from '@/components/PasswordInput';
+import { PillField, pillInputClass } from '@/components/PillField';
+
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
+const menuDanger =
+  'rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50';
 
 interface BranchSettings {
   id: string;
@@ -188,36 +195,41 @@ export function SettingsManager({
             iconClass="bg-emerald-100"
             actions={
               canManage ? (
-                <ActionChip emoji="✅" disabled={savingBranch} onClick={() => void saveBranch()}>
+                <button
+                  type="button"
+                  className={menuAction}
+                  disabled={savingBranch}
+                  onClick={() => void saveBranch()}
+                >
                   {savingBranch ? 'Guardando…' : 'Guardar tienda'}
-                </ActionChip>
+                </button>
               ) : undefined
             }
           />
-          <div className="grid gap-4 md:grid-cols-4">
-            <label className="block text-sm md:col-span-4">
-              <span className="font-medium text-slate-700">Dirección</span>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="block min-w-[12rem] flex-[1_1_100%] text-sm">
+              <span className="text-slate-600">Dirección</span>
               <input
-                className="pv-input mt-1"
+                className="pv-input mt-1 text-sm"
                 value={branch.address ?? ''}
                 disabled={!canManage}
                 onChange={(e) => setBranch((b) => ({ ...b, address: e.target.value }))}
               />
             </label>
-            <label className="block text-sm md:col-span-3">
-              <span className="font-medium text-slate-700">Instrucciones de recolección</span>
+            <label className="block min-w-[12rem] flex-[1_1_18rem] text-sm">
+              <span className="text-slate-600">Instrucciones de recolección</span>
               <textarea
-                className="pv-input mt-1"
+                className="pv-input mt-1 text-sm"
                 rows={2}
                 value={branch.pickup_instructions ?? ''}
                 disabled={!canManage}
                 onChange={(e) => setBranch((b) => ({ ...b, pickup_instructions: e.target.value }))}
               />
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Modo de venta</span>
+            <label className="block w-[14rem] shrink-0 text-sm">
+              <span className="text-slate-600">Modo de venta</span>
               <select
-                className="pv-input mt-1 py-1.5 text-sm"
+                className="pv-input mt-1 block text-sm"
                 value={branch.fulfillment_mode ?? 'both'}
                 disabled={!canManage}
                 onChange={(e) =>
@@ -232,11 +244,10 @@ export function SettingsManager({
                 <option value="delivery">Solo domicilio</option>
               </select>
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Costo de envío</span>
+            <PillField label="Costo de envío" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
               <DecimalInput
                 placeholder="0"
-                className="pv-input mt-1"
+                className={pillInputClass('emerald')}
                 groupThousands
                 value={deliveryFeeText}
                 disabled={!canManage}
@@ -245,12 +256,11 @@ export function SettingsManager({
                   setBranch((b) => ({ ...b, delivery_fee: parseDecimal(value) }));
                 }}
               />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Pedido mínimo</span>
+            </PillField>
+            <PillField label="Pedido mínimo" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
               <DecimalInput
                 placeholder="0"
-                className="pv-input mt-1"
+                className={pillInputClass('emerald')}
                 groupThousands
                 value={minimumOrderText}
                 disabled={!canManage}
@@ -259,28 +269,28 @@ export function SettingsManager({
                   setBranch((b) => ({ ...b, minimum_order_amount: parseDecimal(value) }));
                 }}
               />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">WhatsApp</span>
+            </PillField>
+            <label className="block min-w-[12rem] flex-1 text-sm">
+              <span className="text-slate-600">WhatsApp</span>
               <input
-                className="pv-input mt-1"
+                className="pv-input mt-1 text-sm"
                 value={branch.whatsapp_phone ?? ''}
                 disabled={!canManage}
                 onChange={(e) => setBranch((b) => ({ ...b, whatsapp_phone: e.target.value }))}
                 placeholder="5512345678"
               />
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">Horario</span>
+            <label className="block min-w-[12rem] flex-1 text-sm">
+              <span className="text-slate-600">Horario</span>
               <input
-                className="pv-input mt-1"
+                className="pv-input mt-1 text-sm"
                 value={branch.opening_hours ?? ''}
                 disabled={!canManage}
                 onChange={(e) => setBranch((b) => ({ ...b, opening_hours: e.target.value }))}
                 placeholder="Lun–Sáb 8:00–20:00"
               />
             </label>
-            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/60 p-3 text-sm md:col-span-4">
+            <label className="flex min-w-[12rem] flex-[1_1_100%] items-start gap-3 rounded-xl border border-slate-200 bg-white/60 p-3 text-sm">
               <input
                 type="checkbox"
                 className="mt-0.5"
@@ -341,27 +351,25 @@ export function SettingsManager({
                       </p>
                     </div>
                     {canManage && !isYou ? (
-                      <div className="flex shrink-0 flex-nowrap items-center gap-2">
-                        <div className="w-40 shrink-0">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <div className="w-[11.5rem] shrink-0">
                           <select
-                            className="pv-input py-1.5 text-sm"
+                            className="pv-input text-sm"
                             value={row.role}
                             onChange={(e) =>
                               void updateStaff(row.id, { role: e.target.value as StaffRole })
                             }
                           >
-                            {STAFF_ROLES.map((role) => (
-                              <option key={role} value={role}>
-                                {STAFF_ROLE_LABELS[role]}
-                              </option>
-                            ))}
+                          {STAFF_ROLES.map((role) => (
+                            <option key={role} value={role}>
+                              {STAFF_ROLE_LABELS[role]}
+                            </option>
+                          ))}
                           </select>
                         </div>
-                        <ActionChip
-                          className="shrink-0"
-                          elevated={false}
-                          tone={row.status === 'active' ? 'rose' : 'emerald'}
-                          emoji={row.status === 'active' ? '⏸️' : '▶️'}
+                        <button
+                          type="button"
+                          className={row.status === 'active' ? menuDanger : menuButtonOff}
                           onClick={() =>
                             void updateStaff(row.id, {
                               status: row.status === 'active' ? 'inactive' : 'active',
@@ -369,11 +377,10 @@ export function SettingsManager({
                           }
                         >
                           {row.status === 'active' ? 'Desactivar' : 'Activar'}
-                        </ActionChip>
-                        <ActionChip
-                          className="shrink-0"
-                          elevated={false}
-                          emoji="🔑"
+                        </button>
+                        <button
+                          type="button"
+                          className={menuButtonOff}
                           onClick={() => {
                             setResetId(resetting ? null : row.id);
                             setResetPassword('');
@@ -381,29 +388,31 @@ export function SettingsManager({
                           }}
                         >
                           {resetting ? 'Cerrar' : 'Contraseña'}
-                        </ActionChip>
+                        </button>
                       </div>
                     ) : null}
                   </div>
                   {canManage && resetting ? (
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <div className="w-56">
+                    <div className="flex flex-wrap items-end justify-end gap-2">
+                      <label className="block min-w-[12rem] flex-1 text-sm">
+                        <span className="text-slate-600">Nueva contraseña</span>
                         <PasswordInput
-                          className="pv-input"
-                          placeholder="Nueva contraseña (mín. 8)"
+                          className="pv-input text-sm"
+                          wrapperClassName="mt-1"
+                          placeholder="Mínimo 8"
                           value={resetPassword}
                           onChange={(e) => setResetPassword(e.target.value)}
                           autoComplete="new-password"
                         />
-                      </div>
-                      <ActionChip
-                        tone="emerald"
-                        emoji="✅"
+                      </label>
+                      <button
+                        type="button"
+                        className={menuAction}
                         disabled={savingPassword}
                         onClick={() => void setStaffPassword(row.id)}
                       >
                         {savingPassword ? 'Guardando…' : 'Guardar clave'}
-                      </ActionChip>
+                      </button>
                     </div>
                   ) : null}
                 </li>
@@ -414,42 +423,59 @@ export function SettingsManager({
           {canManage ? (
             <div className="min-w-0 rounded-xl bg-slate-50 p-4">
               <h3 className="font-medium text-slate-900">Nuevo usuario</h3>
-              <div className="mt-3 grid min-w-0 items-end gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,10rem)]">
-                <input
-                  placeholder="Nombre"
-                  className="pv-input min-w-0 py-1.5 text-sm"
-                  value={staffForm.fullName}
-                  onChange={(e) => setStaffForm((f) => ({ ...f, fullName: e.target.value }))}
-                />
-                <input
-                  type="email"
-                  placeholder="Usuario (correo)"
-                  className="pv-input min-w-0 py-1.5 text-sm"
-                  value={staffForm.email}
-                  onChange={(e) => setStaffForm((f) => ({ ...f, email: e.target.value }))}
-                />
-                <PasswordInput
-                  placeholder="Contraseña (mín. 8)"
-                  className="pv-input min-w-0 py-1.5 text-sm"
-                  wrapperClassName="min-w-0"
-                  value={staffForm.password}
-                  onChange={(e) => setStaffForm((f) => ({ ...f, password: e.target.value }))}
-                />
-                <select
-                  className="pv-input min-w-0 py-1.5 text-sm"
-                  value={staffForm.role}
-                  onChange={(e) => setStaffForm((f) => ({ ...f, role: e.target.value as StaffRole }))}
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-slate-600">Nombre</span>
+                  <input
+                    placeholder="Nombre"
+                    className="pv-input mt-1 text-sm"
+                    value={staffForm.fullName}
+                    onChange={(e) => setStaffForm((f) => ({ ...f, fullName: e.target.value }))}
+                  />
+                </label>
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-slate-600">Usuario</span>
+                  <input
+                    type="email"
+                    placeholder="Correo"
+                    className="pv-input mt-1 text-sm"
+                    value={staffForm.email}
+                    onChange={(e) => setStaffForm((f) => ({ ...f, email: e.target.value }))}
+                  />
+                </label>
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-slate-600">Contraseña</span>
+                  <PasswordInput
+                    placeholder="Mínimo 8"
+                    className="pv-input text-sm"
+                    wrapperClassName="mt-1"
+                    value={staffForm.password}
+                    onChange={(e) => setStaffForm((f) => ({ ...f, password: e.target.value }))}
+                  />
+                </label>
+                <label className="block w-[11.5rem] shrink-0 text-sm">
+                  <span className="text-slate-600">Rol</span>
+                  <select
+                    className="pv-input mt-1 block text-sm"
+                    value={staffForm.role}
+                    onChange={(e) => setStaffForm((f) => ({ ...f, role: e.target.value as StaffRole }))}
+                  >
+                    {STAFF_ROLES.filter((r) => r !== 'owner').map((role) => (
+                      <option key={role} value={role}>
+                        {STAFF_ROLE_LABELS[role]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className={menuAction}
+                  disabled={savingStaff}
+                  onClick={() => void createStaff()}
                 >
-                  {STAFF_ROLES.filter((r) => r !== 'owner').map((role) => (
-                    <option key={role} value={role}>
-                      {STAFF_ROLE_LABELS[role]}
-                    </option>
-                  ))}
-                </select>
+                  {savingStaff ? 'Creando…' : 'Crear usuario'}
+                </button>
               </div>
-              <ActionChip className="mt-3" emoji="👤" disabled={savingStaff} onClick={() => void createStaff()}>
-                {savingStaff ? 'Creando…' : 'Crear usuario'}
-              </ActionChip>
             </div>
           ) : null}
         </details>
