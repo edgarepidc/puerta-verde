@@ -128,9 +128,59 @@
 }
 
 .pv-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-  box-shadow: 0 6px 18px rgba(21, 128, 61, 0.28);
-  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 0 0 999px rgba(255, 255, 255, 0.18),
+    0 8px 22px rgba(21, 128, 61, 0.42);
+  transform: translateY(-2px);
+}
+
+.pv-btn-account,
+.pv-btn-cash {
+  border-radius: 9999px;
+  color: white;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.pv-btn-account {
+  background: #1e293b;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+}
+
+.pv-btn-cash {
+  background: #0369a1;
+  box-shadow: 0 4px 14px rgba(3, 105, 161, 0.22);
+}
+
+.pv-btn-account:hover:not(:disabled),
+.pv-btn-cash:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-2px);
+}
+
+.pv-btn-account:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 999px rgba(255, 255, 255, 0.16),
+    0 8px 22px rgba(15, 23, 42, 0.32);
+}
+
+.pv-btn-cash:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 999px rgba(255, 255, 255, 0.16),
+    0 8px 22px rgba(3, 105, 161, 0.38);
+}
+
+.pv-btn-account:active:not(:disabled),
+.pv-btn-cash:active:not(:disabled) {
+  transform: scale(0.97);
+  filter: brightness(0.94);
+}
+
+.pv-btn-account:disabled,
+.pv-btn-cash:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pv-btn-primary:active:not(:disabled) {
