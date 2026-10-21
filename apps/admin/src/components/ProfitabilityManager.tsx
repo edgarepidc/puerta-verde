@@ -1031,6 +1031,13 @@ export function ProfitabilityManager({
 
   const revenue = Number(summary?.revenue ?? 0);
   const cogs = Number(summary?.cogs ?? 0);
+  const grossPct =
+    revenue > 0
+      ? Number(summary?.gross_margin_percent ?? ((revenue - cogs) / revenue) * 100)
+      : null;
+  const shelfGap = totals.inventorySale - totals.inventoryCost;
+  const shelfPct = totals.inventorySale > 0.009 ? (shelfGap / totals.inventorySale) * 100 : null;
+  const formatPct = (value: number) => `${value.toFixed(1).replace(/^-/, '−')}%`;
   const outflows = pocketOutflows(ledgerTotals);
   const contributionsTotal = incomes
     .filter((row) => row.entry_type === 'contribution')
@@ -1175,6 +1182,7 @@ export function ProfitabilityManager({
             tone="amber"
             label="Costo de lo vendido"
             value={formatMoney(cogs)}
+            hint={grossPct == null ? undefined : `Margen bruto ${formatPct(grossPct)}`}
           />
           <SalioCard cash={outflows.cash} account={outflows.account} />
           <MetricCard
@@ -1182,12 +1190,16 @@ export function ProfitabilityManager({
             tone="leaf"
             label="Inventario a venta"
             value={formatMoney(totals.inventorySale)}
+            hint={shelfPct == null ? undefined : `Margen del anaquel ${formatPct(shelfPct)}`}
           />
           <MetricCard
             emoji="📦"
             tone="slate"
             label="Inventario a costo"
             value={formatMoney(totals.inventoryCost)}
+            hint={
+              totals.inventorySale > 0.009 ? `Por vender ${formatMoney(shelfGap)}` : undefined
+            }
           />
           <TeQuedoCard
             total={leftover}
