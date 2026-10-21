@@ -25,6 +25,7 @@ import {
   parseOperatingCostCategory,
   pocketOutflows,
   pocketTotal,
+  roundMoney,
   type MoneyLedgerTotals,
   type IncomeEntryType,
   type MoneyPocket,
@@ -305,6 +306,45 @@ function outflowHint(parts: Array<{ label: string; amount: number }>) {
   const shown = parts.filter((part) => part.amount > 0.009);
   if (!shown.length) return undefined;
   return shown.map((part) => `${part.label} ${formatMoney(part.amount)}`).join(' · ');
+}
+
+function SalioCard({
+  cash,
+  account,
+  cashHint,
+  accountHint,
+}: {
+  cash: number;
+  account: number;
+  cashHint?: string;
+  accountHint?: string;
+}) {
+  return (
+    <div className="pv-glass-card flex h-full gap-3 p-4">
+      <div
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${BADGE_TONES.slate}`}
+        aria-hidden
+      >
+        🧾
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Salió</p>
+        <p className="mt-0.5 truncate text-xl font-bold text-slate-900">
+          {formatMoney(roundMoney(cash + account))}
+        </p>
+        <div className="mt-auto space-y-1.5 pt-1 text-xs text-slate-500">
+          <div>
+            <p className="font-medium text-slate-700">Caja {formatMoney(cash)}</p>
+            {cashHint ? <p>{cashHint}</p> : null}
+          </div>
+          <div>
+            <p className="font-medium text-slate-700">Cuenta {formatMoney(account)}</p>
+            {accountHint ? <p>{accountHint}</p> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TeQuedoCard({
@@ -1169,23 +1209,15 @@ export function ProfitabilityManager({
             label="Costo de lo vendido"
             value={formatMoney(cogs)}
           />
-          <MetricCard
-            emoji="🧾"
-            tone="slate"
-            label="Salió de caja"
-            value={formatMoney(outflows.cash)}
-            hint={outflowHint([
+          <SalioCard
+            cash={outflows.cash}
+            account={outflows.account}
+            cashHint={outflowHint([
               { label: 'Compras', amount: ledgerTotals.purchasesCash },
               { label: 'Gastos', amount: ledgerTotals.expensesCash },
               { label: 'A cuenta', amount: ledgerTotals.toAccount },
             ])}
-          />
-          <MetricCard
-            emoji="🏦"
-            tone="blue"
-            label="Salió de cuenta"
-            value={formatMoney(outflows.account)}
-            hint={outflowHint([
+            accountHint={outflowHint([
               { label: 'Compras', amount: ledgerTotals.purchasesAccount },
               { label: 'Gastos', amount: ledgerTotals.expensesAccount },
               { label: 'A efectivo', amount: ledgerTotals.toCash },
