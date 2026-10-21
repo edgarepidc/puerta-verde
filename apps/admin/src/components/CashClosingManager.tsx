@@ -62,6 +62,17 @@ const formulaInput =
 const editableTotal =
   'pv-input mt-1 text-xl font-semibold tabular-nums text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50';
 
+function CardMark({ emoji }: { emoji: string }) {
+  return (
+    <span
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base leading-none"
+      aria-hidden
+    >
+      {emoji}
+    </span>
+  );
+}
+
 interface Withdrawal {
   id: string;
   amount: number;
@@ -326,14 +337,20 @@ export function CashClosingManager({
         <>
       <div className="flex flex-wrap items-stretch gap-3">
         <div className={formulaCard}>
-          <p className={formulaLabel}>Día</p>
+          <div className="flex items-center gap-2">
+            <CardMark emoji="📅" />
+            <p className={formulaLabel}>Día</p>
+          </div>
           <p className={`${formulaValue} leading-snug`}>
             {formatMexicoSpokenDay(summary.closingDate)}
           </p>
           <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
         </div>
         <div className={formulaCard}>
-          <p className={formulaLabel}>Fondo inicial</p>
+          <div className="flex items-center gap-2">
+            <CardMark emoji="💵" />
+            <p className={formulaLabel}>Fondo inicial</p>
+          </div>
           <DecimalInput
             className={`${formulaInput} mt-1`}
             value={openingFloat}
@@ -346,16 +363,22 @@ export function CashClosingManager({
           +
         </span>
         <div className={formulaCard}>
-          <p className={formulaLabel}>Venta en efectivo</p>
+          <div className="flex items-center gap-2">
+            <CardMark emoji="🛒" />
+            <p className={formulaLabel}>Venta en efectivo</p>
+          </div>
           <p className={formulaValue}>{formatMoney(drawer.sales)}</p>
         </div>
         <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
           =
         </span>
         <div className={`${formulaCard} min-w-[18rem] flex-[1.35]`}>
-          <label className={formulaLabel} htmlFor="drawer-count">
-            Debería haber
-          </label>
+          <div className="flex items-center gap-2">
+            <CardMark emoji="🧮" />
+            <label className={formulaLabel} htmlFor="drawer-count">
+              Debería haber
+            </label>
+          </div>
           <DecimalInput
             id="drawer-count"
             className={editableTotal}
