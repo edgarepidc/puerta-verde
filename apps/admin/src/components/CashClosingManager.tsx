@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   cashCloseValidationError,
   expectedCashOnHand,
+  expectedCashOnHandForCount,
   formatMoney,
   todayMexicoYmd,
   type CashDrawerLine,
@@ -53,9 +54,11 @@ interface CashSummary {
 const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
 const dayButtonOff =
   'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
-const formulaCard = 'min-w-[8.75rem] flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-4';
+const formulaCard = 'min-w-[8.75rem] flex-1 rounded-2xl border-2 border-slate-300 bg-white px-4 py-4';
 const formulaInput =
   'w-full bg-transparent text-xl font-semibold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
+const editableTotal =
+  'mt-1 w-full rounded-lg border-2 border-[var(--pv-green-700)] bg-[var(--pv-green-50)] px-2 py-1.5 text-xl font-semibold tabular-nums text-slate-900 outline-none focus:border-[var(--pv-green-800)] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-50';
 
 interface Withdrawal {
   id: string;
@@ -340,9 +343,12 @@ export function CashClosingManager({
           =
         </span>
         <div className={formulaCard}>
-          <p className="text-xs text-slate-500">Debería haber</p>
+          <label className="text-xs text-slate-500" htmlFor="drawer-count">
+            Debería haber
+          </label>
           <DecimalInput
-            className={`${formulaInput} mt-1`}
+            id="drawer-count"
+            className={editableTotal}
             value={drawer.countValue}
             onChange={(value) => {
               setCountEdited(true);
@@ -351,6 +357,17 @@ export function CashClosingManager({
             disabled={!canEditClose}
             groupThousands
           />
+          <p className="mt-2 text-xs text-slate-500">
+            Esperado{' '}
+            {formatMoney(
+              expectedCashOnHandForCount(
+                openingFloat === '' ? 0 : Number(openingFloat),
+                drawer.sales,
+                drawer.lines,
+                drawer.countValue === '' ? null : Number(drawer.countValue),
+              ),
+            )}
+          </p>
         </div>
       </div>
 
@@ -359,36 +376,38 @@ export function CashClosingManager({
         cashSales={drawer.sales}
         cashLines={drawer.lines}
         countedCash={drawer.countValue === '' ? null : Number(drawer.countValue)}
+        linesOnly
       />
 
-      <label className="block max-w-xl">
-        <span className="text-sm text-slate-600">Notas</span>
-        <input
-          type="text"
-          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-900 disabled:bg-slate-50"
-          value={notes}
-          disabled={!canEditClose}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Si no cuadra, anota por qué"
-        />
-      </label>
-
-      {canEditClose ? (
-        <button
-          type="button"
-          className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-          disabled={closing || closeBlocked}
-          onClick={closeDay}
-        >
-          {summary.closing
-            ? closing
-              ? 'Guardando…'
-              : 'Guardar cambio'
-            : closing
-              ? 'Cerrando…'
-              : 'Cerrar el día'}
-        </button>
-      ) : null}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block min-w-[16rem] flex-1">
+          <span className="text-sm text-slate-600">Notas</span>
+          <input
+            type="text"
+            className="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-[var(--pv-green-700)] disabled:bg-slate-50"
+            value={notes}
+            disabled={!canEditClose}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Si no cuadra, anota por qué"
+          />
+        </label>
+        {canEditClose ? (
+          <button
+            type="button"
+            className="rounded-full bg-[var(--pv-green-700)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--pv-green-800)] disabled:opacity-50"
+            disabled={closing || closeBlocked}
+            onClick={closeDay}
+          >
+            {summary.closing
+              ? closing
+                ? 'Guardando…'
+                : 'Guardar cambio'
+              : closing
+                ? 'Cerrando…'
+                : 'Cerrar el día'}
+          </button>
+        ) : null}
+      </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {canEditClose && !summary.closing ? (
         <p className="text-sm text-slate-500">
