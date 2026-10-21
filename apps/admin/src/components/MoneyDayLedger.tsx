@@ -182,10 +182,9 @@ export function MoneyDayLedger({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <FoldableSummary
+        plain
         title="Movimientos de dinero"
-        hint={`${formatMexicoSpokenDay(ledger.from)} – ${formatMexicoSpokenDay(ledger.to)} · compara la cuenta con el banco`}
-        emoji="🏦"
-        iconClass="bg-sky-100"
+        hint={`${formatMexicoSpokenDay(ledger.from)} – ${formatMexicoSpokenDay(ledger.to)}`}
       />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

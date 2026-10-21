@@ -3,15 +3,15 @@
 import { useEffect, useState } from 'react';
 
 import {
-  PAYMENT_METHOD_LABELS,
   cashCloseValidationError,
+  expectedCashOnHand,
   formatMoney,
   todayMexicoYmd,
   type CashDrawerLine,
   type MoneyLedger,
 } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
 import { CashCloseExpected } from '@/components/CashCloseExpected';
 import { DecimalInput } from '@/components/DecimalInput';
 import { MoneyDayLedger } from '@/components/MoneyDayLedger';
@@ -50,7 +50,12 @@ interface CashSummary {
   cashLines?: CashDrawerLine[];
 }
 
-const METHOD_KEYS = ['cash', 'card_terminal', 'transfer', 'online'] as const;
+const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
+const dayButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const formulaCard = 'min-w-[8.75rem] flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-4';
+const formulaInput =
+  'w-full bg-transparent text-xl font-semibold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
 
 interface Withdrawal {
   id: string;
@@ -74,10 +79,10 @@ export function CashClosingManager({
   const [notes, setNotes] = useState('');
   const [openingFloat, setOpeningFloat] = useState('');
   const [countedCash, setCountedCash] = useState('');
+  const [countEdited, setCountEdited] = useState(false);
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openCaja, setOpenCaja] = useState(true);
   const [moneyLedger, setMoneyLedger] = useState<MoneyLedger | null>(null);
   // Withdrawals
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -112,6 +117,7 @@ export function CashClosingManager({
       setCountedCash(
         payload.closing?.counted_cash != null ? String(payload.closing.counted_cash) : '',
       );
+      setCountEdited(false);
       const wdPayload = await wdRes.json();
       setWithdrawals(wdPayload.withdrawals ?? []);
       if (moneyRes.ok) {
@@ -176,8 +182,23 @@ export function CashClosingManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
+  function resolveCount(edited = countEdited) {
+    const sales = Number(summary?.totals.cash ?? 0);
+    const lines = summary?.cashLines ?? [];
+    const floatNumber = openingFloat === '' ? 0 : Number(openingFloat);
+    const expected = expectedCashOnHand(Number.isFinite(floatNumber) ? floatNumber : 0, sales, lines);
+    const locked = Boolean(summary?.closing) || edited;
+    return {
+      expected,
+      sales,
+      lines,
+      countValue: locked ? countedCash : String(expected),
+    };
+  }
+
   async function closeDay() {
     const revising = Boolean(summary?.closing);
+    const { countValue, sales, lines } = resolveCount();
     if (revising ? !canRevise : !canManage) {
       setError(
         revising
@@ -187,11 +208,11 @@ export function CashClosingManager({
       return;
     }
     const validation = cashCloseValidationError({
-      countedCash: countedCash === '' ? '' : Number(countedCash),
+      countedCash: countValue === '' ? '' : Number(countValue),
       openingFloat: openingFloat === '' ? '' : Number(openingFloat),
-      cashSales: Number(summary?.totals.cash ?? 0),
+      cashSales: sales,
       notes,
-      cashLines: summary?.cashLines,
+      cashLines: lines,
     });
     if (validation) {
       setError(validation);
@@ -207,7 +228,7 @@ export function CashClosingManager({
           date: selectedDate,
           notes,
           openingFloat: openingFloat === '' ? null : Number(openingFloat),
-          countedCash: countedCash === '' ? null : Number(countedCash),
+          countedCash: countValue === '' ? null : Number(countValue),
         }),
       });
       const payload = await response.json();
@@ -220,17 +241,14 @@ export function CashClosingManager({
     }
   }
 
-  const otherTotal =
-    Number(summary?.totals.card_terminal ?? 0) +
-    Number(summary?.totals.transfer ?? 0) +
-    Number(summary?.totals.online ?? 0);
+  const drawer = resolveCount();
   const closeBlocked = Boolean(
     cashCloseValidationError({
-      countedCash: countedCash === '' ? '' : Number(countedCash),
+      countedCash: drawer.countValue === '' ? '' : Number(drawer.countValue),
       openingFloat: openingFloat === '' ? '' : Number(openingFloat),
-      cashSales: Number(summary?.totals.cash ?? 0),
+      cashSales: drawer.sales,
       notes,
-      cashLines: summary?.cashLines,
+      cashLines: drawer.lines,
     }),
   );
 
@@ -255,22 +273,22 @@ export function CashClosingManager({
 
       {/* Day filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <ActionChip
-          tone={isToday ? 'emerald' : 'slate'}
-          elevated={isToday}
+        <button
+          type="button"
+          className={isToday ? dayButtonOn : dayButtonOff}
           onClick={() => setSelectedDate(todayYmd)}
         >
           Hoy
-        </ActionChip>
-        <ActionChip
-          tone={selectedDate === yesterdayMexicoYmd() ? 'emerald' : 'slate'}
-          elevated={selectedDate === yesterdayMexicoYmd()}
+        </button>
+        <button
+          type="button"
+          className={selectedDate === yesterdayMexicoYmd() ? dayButtonOn : dayButtonOff}
           onClick={() => setSelectedDate(yesterdayMexicoYmd())}
         >
           Ayer
-        </ActionChip>
-        <label className="flex items-center gap-1.5 text-sm text-slate-500">
-          <span>📅</span>
+        </button>
+        <label className="text-sm text-slate-600">
+          <span className="sr-only">Elegir día</span>
           <input
             type="date"
             max={todayYmd}
@@ -278,7 +296,7 @@ export function CashClosingManager({
             onChange={(e) => {
               if (e.target.value) setSelectedDate(e.target.value);
             }}
-            className="pv-input h-8 py-1 text-sm"
+            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm text-slate-800"
           />
         </label>
       </div>
@@ -289,196 +307,104 @@ export function CashClosingManager({
         <p className="text-sm text-slate-500">Sin datos para este día.</p>
       ) : null}
 
-      {summary ? (<><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xl"
-            aria-hidden
-          >
-            📅
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Día
-            </p>
-            <p className="mt-0.5 text-xl font-bold leading-snug text-slate-900">
-              {formatMexicoSpokenDay(summary.closingDate)}
-            </p>
-            <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
-          </div>
+      {summary ? (
+        <>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className={formulaCard}>
+          <p className="text-xs text-slate-500">Día</p>
+          <p className="mt-1 text-xl font-semibold leading-snug text-slate-900">
+            {formatMexicoSpokenDay(summary.closingDate)}
+          </p>
+          <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
         </div>
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xl"
-            aria-hidden
-          >
-            💰
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Total del día
-            </p>
-            <p className="mt-0.5 text-xl font-bold text-emerald-800">
-              {formatMoney(summary.grandTotal)}
-            </p>
-            <p className="text-xs text-slate-500">
-              {summary.orderCount} pago{summary.orderCount === 1 ? '' : 's'}
-            </p>
-          </div>
+        <div className={formulaCard}>
+          <p className="text-xs text-slate-500">Fondo inicial</p>
+          <DecimalInput
+            className={`${formulaInput} mt-1`}
+            value={openingFloat}
+            onChange={setOpeningFloat}
+            disabled={!canEditClose}
+            groupThousands
+          />
         </div>
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xl"
-            aria-hidden
-          >
-            💵
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Efectivo
-            </p>
-            <p className="mt-0.5 text-xl font-bold text-slate-900">
-              {formatMoney(summary.totals.cash ?? 0)}
-            </p>
-            <p className="text-xs text-slate-500">Debería haber en caja</p>
-          </div>
+        <span className="px-1 text-2xl font-medium text-slate-400" aria-hidden>
+          +
+        </span>
+        <div className={formulaCard}>
+          <p className="text-xs text-slate-500">Venta en efectivo</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">
+            {formatMoney(drawer.sales)}
+          </p>
         </div>
-        <div className="pv-glass-card flex gap-3 p-4">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl"
-            aria-hidden
-          >
-            💳
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Otros pagos
-            </p>
-            <p className="mt-0.5 text-xl font-bold text-amber-800">{formatMoney(otherTotal)}</p>
-            <p className="text-xs text-slate-500">
-              {METHOD_KEYS.filter((method) => method !== 'cash')
-                .map((method) => PAYMENT_METHOD_LABELS[method])
-                .join(' · ')}
-            </p>
-          </div>
+        <span className="px-1 text-2xl font-medium text-slate-400" aria-hidden>
+          =
+        </span>
+        <div className={formulaCard}>
+          <p className="text-xs text-slate-500">Debería haber</p>
+          <DecimalInput
+            className={`${formulaInput} mt-1`}
+            value={drawer.countValue}
+            onChange={(value) => {
+              setCountEdited(true);
+              setCountedCash(value);
+            }}
+            disabled={!canEditClose}
+            groupThousands
+          />
         </div>
       </div>
 
-      <details
-        className="group pv-glass-card space-y-4 p-4 sm:p-6"
-        open={openCaja}
-        onToggle={(event) => setOpenCaja(event.currentTarget.open)}
-      >
-        <FoldableSummary
-          title="Cerrar caja"
-          hint={
-            summary.closing
-              ? `Historial del día · ${summary.branchName}`
-              : `Fondo, conteo y notas · ${summary.branchName}`
-          }
-          emoji="🧾"
-          iconClass="bg-rose-100"
-          actions={
-            summary.closing ? (
-              <ActionChip as="span" emoji="✅" elevated={false}>
-                Guardado
-              </ActionChip>
-            ) : undefined
-          }
-        />
+      <CashCloseExpected
+        openingFloat={openingFloat === '' ? 0 : Number(openingFloat)}
+        cashSales={drawer.sales}
+        cashLines={drawer.lines}
+        countedCash={drawer.countValue === '' ? null : Number(drawer.countValue)}
+      />
 
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <PillField
-              label="Fondo inicial"
-              icon="$"
-              tone="slate"
-              className="w-[9.75rem] shrink-0"
-              disabled={!canEditClose}
-            >
-              <DecimalInput
-                className={pillInputClass('slate')}
-                value={openingFloat}
-                onChange={setOpeningFloat}
-                disabled={!canEditClose}
-                groupThousands
-              />
-            </PillField>
-            <PillField
-              label="Efectivo contado"
-              icon="$"
-              tone="emerald"
-              className="w-[9.75rem] shrink-0"
-              disabled={!canEditClose}
-            >
-              <DecimalInput
-                className={pillInputClass('emerald')}
-                value={countedCash}
-                onChange={setCountedCash}
-                disabled={!canEditClose}
-                groupThousands
-              />
-            </PillField>
-            <PillField
-              label="Notas del cierre"
-              icon="📝"
-              tone="sky"
-              className="min-w-[10rem] flex-1"
-              disabled={!canEditClose}
-            >
-              <input
-                type="text"
-                className={pillInputClass('sky')}
-                value={notes}
-                disabled={!canEditClose}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Obligatorias si hay diferencia, ej. faltante de $20"
-              />
-            </PillField>
-            {canEditClose ? (
-              <ActionChip
-                className="shrink-0"
-                emoji="💰"
-                tone={summary.closing ? 'sky' : 'amber'}
-                disabled={closing || closeBlocked}
-                onClick={closeDay}
-              >
-                {summary.closing
-                  ? closing
-                    ? 'Guardando…'
-                    : 'Guardar cambio'
-                  : closing
-                    ? 'Cerrando…'
-                    : 'Cerrar caja del día'}
-              </ActionChip>
-            ) : null}
-          </div>
-          {countedCash !== '' || (summary.cashLines?.length ?? 0) > 0 ? (
-            <CashCloseExpected
-              openingFloat={openingFloat === '' ? 0 : Number(openingFloat)}
-              cashSales={Number(summary.totals.cash)}
-              cashLines={summary.cashLines ?? []}
-              countedCash={countedCash === '' ? null : Number(countedCash)}
-            />
-          ) : null}
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {canEditClose && !summary.closing ? (
-            <p className="text-xs text-slate-500">
-              El conteo es obligatorio. Si no cuadra, anota por qué. Queda como historial del día y no cambia el total.
-            </p>
-          ) : null}
-          {summary.closing && canRevise ? (
-            <p className="text-xs text-slate-500">
-              Puedes corregir el conteo o las notas de este día. Caja y cuenta siguen las ventas y compras actuales.
-            </p>
-          ) : null}
-          {summary.closing && !canRevise ? (
-            <p className="text-xs text-slate-500">
-              Este día ya quedó registrado. Solo un administrador puede corregirlo.
-            </p>
-          ) : null}
-        </div>
-      </details>
+      <label className="block max-w-xl">
+        <span className="text-sm text-slate-600">Notas</span>
+        <input
+          type="text"
+          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-900 disabled:bg-slate-50"
+          value={notes}
+          disabled={!canEditClose}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Si no cuadra, anota por qué"
+        />
+      </label>
+
+      {canEditClose ? (
+        <button
+          type="button"
+          className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          disabled={closing || closeBlocked}
+          onClick={closeDay}
+        >
+          {summary.closing
+            ? closing
+              ? 'Guardando…'
+              : 'Guardar cambio'
+            : closing
+              ? 'Cerrando…'
+              : 'Cerrar el día'}
+        </button>
+      ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {canEditClose && !summary.closing ? (
+        <p className="text-sm text-slate-500">
+          El conteo queda en el historial del día. Caja y cuenta siguen las ventas y las compras.
+        </p>
+      ) : null}
+      {summary.closing && canRevise ? (
+        <p className="text-sm text-slate-500">
+          Puedes corregir el total o la nota. Caja y cuenta siguen las ventas y las compras.
+        </p>
+      ) : null}
+      {summary.closing && !canRevise ? (
+        <p className="text-sm text-slate-500">
+          Este día ya quedó registrado. Solo un administrador puede corregirlo.
+        </p>
+      ) : null}
 
       <details
         className="group pv-glass-card space-y-4 p-4 sm:p-6"
@@ -486,29 +412,18 @@ export function CashClosingManager({
         onToggle={(event) => setOpenRetiros(event.currentTarget.open)}
       >
         <FoldableSummary
+          plain
           title="Movimientos de efectivo"
           hint={
             withdrawals.length > 0
-              ? `${withdrawals.length} movimiento${withdrawals.length === 1 ? '' : 's'}`
+              ? [
+                  toAccountTotal > 0 ? `A cuenta ${formatMoney(toAccountTotal)}` : '',
+                  toCashTotal > 0 ? `A efectivo ${formatMoney(toCashTotal)}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ') ||
+                `${withdrawals.length} movimiento${withdrawals.length === 1 ? '' : 's'}`
               : 'De caja a la cuenta, o de la cuenta a caja para la central'
-          }
-          emoji="💸"
-          iconClass="bg-violet-100"
-          actions={
-            withdrawals.length > 0 ? (
-              <>
-                {toAccountTotal > 0 ? (
-                  <ActionChip as="span" emoji="💜" tone="slate" elevated={false}>
-                    A cuenta {formatMoney(toAccountTotal)}
-                  </ActionChip>
-                ) : null}
-                {toCashTotal > 0 ? (
-                  <ActionChip as="span" emoji="💵" tone="emerald" elevated={false}>
-                    A efectivo {formatMoney(toCashTotal)}
-                  </ActionChip>
-                ) : null}
-              </>
-            ) : undefined
           }
         />
         <div className="mt-4 space-y-4">
@@ -531,24 +446,22 @@ export function CashClosingManager({
                   onChange={(e) => setWithdrawalNotes(e.target.value)}
                 />
               </PillField>
-              <ActionChip
-                className="shrink-0"
-                emoji="💸"
-                tone="sky"
+              <button
+                type="button"
+                className={dayButtonOff}
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('account')}
               >
-                {savingWithdrawal ? 'Guardando…' : 'Registrar retiro'}
-              </ActionChip>
-              <ActionChip
-                className="shrink-0"
-                emoji="💵"
-                tone="emerald"
+                {savingWithdrawal ? 'Guardando…' : 'A cuenta'}
+              </button>
+              <button
+                type="button"
+                className={dayButtonOff}
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('cash')}
               >
-                {savingWithdrawal ? 'Guardando…' : 'Traer a efectivo'}
-              </ActionChip>
+                {savingWithdrawal ? 'Guardando…' : 'A efectivo'}
+              </button>
             </div>
           ) : null}
           {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
