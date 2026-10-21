@@ -10,7 +10,7 @@ import {
   type MoneyLedger,
 } from '@puertaverde/shared';
 
-import { FoldableSummary } from '@/components/ActionChip';
+import { TextSummary } from '@/components/ActionChip';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
 function signedMoney(amount: number): string {
@@ -177,15 +177,13 @@ export function MoneyDayLedger({
 
   return (
     <details
-      className="group pv-glass-card min-w-0 space-y-4 overflow-hidden p-4 sm:p-6"
+      className="group min-w-0 space-y-4 overflow-hidden border-t border-slate-200 pt-4"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <FoldableSummary
-        title="Movimientos de dinero"
-        hint={`${formatMexicoSpokenDay(ledger.from)} – ${formatMexicoSpokenDay(ledger.to)} · compara la cuenta con el banco`}
-        emoji="🏦"
-        iconClass="bg-sky-100"
+      <TextSummary
+        title="El mes"
+        hint={`${formatMexicoSpokenDay(ledger.from)} – ${formatMexicoSpokenDay(ledger.to)}`}
       />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -215,8 +213,8 @@ export function MoneyDayLedger({
               <details
                 className={
                   reviewingThis
-                    ? 'group/day rounded-2xl border-2 border-emerald-500 bg-emerald-50/70 shadow-[0_0_0_4px_rgba(16,185,129,0.18)]'
-                    : 'group/day rounded-xl border border-slate-100 bg-white'
+                    ? 'group/day rounded-xl border border-slate-900 bg-slate-50'
+                    : 'group/day rounded-xl border border-slate-200 bg-white'
                 }
                 open={reviewingThis}
               >
@@ -234,7 +232,7 @@ export function MoneyDayLedger({
                         {formatMexicoWeekday(day.ymd)}
                       </span>
                       {reviewingThis ? (
-                        <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                        <span className="ml-2 rounded-full bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">
                           Revisando
                         </span>
                       ) : null}
