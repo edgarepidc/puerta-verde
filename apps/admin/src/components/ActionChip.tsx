@@ -146,22 +146,26 @@ export function FoldableSummary({
   emoji,
   iconClass,
   actions,
+  plain = false,
 }: {
   title: string;
   hint: string;
-  emoji: string;
-  iconClass: string;
+  emoji?: string;
+  iconClass?: string;
   actions?: ReactNode;
+  plain?: boolean;
 }) {
   return (
     <summary className="flex cursor-pointer list-none items-start justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
       <div className="flex min-w-0 items-start gap-3">
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${iconClass}`}
-          aria-hidden
-        >
-          {emoji}
-        </div>
+        {plain || !emoji ? null : (
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${iconClass ?? ''}`}
+            aria-hidden
+          >
+            {emoji}
+          </div>
+        )}
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <p className="mt-0.5 text-sm font-normal text-slate-500">{hint}</p>
