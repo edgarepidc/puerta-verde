@@ -629,8 +629,8 @@ export function ProfitabilityManager({
   const [loadingPeriod, setLoadingPeriod] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllMargins, setShowAllMargins] = useState(false);
-  const [openVentas, setOpenVentas] = useState(false);
-  const [openGastosUtilidad, setOpenGastosUtilidad] = useState(false);
+  const [openVentas, setOpenVentas] = useState(true);
+  const [openGastosUtilidad, setOpenGastosUtilidad] = useState(true);
   const [openCategoria, setOpenCategoria] = useState(false);
   const [openMargenes, setOpenMargenes] = useState(false);
   const [openGastosLista, setOpenGastosLista] = useState(false);
