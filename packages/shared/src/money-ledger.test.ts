@@ -13,15 +13,12 @@ import {
   positionResetsBalance,
 } from './money-ledger';
 
-test('cash closes after the 2 Oct adjustment stay as history', () => {
+test('cash closes after the 9 Oct close stay as history', () => {
   assert.equal(positionResetsBalance('2026-08-31', null), true);
-  assert.equal(positionResetsBalance('2026-09-28', null), true);
-  assert.equal(
-    positionResetsBalance('2026-09-30', 'Ajuste 2 oct 2026: Central no pagadas en efectivo'),
-    true,
-  );
-  assert.equal(positionResetsBalance('2026-10-05', 'Cierre de caja'), false);
-  assert.equal(positionResetsBalance('2026-10-09', 'Cierre de caja'), false);
+  assert.equal(positionResetsBalance('2026-09-30', 'Ajuste 2 oct 2026: Central no pagadas en efectivo'), true);
+  assert.equal(positionResetsBalance('2026-10-05', 'Cierre de caja'), true);
+  assert.equal(positionResetsBalance('2026-10-09', 'Cierre de caja'), true);
+  assert.equal(positionResetsBalance('2026-10-10', 'Cierre de caja'), false);
   assert.equal(positionResetsBalance('2026-10-19', 'Cierre de caja'), false);
   assert.equal(positionResetsBalance('2026-11-02', 'Ajuste manual de caja y cuenta'), true);
 });
