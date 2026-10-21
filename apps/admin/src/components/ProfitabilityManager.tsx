@@ -40,6 +40,7 @@ import {
 
 import { ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
 import { MoneyPocketField } from '@/components/MoneyPocketField';
+import { PillField, pillInputClass } from '@/components/PillField';
 import {
   PeriodSalesCharts,
   type PaymentRow,
@@ -238,18 +239,21 @@ function ChargeDayField({
   const ymd = `${year}-${monthKey}-${pad2(selected)}`;
 
   return (
-    <input
-      type="date"
-      className="pv-input min-w-0"
-      aria-label="Se suma el día"
-      min={`${year}-${monthKey}-01`}
-      max={`${year}-${monthKey}-${pad2(dayCount)}`}
-      value={ymd}
-      onChange={(event) => {
-        const day = Number(event.target.value.slice(8, 10));
-        if (Number.isInteger(day) && day >= 1 && day <= 31) onChange(day);
-      }}
-    />
+    <label className="block w-[9.75rem] shrink-0 text-sm">
+      <span className="text-slate-600">Se suma el día</span>
+      <input
+        type="date"
+        className="pv-input mt-1 block text-sm"
+        aria-label="Se suma el día"
+        min={`${year}-${monthKey}-01`}
+        max={`${year}-${monthKey}-${pad2(dayCount)}`}
+        value={ymd}
+        onChange={(event) => {
+          const day = Number(event.target.value.slice(8, 10));
+          if (Number.isInteger(day) && day >= 1 && day <= 31) onChange(day);
+        }}
+      />
+    </label>
   );
 }
 
@@ -1548,22 +1552,29 @@ export function ProfitabilityManager({
                               )
                             }
                           />
-                          <div className="grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)]">
-                          <input
-                            className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                            value={editCost.name}
-                            onChange={(e) =>
-                              setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
-                            }
-                          />
-                          <DecimalInput
-                            className="pv-input min-w-0"
-                            groupThousands
-                            value={editCost.amount}
-                            onChange={(value) =>
-                              setEditCost((d) => (d ? { ...d, amount: value } : d))
-                            }
-                          />
+                          <div className="flex flex-wrap items-end gap-2">
+                          <label className="block min-w-[12rem] flex-1 text-sm">
+                            <span className="text-sm text-slate-600">Nombre</span>
+                            <input
+                              className="pv-input mt-1 text-sm"
+                              placeholder="Nombre"
+                              value={editCost.name}
+                              onChange={(e) =>
+                                setEditCost((d) => (d ? { ...d, name: e.target.value } : d))
+                              }
+                            />
+                          </label>
+                          <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
+                            <DecimalInput
+                              placeholder="0"
+                              className={pillInputClass('emerald')}
+                              groupThousands
+                              value={editCost.amount}
+                              onChange={(value) =>
+                                setEditCost((d) => (d ? { ...d, amount: value } : d))
+                              }
+                            />
+                          </PillField>
                           <ChargeDayField
                             value={editCost.chargeDay}
                             onChange={(day) =>
@@ -1572,25 +1583,24 @@ export function ProfitabilityManager({
                             monthYmd={from}
                           />
                           <MoneyPocketField
+                            className="w-[9.75rem] shrink-0"
                             label="Sale de"
                             value={editCost.paidFrom}
                             onChange={(value) =>
                               setEditCost((d) => (d ? { ...d, paidFrom: value } : d))
                             }
                           />
-                          <div className="col-span-2 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className={menuAction}
-                              disabled={saving}
-                              onClick={() => void saveCostEdit()}
-                            >
-                              {saving ? 'Guardando…' : 'Guardar'}
-                            </button>
-                            <button type="button" className={menuButtonOff} onClick={() => setEditCost(null)}>
-                              Cancelar
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            className={menuAction}
+                            disabled={saving}
+                            onClick={() => void saveCostEdit()}
+                          >
+                            {saving ? 'Guardando…' : 'Guardar'}
+                          </button>
+                          <button type="button" className={menuButtonOff} onClick={() => setEditCost(null)}>
+                            Cancelar
+                          </button>
                           </div>
                         </div>
                       ) : (
@@ -1671,60 +1681,70 @@ export function ProfitabilityManager({
                     return (
                       <li key={row.id} className="px-4 py-2.5 text-sm">
                         {editing && editVisit ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              className="pv-input col-span-2"
-                              value={editVisit.concept}
-                              onChange={(e) =>
-                                setEditVisit((d) => (d ? { ...d, concept: e.target.value } : d))
-                              }
-                            />
-                            <DecimalInput
-                              className="pv-input"
-                              groupThousands
-                              value={editVisit.amount}
-                              onChange={(value) =>
-                                setEditVisit((d) => (d ? { ...d, amount: value } : d))
-                              }
-                            />
-                            <input
-                              type="date"
-                              max={today}
-                              className="pv-input"
-                              value={editVisit.expenseDate}
-                              onChange={(e) =>
-                                setEditVisit((d) => (d ? { ...d, expenseDate: e.target.value } : d))
-                              }
-                            />
-                            <input
-                              className="pv-input col-span-2"
-                              placeholder="Nota (opcional)"
-                              value={editVisit.notes}
-                              onChange={(e) =>
-                                setEditVisit((d) => (d ? { ...d, notes: e.target.value } : d))
-                              }
-                            />
-                            <div className="col-span-2">
-                              <MoneyPocketField
-                                value={editVisit.paidFrom}
-                                onChange={(value) =>
-                                  setEditVisit((d) => (d ? { ...d, paidFrom: value } : d))
+                          <div className="flex flex-wrap items-end gap-2">
+                            <label className="block min-w-[12rem] flex-1 text-sm">
+                              <span className="text-sm text-slate-600">Concepto</span>
+                              <input
+                                className="pv-input mt-1 text-sm"
+                                placeholder="Concepto"
+                                value={editVisit.concept}
+                                onChange={(e) =>
+                                  setEditVisit((d) => (d ? { ...d, concept: e.target.value } : d))
                                 }
                               />
-                            </div>
-                            <div className="col-span-2 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                className={menuAction}
-                                disabled={saving}
-                                onClick={() => void saveVisitEdit()}
-                              >
-                                {saving ? 'Guardando…' : 'Guardar'}
-                              </button>
-                              <button type="button" className={menuButtonOff} onClick={() => setEditVisit(null)}>
-                                Cancelar
-                              </button>
-                            </div>
+                            </label>
+                            <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
+                              <DecimalInput
+                                placeholder="0"
+                                className={pillInputClass('emerald')}
+                                groupThousands
+                                value={editVisit.amount}
+                                onChange={(value) =>
+                                  setEditVisit((d) => (d ? { ...d, amount: value } : d))
+                                }
+                              />
+                            </PillField>
+                            <label className="block w-[9.75rem] shrink-0 text-sm">
+                              <span className="text-slate-600">Fecha</span>
+                              <input
+                                type="date"
+                                max={today}
+                                className="pv-input mt-1 block text-sm"
+                                value={editVisit.expenseDate}
+                                onChange={(e) =>
+                                  setEditVisit((d) => (d ? { ...d, expenseDate: e.target.value } : d))
+                                }
+                              />
+                            </label>
+                            <label className="block min-w-[12rem] flex-1 text-sm">
+                              <span className="text-sm text-slate-600">Nota</span>
+                              <input
+                                className="pv-input mt-1 text-sm"
+                                placeholder="Nota (opcional)"
+                                value={editVisit.notes}
+                                onChange={(e) =>
+                                  setEditVisit((d) => (d ? { ...d, notes: e.target.value } : d))
+                                }
+                              />
+                            </label>
+                            <MoneyPocketField
+                              className="w-[9.75rem] shrink-0"
+                              value={editVisit.paidFrom}
+                              onChange={(value) =>
+                                setEditVisit((d) => (d ? { ...d, paidFrom: value } : d))
+                              }
+                            />
+                            <button
+                              type="button"
+                              className={menuAction}
+                              disabled={saving}
+                              onClick={() => void saveVisitEdit()}
+                            >
+                              {saving ? 'Guardando…' : 'Guardar'}
+                            </button>
+                            <button type="button" className={menuButtonOff} onClick={() => setEditVisit(null)}>
+                              Cancelar
+                            </button>
                           </div>
                         ) : (
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1811,35 +1831,39 @@ export function ProfitabilityManager({
                   }))
                 }
               />
-              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
-                <input
-                  placeholder="Nombre"
-                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                  value={costForm.name}
-                  onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
-                />
-                <DecimalInput
-                  placeholder="Monto"
-                  className="pv-input min-w-0"
-                  groupThousands
-                  value={costAmountText}
-                  onChange={setCostAmountText}
-                />
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-sm text-slate-600">Nombre</span>
+                  <input
+                    placeholder="Nombre"
+                    className="pv-input mt-1 text-sm"
+                    value={costForm.name}
+                    onChange={(e) => setCostForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                </label>
+                <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
+                  <DecimalInput
+                    placeholder="0"
+                    className={pillInputClass('emerald')}
+                    groupThousands
+                    value={costAmountText}
+                    onChange={setCostAmountText}
+                  />
+                </PillField>
                 <ChargeDayField
                   value={costForm.chargeDay ?? 1}
                   onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
                   monthYmd={from}
                 />
                 <MoneyPocketField
+                  className="w-[9.75rem] shrink-0"
                   label="Sale de"
                   value={costForm.paidFrom ?? 'account'}
                   onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
                 />
-                <div className="col-span-2 flex justify-end lg:col-span-1">
-                  <button type="button" className={menuAction} disabled={saving} onClick={addCost}>
-                    Agregar costo
-                  </button>
-                </div>
+                <button type="button" className={menuAction} disabled={saving} onClick={addCost}>
+                  Agregar costo
+                </button>
               </div>
             </div>
         </div>
@@ -1885,8 +1909,8 @@ export function ProfitabilityManager({
                   return (
                     <li key={row.id} className="px-4 py-2.5 text-sm">
                       {editing && editIncome ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="col-span-2 flex flex-wrap gap-2">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
                             {(['contribution', 'operating'] as IncomeEntryType[]).map((key) => (
                               <button
                                 key={key}
@@ -1900,48 +1924,60 @@ export function ProfitabilityManager({
                               </button>
                             ))}
                           </div>
-                          <input
-                            className="pv-input col-span-2"
-                            value={editIncome.concept}
-                            onChange={(e) =>
-                              setEditIncome((d) => (d ? { ...d, concept: e.target.value } : d))
-                            }
-                          />
-                          <DecimalInput
-                            className="pv-input"
-                            groupThousands
-                            value={editIncome.amount}
-                            onChange={(value) =>
-                              setEditIncome((d) => (d ? { ...d, amount: value } : d))
-                            }
-                          />
-                          <input
-                            type="date"
-                            max={today}
-                            className="pv-input"
-                            value={editIncome.entryDate}
-                            onChange={(e) =>
-                              setEditIncome((d) => (d ? { ...d, entryDate: e.target.value } : d))
-                            }
-                          />
-                          <div className="col-span-2">
+                          <div className="flex flex-wrap items-end gap-2">
+                            <label className="block min-w-[12rem] flex-1 text-sm">
+                              <span className="text-sm text-slate-600">Concepto</span>
+                              <input
+                                className="pv-input mt-1 text-sm"
+                                placeholder="Concepto"
+                                value={editIncome.concept}
+                                onChange={(e) =>
+                                  setEditIncome((d) => (d ? { ...d, concept: e.target.value } : d))
+                                }
+                              />
+                            </label>
+                            <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
+                              <DecimalInput
+                                placeholder="0"
+                                className={pillInputClass('emerald')}
+                                groupThousands
+                                value={editIncome.amount}
+                                onChange={(value) =>
+                                  setEditIncome((d) => (d ? { ...d, amount: value } : d))
+                                }
+                              />
+                            </PillField>
+                            <label className="block w-[9.75rem] shrink-0 text-sm">
+                              <span className="text-slate-600">Fecha</span>
+                              <input
+                                type="date"
+                                max={today}
+                                className="pv-input mt-1 block text-sm"
+                                value={editIncome.entryDate}
+                                onChange={(e) =>
+                                  setEditIncome((d) => (d ? { ...d, entryDate: e.target.value } : d))
+                                }
+                              />
+                            </label>
                             <MoneyPocketField
+                              className="w-[9.75rem] shrink-0"
                               label="Entra a"
                               value={editIncome.paidFrom}
                               onChange={(value) =>
                                 setEditIncome((d) => (d ? { ...d, paidFrom: value } : d))
                               }
                             />
-                          </div>
-                          <input
-                            className="pv-input col-span-2"
-                            placeholder="Nota (opcional)"
-                            value={editIncome.notes}
-                            onChange={(e) =>
-                              setEditIncome((d) => (d ? { ...d, notes: e.target.value } : d))
-                            }
-                          />
-                          <div className="col-span-2 flex flex-wrap gap-2">
+                            <label className="block min-w-[12rem] flex-1 text-sm">
+                              <span className="text-sm text-slate-600">Nota</span>
+                              <input
+                                className="pv-input mt-1 text-sm"
+                                placeholder="Nota (opcional)"
+                                value={editIncome.notes}
+                                onChange={(e) =>
+                                  setEditIncome((d) => (d ? { ...d, notes: e.target.value } : d))
+                                }
+                              />
+                            </label>
                             <button
                               type="button"
                               className={menuAction}
@@ -2014,44 +2050,54 @@ export function ProfitabilityManager({
                   </button>
                 ))}
               </div>
-              <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
-                <input
-                  placeholder="Concepto"
-                  className="pv-input min-w-0 col-span-2 lg:col-span-1"
-                  value={incomeConcept}
-                  onChange={(e) => setIncomeConcept(e.target.value)}
-                />
-                <DecimalInput
-                  placeholder="Monto"
-                  className="pv-input min-w-0"
-                  groupThousands
-                  value={incomeAmountText}
-                  onChange={setIncomeAmountText}
-                />
-                <input
-                  type="date"
-                  max={today}
-                  className="pv-input min-w-0"
-                  value={incomeDate}
-                  onChange={(e) => setIncomeDate(e.target.value)}
-                />
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-sm text-slate-600">Concepto</span>
+                  <input
+                    placeholder="Concepto"
+                    className="pv-input mt-1 text-sm"
+                    value={incomeConcept}
+                    onChange={(e) => setIncomeConcept(e.target.value)}
+                  />
+                </label>
+                <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
+                  <DecimalInput
+                    placeholder="0"
+                    className={pillInputClass('emerald')}
+                    groupThousands
+                    value={incomeAmountText}
+                    onChange={setIncomeAmountText}
+                  />
+                </PillField>
+                <label className="block w-[9.75rem] shrink-0 text-sm">
+                  <span className="text-slate-600">Fecha</span>
+                  <input
+                    type="date"
+                    max={today}
+                    className="pv-input mt-1 block text-sm"
+                    value={incomeDate}
+                    onChange={(e) => setIncomeDate(e.target.value)}
+                  />
+                </label>
                 <MoneyPocketField
+                  className="w-[9.75rem] shrink-0"
                   label="Entra a"
                   value={incomePaidFrom}
                   onChange={setIncomePaidFrom}
                 />
-                <div className="col-span-2 flex justify-end lg:col-span-1">
-                  <button type="button" className={menuAction} disabled={saving} onClick={() => void addIncome()}>
-                    Agregar
-                  </button>
-                </div>
+                <label className="block min-w-[12rem] flex-1 text-sm">
+                  <span className="text-sm text-slate-600">Nota</span>
+                  <input
+                    placeholder="Nota (opcional)"
+                    className="pv-input mt-1 text-sm"
+                    value={incomeNotes}
+                    onChange={(e) => setIncomeNotes(e.target.value)}
+                  />
+                </label>
+                <button type="button" className={menuAction} disabled={saving} onClick={() => void addIncome()}>
+                  Agregar
+                </button>
               </div>
-              <input
-                placeholder="Nota (opcional)"
-                className="pv-input mt-2 w-full text-sm"
-                value={incomeNotes}
-                onChange={(e) => setIncomeNotes(e.target.value)}
-              />
             </div>
           </div>
         </details>
