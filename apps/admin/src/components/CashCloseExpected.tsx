@@ -12,11 +12,13 @@ export function CashCloseExpected({
   cashSales,
   cashLines,
   countedCash,
+  linesOnly = false,
 }: {
   openingFloat: number;
   cashSales: number;
   cashLines: CashDrawerLine[];
   countedCash: number | null;
+  linesOnly?: boolean;
 }) {
   const counted = countedCash != null && Number.isFinite(countedCash) ? countedCash : null;
   const salesExpected = expectedCashOnHand(openingFloat, cashSales);
@@ -37,9 +39,11 @@ export function CashCloseExpected({
     <div className="space-y-1.5 text-sm">
       {hasActivity ? (
         <>
-          <p className="font-medium text-slate-700">
-            Fondo + efectivo vendido {formatMoney(salesExpected)}
-          </p>
+          {linesOnly ? null : (
+            <p className="font-medium text-slate-700">
+              Fondo + efectivo vendido {formatMoney(salesExpected)}
+            </p>
+          )}
           {takenFromDrawer.length > 0 ? (
             <div className="space-y-0.5">
               <p className="text-rose-800">Falta porque se tomó de caja para pagos:</p>
@@ -70,9 +74,9 @@ export function CashCloseExpected({
               ))}
             </div>
           ) : null}
-          <p className="font-medium text-slate-900">En caja {formatMoney(expected)}</p>
+          {linesOnly ? null : <p className="font-medium text-slate-900">En caja {formatMoney(expected)}</p>}
         </>
-      ) : (
+      ) : linesOnly ? null : (
         <p className="font-medium text-slate-700">Esperado {formatMoney(expected)}</p>
       )}
       {cashDiff == null ? (
