@@ -36,8 +36,23 @@ export function CashCloseExpected({
   const hasActivity = takenFromDrawer.length > 0 || cashIns.length > 0 || accountOnly.length > 0;
   if (linesOnly && !hasActivity) return null;
 
+  const shortageChip =
+    takenFromDrawer.length > 0 ? (
+      <div className="ml-auto w-fit max-w-full rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-right shadow-[0_4px_14px_rgba(190,18,60,0.08)]">
+        <p className="text-xs font-semibold text-rose-800">Falta porque se tomó de caja para pagos</p>
+        <div className="mt-1 space-y-0.5">
+          {takenFromDrawer.map((line, index) => (
+            <p key={`out-${index}`} className="text-sm font-medium tabular-nums text-rose-900">
+              {line.label} −{formatMoney(line.amount)}
+            </p>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
   return (
-    <div className="space-y-1.5 text-sm">
+    <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
+      <div className="min-w-0 space-y-1.5">
       {hasActivity ? (
         <>
           {linesOnly ? null : (
@@ -45,16 +60,6 @@ export function CashCloseExpected({
               Fondo + efectivo vendido {formatMoney(salesExpected)}
             </p>
           )}
-          {takenFromDrawer.length > 0 ? (
-            <div className="space-y-0.5">
-              <p className="text-rose-800">Falta porque se tomó de caja para pagos:</p>
-              {takenFromDrawer.map((line, index) => (
-                <p key={`out-${index}`} className="pl-3 text-rose-800">
-                  {line.label} −{formatMoney(line.amount)}
-                </p>
-              ))}
-            </div>
-          ) : null}
           {cashIns.length > 0 ? (
             <div className="space-y-0.5">
               <p className="text-emerald-800">Entró a caja:</p>
@@ -87,6 +92,8 @@ export function CashCloseExpected({
           {matches ? 'Cuadra con lo contado' : `Diferencia ${formatMoney(cashDiff)}`}
         </p>
       )}
+      </div>
+      {shortageChip}
     </div>
   );
 }
