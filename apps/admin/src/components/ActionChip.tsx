@@ -140,68 +140,6 @@ export function ActionChip({
   );
 }
 
-export function PlainButton({
-  children,
-  primary = false,
-  className = '',
-  disabled,
-  onClick,
-  type = 'button',
-}: {
-  children: ReactNode;
-  primary?: boolean;
-  className?: string;
-  disabled?: boolean;
-  onClick?: () => void | Promise<void>;
-  type?: 'button' | 'submit';
-}) {
-  const look = primary
-    ? 'bg-slate-900 text-white hover:bg-slate-800'
-    : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50';
-  return (
-    <button
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
-      className={`inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${look} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-export function QuietField({
-  label,
-  children,
-  className = '',
-}: {
-  label: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block min-w-0 ${className}`}>
-      <span className="text-sm text-slate-600">{label}</span>
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-export const quietInputClass =
-  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-900 disabled:bg-slate-50 disabled:text-slate-500';
-
-export function TextSummary({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 marker:content-none [&::-webkit-details-marker]:hidden">
-      <div className="min-w-0">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        {hint ? <p className="mt-0.5 text-sm font-normal text-slate-500">{hint}</p> : null}
-      </div>
-      <ChevronDownIcon className="shrink-0 text-slate-400" />
-    </summary>
-  );
-}
-
 export function FoldableSummary({
   title,
   hint,
