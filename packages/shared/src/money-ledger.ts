@@ -35,7 +35,10 @@ export interface MoneyDayRow {
   netAccount: number;
   runningCash: number | null;
   runningAccount: number | null;
+  /** This day has a saved close. It does not reset the running balance. */
   counted: boolean;
+  /** Cash counted when the day was closed. History only. */
+  countedCash: number | null;
   details: MoneyDayDetail[];
   countAdjustCash: number;
   countAdjustAccount: number;
@@ -110,22 +113,11 @@ export interface MoneyLedgerTransferRow {
 }
 
 export interface MoneyLedgerCount extends MoneyPositionSnapshot {
-  /** When the count was saved. Later entries on that day still move the balance. */
+  /** Counted cash saved with the close. Null when the close has no count. */
+  countedCash?: number | null;
   countedAt?: string | null;
   pausedCash?: number;
   pausedAccount?: number;
-}
-
-/** True when the entry was saved after the cash count on that same day. */
-export function isRecordedAfterCount(
-  recordedAt: string | null | undefined,
-  countedAt: string | null | undefined,
-): boolean {
-  if (!recordedAt || !countedAt) return false;
-  const recorded = Date.parse(recordedAt);
-  const counted = Date.parse(countedAt);
-  if (!Number.isFinite(recorded) || !Number.isFinite(counted)) return false;
-  return recorded > counted;
 }
 
 export function eachInclusiveYmd(from: string, to: string): string[] {
@@ -162,6 +154,7 @@ export function emptyMoneyDay(ymd: string): MoneyDayRow {
     runningCash: null,
     runningAccount: null,
     counted: false,
+    countedCash: null,
     details: [],
     countAdjustCash: 0,
     countAdjustAccount: 0,
@@ -311,16 +304,6 @@ export function buildMoneyLedger(input: {
       countByDay.set(count.asOfDate, count);
     }
   }
-  const afterCountNet = new Map<string, { cash: number; account: number }>();
-  const addAfterCount = (ymd: string, cashDelta: number, accountDelta: number) => {
-    if (Math.abs(cashDelta) < AUDIT_EPS && Math.abs(accountDelta) < AUDIT_EPS) return;
-    const current = afterCountNet.get(ymd) ?? { cash: 0, account: 0 };
-    current.cash += cashDelta;
-    current.account += accountDelta;
-    afterCountNet.set(ymd, current);
-  };
-  const recordedAfterCount = (ymd: string, recordedAt?: string | null) =>
-    isRecordedAfterCount(recordedAt, countByDay.get(ymd)?.countedAt);
 
   const orderCountByDay = new Map<string, number>();
   for (const ticket of input.tickets) {
@@ -328,21 +311,7 @@ export function buildMoneyLedger(input: {
     const day = ensureDay(ymd);
     if (!day) continue;
     if (!isCollectedTicket(ticket)) continue;
-    const cashBefore = day.cashSales;
-    const cardBefore = day.cardSales;
-    const transferBefore = day.transferSales;
-    const onlineBefore = day.onlineSales;
     addCollectedTicketMethods(day, ticket);
-    if (recordedAfterCount(ymd, ticket.recordedAt)) {
-      addAfterCount(
-        ymd,
-        day.cashSales - cashBefore,
-        day.cardSales -
-          cardBefore +
-          (day.transferSales - transferBefore) +
-          (day.onlineSales - onlineBefore),
-      );
-    }
     orderCountByDay.set(ymd, (orderCountByDay.get(ymd) ?? 0) + 1);
   }
 
@@ -355,11 +324,9 @@ export function buildMoneyLedger(input: {
     if (parseMoneyPocket(row.paidFrom) === 'account') {
       day.purchasesAccount += amount;
       addDetail(day, label, 0, -amount);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, 0, -amount);
     } else {
       day.purchasesCash += amount;
       addDetail(day, label, -amount, 0);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, -amount, 0);
     }
   }
 
@@ -372,11 +339,9 @@ export function buildMoneyLedger(input: {
     if (parseMoneyPocket(row.paidFrom) === 'account') {
       day.expensesAccount += amount;
       addDetail(day, label, 0, -amount);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, 0, -amount);
     } else {
       day.expensesCash += amount;
       addDetail(day, label, -amount, 0);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, -amount, 0);
     }
   }
 
@@ -391,11 +356,9 @@ export function buildMoneyLedger(input: {
     if (pocket === 'account') {
       day.otherInAccount += amount;
       addDetail(day, label, 0, amount);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, 0, amount);
     } else {
       day.otherInCash += amount;
       addDetail(day, label, amount, 0);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, amount, 0);
     }
   }
 
@@ -408,11 +371,9 @@ export function buildMoneyLedger(input: {
     if (parseMoneyPocket(row.destination, 'account') === 'cash') {
       day.toCash += amount;
       addDetail(day, named || 'Cuenta → caja', amount, -amount);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, amount, -amount);
     } else {
       day.toAccount += amount;
       addDetail(day, named || 'Depósito a cuenta', -amount, amount);
-      if (recordedAfterCount(row.ymd, row.recordedAt)) addAfterCount(row.ymd, -amount, amount);
     }
   }
 
@@ -441,48 +402,25 @@ export function buildMoneyLedger(input: {
   const pausedCash = roundMoney(input.pausedCash ?? 0);
   const pausedAccount = roundMoney(input.pausedAccount ?? 0);
 
-  let tracking = Boolean(input.opening) || !countByDay.size;
   let cash = roundMoney(openingCash + pausedCash);
   let account = roundMoney(openingAccount + pausedAccount);
-  let pendingPausedCash = 0;
-  let pendingPausedAccount = 0;
+  const openingAsOf = input.opening?.asOfDate ?? null;
 
   const orderedDays = [...days.values()].sort((a, b) => a.ymd.localeCompare(b.ymd));
   for (const day of orderedDays) {
     applyMoneyDayNets(day);
-    if (tracking && (pendingPausedCash || pendingPausedAccount)) {
-      cash = roundMoney(cash + pendingPausedCash);
-      account = roundMoney(account + pendingPausedAccount);
-      pendingPausedCash = 0;
-      pendingPausedAccount = 0;
-    }
-    const extra = afterCountNet.get(day.ymd) ?? { cash: 0, account: 0 };
     const count = countByDay.get(day.ymd);
     if (count) {
       day.counted = true;
-      const netCashForCount = day.netCash - extra.cash;
-      if (tracking) {
-        day.countAdjustCash = roundMoney(count.cash - roundMoney(cash + netCashForCount));
-        // Account follows the current tag (efectivo, TPV, compra de cuenta).
-        // The saved count is not a bank recount, so a later correction must move the total.
-        day.countAdjustAccount = 0;
+      day.countedCash = count.countedCash === undefined ? count.cash : count.countedCash;
+    }
+    if (openingAsOf && day.ymd <= openingAsOf) {
+      if (day.ymd === openingAsOf) {
+        day.runningCash = cash;
+        day.runningAccount = account;
       }
-      cash = roundMoney(count.cash + extra.cash);
-      account = roundMoney(account + day.netAccount);
-      tracking = true;
-      pendingPausedCash = count.asOfDate < input.to ? roundMoney(count.pausedCash ?? 0) : 0;
-      pendingPausedAccount = count.asOfDate < input.to ? roundMoney(count.pausedAccount ?? 0) : 0;
-      day.runningCash = cash;
-      day.runningAccount = account;
       continue;
     }
-
-    if (!tracking) {
-      day.runningCash = null;
-      day.runningAccount = null;
-      continue;
-    }
-
     cash = roundMoney(cash + day.netCash);
     account = roundMoney(account + day.netAccount);
     day.runningCash = cash;

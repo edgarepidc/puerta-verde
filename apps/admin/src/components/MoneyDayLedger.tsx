@@ -199,8 +199,7 @@ export function MoneyDayLedger({
       </div>
 
       <p className="text-xs text-slate-500">
-        Al inicio: caja {formatMoney(ledger.openingCash)} · cuenta {formatMoney(ledger.openingAccount)}
-        {ledger.openingAsOf ? ` · último conteo ${formatMexicoSpokenDay(ledger.openingAsOf)}` : ''}
+        Al inicio del periodo: caja {formatMoney(ledger.openingCash)} · cuenta {formatMoney(ledger.openingAccount)}
         {accountSales > 0 ? ` · cobros a cuenta ${formatMoney(accountSales)}` : ''}
       </p>
 
@@ -241,7 +240,7 @@ export function MoneyDayLedger({
                       ) : null}
                       {day.counted ? (
                         <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                          Conteo
+                          Cierre
                         </span>
                       ) : null}
                     </p>
@@ -251,6 +250,7 @@ export function MoneyDayLedger({
                       {day.transferSales > 0 ? ` · Transf. ${formatMoney(day.transferSales)}` : ''}
                       {day.onlineSales > 0 ? ` · Stripe ${formatMoney(day.onlineSales)}` : ''}
                       {day.toAccount > 0 ? ` · Depósito ${formatMoney(day.toAccount)}` : ''}
+                      {day.countedCash != null ? ` · Contado ${formatMoney(day.countedCash)}` : ''}
                     </p>
                   </div>
                   <PocketHead label="Efectivo" amount={day.runningCash} reviewing={reviewingThis} />

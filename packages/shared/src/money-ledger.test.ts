@@ -143,7 +143,7 @@ test('buildMoneyLedger charges rent on the chosen day', () => {
   assert.equal(ledger.days[1]!.runningAccount, 1800);
 });
 
-test('a mid-period count resets cash and keeps account on the current tags', () => {
+test('a saved close stays as history and the balance keeps the current tags', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-03',
@@ -172,15 +172,18 @@ test('a mid-period count resets cash and keeps account on the current tags', () 
   });
   const counted = ledger.days[1]!;
   assert.equal(counted.counted, true);
+  assert.equal(counted.countedCash, 50);
   assert.equal(counted.transferSales, 90);
-  assert.equal(counted.runningCash, 50);
+  assert.equal(counted.runningCash, 100);
   assert.equal(counted.runningAccount, 1090);
+  assert.equal(counted.countAdjustCash, 0);
   assert.equal(counted.countAdjustAccount, 0);
+  assert.equal(ledger.days[2]!.runningCash, 100);
   assert.equal(ledger.days[2]!.runningAccount, 1130);
   assert.equal(moneyDayHasActivity(counted), true);
 });
 
-test('paused rent after a mid-period count enters the following day, like Tienes', () => {
+test('a saved close does not pause rent or reset the account', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-03',
@@ -201,7 +204,8 @@ test('paused rent after a mid-period count enters the following day, like Tienes
     transfers: [],
   });
   assert.equal(ledger.days[1]!.runningAccount, 1000);
-  assert.equal(ledger.days[2]!.runningAccount, 1140);
+  assert.equal(ledger.days[1]!.counted, true);
+  assert.equal(ledger.days[2]!.runningAccount, 1040);
 });
 
 test('audit lines name visit, expense and rent instead of lumping them', () => {
@@ -240,7 +244,7 @@ test('audit lines name visit, expense and rent instead of lumping them', () => {
   assert.equal(ledger.days[0]!.runningAccount, -4500);
 });
 
-test('a short cash close shows the missing amount as Faltante de caja', () => {
+test('a short cash close stays in the history and the book keeps the sales', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-01',
@@ -269,11 +273,13 @@ test('a short cash close shows the missing amount as Faltante de caja', () => {
   });
   const day = ledger.days[0]!;
   assert.equal(day.counted, true);
-  assert.equal(day.countAdjustCash, -50);
+  assert.equal(day.countedCash, 1050);
+  assert.equal(day.countAdjustCash, 0);
   assert.equal(day.countAdjustAccount, 0);
-  assert.equal(day.runningCash, 1050);
+  assert.equal(day.runningCash, 1100);
+  assert.equal(day.runningAccount, 4500);
   const faltante = moneyDayAuditMovements(day).find((row) => row.label === 'Faltante de caja');
-  assert.deepEqual(faltante, { label: 'Faltante de caja', cash: -50, account: 0 });
+  assert.equal(faltante, undefined);
 });
 
 test('a sale retagged to TPV and a purchase retagged to cuenta move the account after the count', () => {
@@ -297,14 +303,16 @@ test('a sale retagged to TPV and a purchase retagged to cuenta move the account 
     transfers: [],
   });
   const day = ledger.days[0]!;
-  assert.equal(day.runningCash, 2500);
+  assert.equal(day.runningCash, 2000);
+  assert.equal(day.countedCash, 2500);
   assert.equal(day.cardSales, 180);
   assert.equal(day.purchasesAccount, 70);
   assert.equal(day.runningAccount, 9110);
+  assert.equal(day.countAdjustCash, 0);
   assert.equal(day.countAdjustAccount, 0);
 });
 
-test('money registered after the cash count is added on top of the count', () => {
+test('money saved after the close still stays in that day total', () => {
   const ledger = buildMoneyLedger({
     from: '2026-10-05',
     to: '2026-10-05',

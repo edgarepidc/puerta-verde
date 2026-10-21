@@ -16,6 +16,7 @@ export const PERMISSION_KEYS = [
   'products.manage',
   'promotions.manage',
   'cash.closing',
+  'cash.revise',
   'profit.view',
   'stock.thresholds',
   'orders.edit',
@@ -79,6 +80,11 @@ export const PERMISSIONS: PermissionDefinition[] = [
     description: 'Registrar el corte de caja y conteo de efectivo.',
   },
   {
+    key: 'cash.revise',
+    label: 'Corregir un cierre de caja',
+    description: 'Cambiar el conteo o las notas de un día que ya se cerró.',
+  },
+  {
     key: 'profit.view',
     label: 'Ver utilidades y márgenes',
     description: 'Consultar márgenes, costos operativos y reportes de utilidad.',
@@ -121,6 +127,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<PermissionKey, StaffRole[]> = {
   'products.manage': ['owner', 'branch_manager', 'staff'],
   'promotions.manage': ['owner', 'branch_manager'],
   'cash.closing': ['owner', 'branch_manager', 'staff'],
+  'cash.revise': ['owner', 'branch_manager'],
   'profit.view': ['owner', 'branch_manager'],
   'stock.thresholds': ['owner', 'branch_manager'],
   'orders.edit': ['owner', 'branch_manager', 'staff'],

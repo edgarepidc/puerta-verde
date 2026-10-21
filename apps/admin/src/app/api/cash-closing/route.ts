@@ -6,7 +6,7 @@ import { createAdminClient } from '@puertaverde/supabase/admin';
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { loadCashDay } from '@/lib/cash-day';
 import { isValidYmd, todayMexicoYmd } from '@/lib/mexico-date';
-import { fetchMoneyPosition, syncTienesFromCashClose } from '@/lib/money-position';
+import { fetchMoneyPosition } from '@/lib/money-position';
 
 export async function GET(request: Request) {
   const auth = await requireStaffApi();
@@ -56,6 +56,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No se puede cerrar un día futuro' }, { status: 400 });
   }
 
+  const supabase = createAdminClient();
+  const { data: existing, error: existingError } = await supabase
+    .from('daily_cash_closings')
+    .select('id, closed_by')
+    .eq('branch_id', auth.branchId)
+    .eq('closing_date', requested)
+    .maybeSingle();
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 400 });
+  }
+  if (existing) {
+    const reviseDenied = await requireStaffPermission(
+      auth,
+      'cash.revise',
+      'Solo un administrador puede corregir un día ya cerrado',
+    );
+    if (reviseDenied) return reviseDenied;
+  }
+
   const summary = await loadCashDay(auth.branchId, requested);
   const notes = body.notes?.trim() || null;
   const countedCash = parseOptionalMoney(body.countedCash);
@@ -80,7 +99,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validation }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('daily_cash_closings')
     .upsert(
@@ -93,7 +111,7 @@ export async function POST(request: Request) {
         notes,
         opening_float: openingFloat,
         counted_cash: countedCash,
-        closed_by: auth.userId,
+        closed_by: existing?.closed_by ?? auth.userId,
       },
       { onConflict: 'branch_id,closing_date' },
     )
@@ -102,27 +120,6 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  if (countedCash != null) {
-    try {
-      await syncTienesFromCashClose({
-        branchId: auth.branchId,
-        closingDate: requested,
-        countedCash,
-        userId: auth.userId,
-      });
-    } catch (syncError) {
-      return NextResponse.json(
-        {
-          error:
-            syncError instanceof Error
-              ? syncError.message
-              : 'Caja cerró, pero no se pudo actualizar Tienes',
-        },
-        { status: 400 },
-      );
-    }
   }
 
   return NextResponse.json({ ok: true, closing: data, totals: summary.totals });

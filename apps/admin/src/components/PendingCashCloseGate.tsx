@@ -195,8 +195,8 @@ export function PendingCashCloseGate({
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {spoken}
-          {weekday ? ` · ${weekday}` : ''}. Cuenta el efectivo. La cuenta no se cuenta: es lo que
-          debería estar en el banco. Al confirmar, las ventas de hoy ya no mueven este saldo.
+          {weekday ? ` · ${weekday}` : ''}. Cuenta el efectivo y anota si no cuadra. Esto queda
+          como el historial del día. El total sigue las ventas y las compras con su forma de pago.
         </p>
 
         {loading ? <p className="mt-4 text-sm text-slate-500">Cargando el saldo de ayer…</p> : null}
