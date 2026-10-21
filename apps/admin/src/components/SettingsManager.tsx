@@ -47,14 +47,14 @@ interface StaffRow {
 export function SettingsManager({
   initialBranch,
   initialStaff,
-  initialStorefront = null,
+  initialStorefronts = [],
   canManage,
   currentUserId,
   section = 'all',
 }: {
   initialBranch: BranchSettings;
   initialStaff: StaffRow[];
-  initialStorefront?: MirrorStorefront | null;
+  initialStorefronts?: MirrorStorefront[];
   canManage: boolean;
   currentUserId: string;
   section?: 'all' | 'branch' | 'staff';
@@ -76,7 +76,7 @@ export function SettingsManager({
     fullName: '',
     role: 'staff' as StaffRole,
   });
-  const [openTienda, setOpenTienda] = useState(true);
+  const [openTienda, setOpenTienda] = useState(false);
   const [openEquipo, setOpenEquipo] = useState(true);
   const [resetId, setResetId] = useState<string | null>(null);
   const [resetPassword, setResetPassword] = useState('');
@@ -177,6 +177,9 @@ export function SettingsManager({
   }
 
   const activeStaff = useMemo(() => staff.filter((row) => row.status === 'active').length, [staff]);
+  const storeHint = [branch.address?.trim(), branch.opening_hours?.trim(), `/${branch.slug}`]
+    .filter(Boolean)
+    .join(' · ');
   const showBranch = section === 'all' || section === 'branch';
   const showStaff = section === 'all' || section === 'staff';
 
@@ -190,7 +193,7 @@ export function SettingsManager({
         >
           <FoldableSummary
             title={branch.name}
-            hint={`Slug de tienda: /${branch.slug}`}
+            hint={storeHint}
             emoji="🏪"
             iconClass="bg-emerald-100"
             actions={
@@ -316,7 +319,7 @@ export function SettingsManager({
       ) : null}
 
       {showBranch ? (
-        <MirrorStorefrontCard initial={initialStorefront} canManage={canManage} />
+        <MirrorStorefrontCard initial={initialStorefronts} canManage={canManage} />
       ) : null}
 
       {showStaff ? (

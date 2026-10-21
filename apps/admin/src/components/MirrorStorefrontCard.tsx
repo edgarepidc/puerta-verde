@@ -8,6 +8,8 @@ import { FoldableSummary } from '@/components/ActionChip';
 import { DecimalInput, decimalFromNumber, parseDecimal } from '@/components/DecimalInput';
 import { PillField, pillInputClass } from '@/components/PillField';
 
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
 const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
 
 export interface MirrorStorefront {
@@ -24,14 +26,38 @@ export interface MirrorStorefront {
   opening_hours: string | null;
 }
 
-export function MirrorStorefrontCard({
+function zoneHint(zone: {
+  slug: string;
+  markup: number;
+  openingHours: string;
+  isActive: boolean;
+}) {
+  const slug = normalizeStorefrontSlug(zone.slug);
+  return [
+    slug ? `/${slug}` : null,
+    `${zone.markup}%`,
+    zone.openingHours.trim() || null,
+    zone.isActive ? 'Activa' : 'Pausada',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function ZoneEditor({
   initial,
   canManage,
+  startOpen,
+  onCancel,
+  onSaved,
 }: {
   initial: MirrorStorefront | null;
   canManage: boolean;
+  startOpen: boolean;
+  onCancel?: () => void;
+  onSaved: (zone: MirrorStorefront) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(startOpen);
+  const [zoneId, setZoneId] = useState(initial?.id ?? null);
   const [name, setName] = useState(initial?.name ?? '');
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [markupText, setMarkupText] = useState(decimalFromNumber(initial?.markup_percent ?? 0));
@@ -57,6 +83,7 @@ export function MirrorStorefrontCard({
   const publicSlug = normalizeStorefrontSlug(savedSlug);
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? 'https://puerta-verde-web.vercel.app';
   const publicHref = publicSlug && savedActive ? `${webUrl}/${publicSlug}` : null;
+  const isNew = !zoneId;
 
   async function save() {
     setSaving(true);
@@ -67,6 +94,7 @@ export function MirrorStorefrontCard({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: zoneId,
           name,
           slug,
           markupPercent: markup,
@@ -82,6 +110,11 @@ export function MirrorStorefrontCard({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
       const next = result.storefront as MirrorStorefront;
+      if (!zoneId) {
+        onSaved(next);
+        return;
+      }
+      setZoneId(next.id);
       setName(next.name);
       setSlug(next.slug);
       setSavedSlug(next.slug);
@@ -95,6 +128,7 @@ export function MirrorStorefrontCard({
       setWhatsappPhone(next.whatsapp_phone ?? '');
       setOpeningHours(next.opening_hours ?? '');
       setSaved(true);
+      onSaved(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {
@@ -109,15 +143,26 @@ export function MirrorStorefrontCard({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <FoldableSummary
-        title="Otra zona"
-        hint="Misma mercancía. El porcentaje va en el precio. Estos datos salen en su página."
+        title={name.trim() || 'Zona nueva'}
+        hint={
+          name.trim()
+            ? zoneHint({ slug, markup, openingHours, isActive })
+            : 'Misma mercancía. El porcentaje va en el precio. Estos datos salen en su página.'
+        }
         emoji="🚚"
         iconClass="bg-amber-100"
         actions={
           canManage ? (
-            <button type="button" className={menuAction} disabled={saving} onClick={() => void save()}>
-              {saving ? 'Guardando…' : 'Guardar zona'}
-            </button>
+            <>
+              {isNew && onCancel ? (
+                <button type="button" className={menuButtonOff} disabled={saving} onClick={onCancel}>
+                  Cancelar
+                </button>
+              ) : null}
+              <button type="button" className={menuAction} disabled={saving} onClick={() => void save()}>
+                {saving ? 'Guardando…' : 'Guardar zona'}
+              </button>
+            </>
           ) : undefined
         }
       />
@@ -248,5 +293,50 @@ export function MirrorStorefrontCard({
         <p className="text-sm text-slate-500">Solo lectura · no tienes permiso para editar la tienda.</p>
       ) : null}
     </details>
+  );
+}
+
+export function MirrorStorefrontCard({
+  initial,
+  canManage,
+}: {
+  initial: MirrorStorefront[];
+  canManage: boolean;
+}) {
+  const [zones, setZones] = useState(initial);
+  const [draftOpen, setDraftOpen] = useState(false);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <p className="text-sm text-slate-500">Zonas con la misma mercancía.</p>
+        {canManage && !draftOpen ? (
+          <button type="button" className={menuAction} onClick={() => setDraftOpen(true)}>
+            Nueva zona
+          </button>
+        ) : null}
+      </div>
+      {draftOpen ? (
+        <ZoneEditor
+          initial={null}
+          canManage={canManage}
+          startOpen
+          onCancel={() => setDraftOpen(false)}
+          onSaved={(zone) => {
+            setZones((rows) => [...rows, zone]);
+            setDraftOpen(false);
+          }}
+        />
+      ) : null}
+      {zones.map((zone) => (
+        <ZoneEditor
+          key={zone.id}
+          initial={zone}
+          canManage={canManage}
+          startOpen={false}
+          onSaved={(next) => setZones((rows) => rows.map((row) => (row.id === next.id ? next : row)))}
+        />
+      ))}
+    </div>
   );
 }

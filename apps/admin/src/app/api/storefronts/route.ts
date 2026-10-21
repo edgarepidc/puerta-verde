@@ -19,6 +19,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = (await request.json()) as {
+      id?: string;
       name?: string;
       slug?: string;
       markupPercent?: number;
@@ -63,12 +64,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    const zoneId = body.id?.trim() || null;
     const { data: slugHit } = await supabase
       .from('storefronts')
       .select('id, branch_id')
       .eq('slug', slug)
       .maybeSingle();
-    if (slugHit && slugHit.branch_id !== tenant.branchId) {
+    if (slugHit && slugHit.id !== zoneId) {
       return NextResponse.json({ error: 'Esa liga ya está en uso. Elige otra.' }, { status: 409 });
     }
 
@@ -86,27 +88,20 @@ export async function PUT(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabase
-      .from('storefronts')
-      .select('id')
-      .eq('branch_id', tenant.branchId)
-      .maybeSingle();
-
-    const { data, error } = existing
+    const zoneSelect =
+      'id, name, slug, markup_percent, is_active, pickup_instructions, fulfillment_mode, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours';
+    const { data, error } = zoneId
       ? await supabase
           .from('storefronts')
           .update(row)
-          .eq('id', existing.id)
-          .select(
-            'id, name, slug, markup_percent, is_active, pickup_instructions, fulfillment_mode, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours',
-          )
-          .single()
+          .eq('id', zoneId)
+          .eq('branch_id', tenant.branchId)
+          .select(zoneSelect)
+          .maybeSingle()
       : await supabase
           .from('storefronts')
           .insert({ ...row, branch_id: tenant.branchId })
-          .select(
-            'id, name, slug, markup_percent, is_active, pickup_instructions, fulfillment_mode, delivery_fee, minimum_order_amount, whatsapp_phone, opening_hours',
-          )
+          .select(zoneSelect)
           .single();
 
     if (error || !data) {
