@@ -266,11 +266,9 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   custom: 'Personalizado',
 };
 
-const PRESET_EMOJI: Record<PeriodPreset, string> = {
-  current: '📅',
-  previous: '📆',
-  custom: '✏️',
-};
+const periodButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
+const periodButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
 
 function MetricCard({
   emoji,
@@ -302,23 +300,7 @@ function MetricCard({
   );
 }
 
-function outflowHint(parts: Array<{ label: string; amount: number }>) {
-  const shown = parts.filter((part) => part.amount > 0.009);
-  if (!shown.length) return undefined;
-  return shown.map((part) => `${part.label} ${formatMoney(part.amount)}`).join(' · ');
-}
-
-function SalioCard({
-  cash,
-  account,
-  cashHint,
-  accountHint,
-}: {
-  cash: number;
-  account: number;
-  cashHint?: string;
-  accountHint?: string;
-}) {
+function SalioCard({ cash, account }: { cash: number; account: number }) {
   return (
     <div className="pv-glass-card flex h-full gap-3 p-4">
       <div
@@ -332,16 +314,9 @@ function SalioCard({
         <p className="mt-0.5 truncate text-xl font-bold text-slate-900">
           {formatMoney(roundMoney(cash + account))}
         </p>
-        <div className="mt-auto space-y-1.5 pt-1 text-xs text-slate-500">
-          <div>
-            <p className="font-medium text-slate-700">Caja {formatMoney(cash)}</p>
-            {cashHint ? <p>{cashHint}</p> : null}
-          </div>
-          <div>
-            <p className="font-medium text-slate-700">Cuenta {formatMoney(account)}</p>
-            {accountHint ? <p>{accountHint}</p> : null}
-          </div>
-        </div>
+        <p className="mt-auto truncate pt-0.5 text-xs text-slate-500">
+          Caja {formatMoney(cash)} · Cuenta {formatMoney(account)}
+        </p>
       </div>
     </div>
   );
@@ -1142,34 +1117,26 @@ export function ProfitabilityManager({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {(['current', 'previous', 'custom'] as PeriodPreset[]).map((key) => (
-          <ActionChip
+          <button
             key={key}
-            emoji={PRESET_EMOJI[key]}
-            tone={preset === key ? 'emerald' : 'slate'}
-            elevated={preset === key}
+            type="button"
+            className={preset === key ? periodButtonOn : periodButtonOff}
             onClick={() => applyPreset(key)}
           >
             {PRESET_LABELS[key]}
-          </ActionChip>
+          </button>
         ))}
-        <ActionChip emoji="🔄" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
-          {loadingPeriod ? 'Cargando…' : 'Actualizar'}
-        </ActionChip>
-        <a href={`/api/export/profit?${exportQuery}`}>
-          <ActionChip as="span" emoji="📗">
-            Excel
-          </ActionChip>
-        </a>
-        <a href={`/api/export/profit/pdf?${exportQuery}`}>
-          <ActionChip as="span" emoji="📄">
-            PDF
-          </ActionChip>
+        <a
+          href={`/api/export/profit?${exportQuery}`}
+          className={`${periodButtonOff} inline-flex items-center no-underline`}
+        >
+          Excel
         </a>
       </div>
       {preset === 'custom' ? (
-        <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-3">
+        <div className="flex flex-wrap items-end justify-end gap-3">
           <label className="text-xs font-medium text-slate-600">
             Desde
             <input
@@ -1209,20 +1176,7 @@ export function ProfitabilityManager({
             label="Costo de lo vendido"
             value={formatMoney(cogs)}
           />
-          <SalioCard
-            cash={outflows.cash}
-            account={outflows.account}
-            cashHint={outflowHint([
-              { label: 'Compras', amount: ledgerTotals.purchasesCash },
-              { label: 'Gastos', amount: ledgerTotals.expensesCash },
-              { label: 'A cuenta', amount: ledgerTotals.toAccount },
-            ])}
-            accountHint={outflowHint([
-              { label: 'Compras', amount: ledgerTotals.purchasesAccount },
-              { label: 'Gastos', amount: ledgerTotals.expensesAccount },
-              { label: 'A efectivo', amount: ledgerTotals.toCash },
-            ])}
-          />
+          <SalioCard cash={outflows.cash} account={outflows.account} />
           <MetricCard
             emoji="🏷️"
             tone="leaf"
