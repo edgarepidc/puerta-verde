@@ -54,18 +54,25 @@ interface CashSummary {
 const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
 const dayButtonOff =
   'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
-const formulaCard = 'min-w-[8.75rem] flex-1 pv-glass-card px-4 py-4';
-const formulaLabel = 'text-xs text-slate-500';
-const formulaValue = 'mt-1 text-xl font-semibold tabular-nums text-slate-900';
+const formulaCard = 'flex min-w-[12rem] flex-1 items-center gap-3 pv-glass-card p-4';
+const formulaLabel = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
+const formulaValue = 'mt-0.5 text-xl font-bold tabular-nums text-slate-900';
 const formulaInput =
-  'w-full bg-transparent text-xl font-semibold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
+  'mt-0.5 w-full bg-transparent text-xl font-bold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
 const editableTotal =
-  'pv-input mt-1 text-xl font-semibold tabular-nums text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50';
+  'mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xl font-bold tabular-nums text-slate-900 outline-none focus:border-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-50';
 
-function CardMark({ emoji }: { emoji: string }) {
+const CARD_MARK = {
+  blue: 'bg-sky-100',
+  amber: 'bg-amber-100',
+  green: 'bg-emerald-100',
+  slate: 'bg-slate-100',
+} as const;
+
+function CardMark({ emoji, tone }: { emoji: string; tone: keyof typeof CARD_MARK }) {
   return (
     <span
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-base leading-none"
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${CARD_MARK[tone]}`}
       aria-hidden
     >
       {emoji}
@@ -337,70 +344,70 @@ export function CashClosingManager({
         <>
       <div className="flex flex-wrap items-stretch gap-3">
         <div className={formulaCard}>
-          <div className="flex items-center gap-2">
-            <CardMark emoji="📅" />
+          <CardMark emoji="📅" tone="blue" />
+          <div className="min-w-0 flex-1">
             <p className={formulaLabel}>Día</p>
+            <p className={`${formulaValue} leading-snug`}>
+              {formatMexicoSpokenDay(summary.closingDate)}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
           </div>
-          <p className={`${formulaValue} leading-snug`}>
-            {formatMexicoSpokenDay(summary.closingDate)}
-          </p>
-          <p className="text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
         </div>
         <div className={formulaCard}>
-          <div className="flex items-center gap-2">
-            <CardMark emoji="💵" />
+          <CardMark emoji="💵" tone="amber" />
+          <div className="min-w-0 flex-1">
             <p className={formulaLabel}>Fondo inicial</p>
+            <DecimalInput
+              className={formulaInput}
+              value={openingFloat}
+              onChange={setOpeningFloat}
+              disabled={!canEditClose}
+              groupThousands
+            />
           </div>
-          <DecimalInput
-            className={`${formulaInput} mt-1`}
-            value={openingFloat}
-            onChange={setOpeningFloat}
-            disabled={!canEditClose}
-            groupThousands
-          />
         </div>
         <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
           +
         </span>
         <div className={formulaCard}>
-          <div className="flex items-center gap-2">
-            <CardMark emoji="🛒" />
+          <CardMark emoji="🛒" tone="green" />
+          <div className="min-w-0 flex-1">
             <p className={formulaLabel}>Venta en efectivo</p>
+            <p className={formulaValue}>{formatMoney(drawer.sales)}</p>
           </div>
-          <p className={formulaValue}>{formatMoney(drawer.sales)}</p>
         </div>
         <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
           =
         </span>
         <div className={`${formulaCard} min-w-[18rem] flex-[1.35]`}>
-          <div className="flex items-center gap-2">
-            <CardMark emoji="🧮" />
+          <CardMark emoji="🧮" tone="slate" />
+          <div className="min-w-0 flex-1">
             <label className={formulaLabel} htmlFor="drawer-count">
               Debería haber
             </label>
-          </div>
-          <DecimalInput
-            id="drawer-count"
-            className={editableTotal}
-            value={drawer.countValue}
-            onChange={(value) => {
-              setCountEdited(true);
-              setCountedCash(value);
-            }}
-            disabled={!canEditClose}
-            groupThousands
-          />
-          <div className="mt-2 flex items-baseline justify-between gap-3">
-            <p className="text-xs text-slate-500">Esperado {formatMoney(shownExpected)}</p>
-            {cashDiff == null ? (
-              <p className="text-right text-xs text-slate-500">Cuenta el efectivo</p>
-            ) : (
-              <p
-                className={`text-right text-xs font-semibold ${countMatches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}
-              >
-                {countMatches ? 'Cuadra' : `Diferencia ${formatMoney(cashDiff)}`}
-              </p>
-            )}
+            <DecimalInput
+              id="drawer-count"
+              className={editableTotal}
+              value={drawer.countValue}
+              onChange={(value) => {
+                setCountEdited(true);
+                setCountedCash(value);
+              }}
+              disabled={!canEditClose}
+              groupThousands
+            />
+            <div className="mt-1 flex items-baseline justify-between gap-3">
+              <p className="text-xs text-slate-500">Esperado {formatMoney(shownExpected)}</p>
+              {cashDiff == null ? (
+                <p className="text-right text-xs text-slate-500">Cuenta el efectivo</p>
+              ) : (
+                <p
+                  className={`text-right text-xs font-semibold ${countMatches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}
+                >
+                  {countMatches ? 'Cuadra' : `Diferencia ${formatMoney(cashDiff)}`}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
