@@ -60,7 +60,8 @@ const formulaValue = 'mt-0.5 text-xl font-bold tabular-nums text-slate-900';
 const formulaInput =
   'mt-0.5 w-full bg-transparent text-xl font-bold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
 const editableTotal =
-  'mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xl font-bold tabular-nums text-slate-900 outline-none focus:border-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-50';
+  'mt-0.5 w-full rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xl font-bold tabular-nums text-slate-900 outline-none focus:border-[#15803d] disabled:cursor-not-allowed disabled:bg-slate-50';
+const actionGlow = '!border-emerald-200 !shadow-[0_4px_16px_rgba(21,128,61,0.22)]';
 
 const CARD_MARK = {
   blue: 'bg-sky-100',
@@ -379,7 +380,7 @@ export function CashClosingManager({
         <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
           =
         </span>
-        <div className={`${formulaCard} min-w-[18rem] flex-[1.35]`}>
+        <div className={`${formulaCard} min-w-[18rem] flex-[1.35] ${canEditClose ? actionGlow : ''}`}>
           <CardMark emoji="🧮" tone="slate" />
           <div className="min-w-0 flex-1">
             <label className={formulaLabel} htmlFor="drawer-count">
@@ -489,10 +490,10 @@ export function CashClosingManager({
         <div className="mt-4 space-y-4">
           {canManage ? (
             <div className="flex flex-wrap items-end gap-2">
-              <PillField label="Monto" icon="$" tone="amber" className="w-[9.75rem] shrink-0">
+              <PillField label="Monto" icon="$" tone="emerald" className="w-[9.75rem] shrink-0">
                 <DecimalInput
                   placeholder="0"
-                  className={pillInputClass('amber')}
+                  className={pillInputClass('emerald')}
                   value={withdrawalAmount}
                   onChange={setWithdrawalAmount}
                 />

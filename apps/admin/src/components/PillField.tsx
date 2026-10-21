@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 const PILL_TONES = {
   emerald: {
-    wrap: 'border-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.28)] focus-within:bg-emerald-50',
+    wrap: 'border-emerald-200 shadow-[0_4px_16px_rgba(21,128,61,0.22)] focus-within:bg-emerald-50',
     icon: 'bg-emerald-100 text-emerald-800',
     input: 'text-emerald-900 placeholder:text-emerald-800/40',
   },
