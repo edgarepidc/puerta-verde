@@ -114,6 +114,7 @@ export function CashClosingManager({
   const [withdrawalNotes, setWithdrawalNotes] = useState('');
   const [savingWithdrawal, setSavingWithdrawal] = useState(false);
   const [withdrawalError, setWithdrawalError] = useState<string | null>(null);
+  const [editingWithdrawalId, setEditingWithdrawalId] = useState<string | null>(null);
   const [openRetiros, setOpenRetiros] = useState(true);
 
   async function load(date?: string) {
@@ -144,6 +145,9 @@ export function CashClosingManager({
       setCountEdited(false);
       const wdPayload = await wdRes.json();
       setWithdrawals(wdPayload.withdrawals ?? []);
+      setEditingWithdrawalId(null);
+      setWithdrawalAmount('');
+      setWithdrawalNotes('');
       if (moneyRes.ok) {
         const moneyPayload = await moneyRes.json();
         setMoneyLedger(moneyPayload.ledger ?? null);
@@ -166,10 +170,12 @@ export function CashClosingManager({
     setSavingWithdrawal(true);
     setWithdrawalError(null);
     try {
+      const editing = editingWithdrawalId;
       const response = await fetch('/api/cash-withdrawals', {
-        method: 'POST',
+        method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editing ?? undefined,
           amount,
           notes: withdrawalNotes,
           date: selectedDate,
@@ -178,9 +184,14 @@ export function CashClosingManager({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? 'No se pudo registrar');
-      setWithdrawals((current) => [payload.withdrawal, ...current]);
+      setWithdrawals((current) =>
+        editing
+          ? current.map((row) => (row.id === editing ? payload.withdrawal : row))
+          : [payload.withdrawal, ...current],
+      );
       setWithdrawalAmount('');
       setWithdrawalNotes('');
+      setEditingWithdrawalId(null);
     } catch (err) {
       setWithdrawalError(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -196,6 +207,11 @@ export function CashClosingManager({
         throw new Error(payload.error ?? 'No se pudo eliminar');
       }
       setWithdrawals((current) => current.filter((w) => w.id !== id));
+      if (editingWithdrawalId === id) {
+        setEditingWithdrawalId(null);
+        setWithdrawalAmount('');
+        setWithdrawalNotes('');
+      }
     } catch (err) {
       setWithdrawalError(err instanceof Error ? err.message : 'Error al eliminar');
     }
@@ -358,7 +374,7 @@ export function CashClosingManager({
           <div className="min-w-0 flex-1">
             <p className={formulaLabel}>Fondo inicial</p>
             <div className="mt-0.5 flex items-baseline gap-1">
-              <span className="text-lg font-bold text-slate-400">$</span>
+              <span className="text-lg font-bold text-slate-900">$</span>
               <DecimalInput
                 className={formulaInput}
                 value={openingFloat}
@@ -389,7 +405,7 @@ export function CashClosingManager({
               Debería haber
             </label>
             <div className="mt-0.5 flex items-baseline gap-1">
-              <span className="text-lg font-bold text-slate-400">$</span>
+              <span className="text-lg font-bold text-slate-900">$</span>
               <DecimalInput
                 id="drawer-count"
                 className={editableTotal}
@@ -483,8 +499,8 @@ export function CashClosingManager({
           hint={
             withdrawals.length > 0
               ? [
-                  toAccountTotal > 0 ? `A cuenta ${formatMoney(toAccountTotal)}` : '',
-                  toCashTotal > 0 ? `A efectivo ${formatMoney(toCashTotal)}` : '',
+                  toAccountTotal > 0 ? `Depósito a cuenta ${formatMoney(toAccountTotal)}` : '',
+                  toCashTotal > 0 ? `Retiro a efectivo ${formatMoney(toCashTotal)}` : '',
                 ]
                   .filter(Boolean)
                   .join(' · ') ||
@@ -519,7 +535,7 @@ export function CashClosingManager({
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('account')}
               >
-                {savingWithdrawal ? 'Guardando…' : 'A cuenta'}
+                {savingWithdrawal ? 'Guardando…' : 'Depósito de caja a cuenta'}
               </button>
               <button
                 type="button"
@@ -527,14 +543,30 @@ export function CashClosingManager({
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('cash')}
               >
-                {savingWithdrawal ? 'Guardando…' : 'A efectivo'}
+                {savingWithdrawal ? 'Guardando…' : 'Retiro de cuenta a efectivo'}
               </button>
+              {editingWithdrawalId ? (
+                <button
+                  type="button"
+                  className="px-2 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-800"
+                  onClick={() => {
+                    setEditingWithdrawalId(null);
+                    setWithdrawalAmount('');
+                    setWithdrawalNotes('');
+                    setWithdrawalError(null);
+                  }}
+                >
+                  Cancelar
+                </button>
+              ) : null}
             </div>
           ) : null}
           {withdrawalError ? <p className="text-sm text-red-600">{withdrawalError}</p> : null}
           {canManage ? (
             <p className="text-xs text-slate-500">
-              Retiro: caja → cuenta. Traer: cuenta → caja, para comprar en la central.
+              {editingWithdrawalId
+                ? 'Estás corrigiendo un movimiento. Elige otra vez depósito o retiro para guardarlo.'
+                : 'Depósito: el efectivo sale de caja y entra a la cuenta. Retiro: sale de la cuenta y entra a efectivo.'}
             </p>
           ) : null}
           {withdrawals.length > 0 ? (
@@ -546,19 +578,33 @@ export function CashClosingManager({
                   <div className="min-w-0">
                     <p className="font-semibold tabular-nums text-slate-900">{formatMoney(Number(w.amount))}</p>
                     <p className="text-xs text-slate-500">
-                      {toCash ? 'Cuenta → efectivo' : 'Efectivo → cuenta'}
+                      {toCash ? 'Retiro de cuenta a efectivo' : 'Depósito de caja a cuenta'}
                       {w.notes ? ` · ${w.notes}` : ''}
                     </p>
                   </div>
                   {canManage ? (
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs text-slate-400 hover:text-red-600"
-                      onClick={() => void deleteWithdrawal(w.id)}
-                      title="Eliminar movimiento"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-slate-700 hover:text-slate-950"
+                        onClick={() => {
+                          setEditingWithdrawalId(w.id);
+                          setWithdrawalAmount(String(Number(w.amount)));
+                          setWithdrawalNotes(w.notes ?? '');
+                          setWithdrawalError(null);
+                        }}
+                      >
+                        {editingWithdrawalId === w.id ? 'Editando' : 'Editar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-400 hover:text-red-600"
+                        onClick={() => void deleteWithdrawal(w.id)}
+                        title="Eliminar movimiento"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   ) : null}
                 </li>
                 );

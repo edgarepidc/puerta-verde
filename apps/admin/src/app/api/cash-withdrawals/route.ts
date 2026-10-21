@@ -77,6 +77,50 @@ export async function POST(request: Request) {
   return NextResponse.json({ withdrawal: data });
 }
 
+/** PATCH /api/cash-withdrawals — correct an existing movement */
+export async function PATCH(request: Request) {
+  const auth = await requireStaffApi();
+  if (auth instanceof NextResponse) return auth;
+
+  const denied = await requireStaffPermission(
+    auth,
+    'cash.closing',
+    'No tienes permiso para corregir movimientos',
+  );
+  if (denied) return denied;
+
+  const body = (await request.json().catch(() => ({}))) as {
+    id?: unknown;
+    amount?: unknown;
+    notes?: unknown;
+    destination?: unknown;
+  };
+
+  const id = typeof body.id === 'string' ? body.id : '';
+  const amount = Number(body.amount);
+  if (!id) return NextResponse.json({ error: 'Falta el movimiento' }, { status: 400 });
+  if (!amount || amount <= 0) {
+    return NextResponse.json({ error: 'Monto inválido' }, { status: 400 });
+  }
+
+  const destination = body.destination === 'cash' ? 'cash' : 'account';
+  const notes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
+
+  const supabase = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('cash_withdrawals')
+    .update({ amount, notes, destination })
+    .eq('id', id)
+    .eq('branch_id', auth.branchId)
+    .select('id, amount, withdrawal_date, withdrawn_at, notes, destination')
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  return NextResponse.json({ withdrawal: data });
+}
+
 /** DELETE /api/cash-withdrawals?id=UUID — delete a withdrawal */
 export async function DELETE(request: Request) {
   const auth = await requireStaffApi();
