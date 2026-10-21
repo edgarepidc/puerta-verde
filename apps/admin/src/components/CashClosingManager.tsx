@@ -509,7 +509,7 @@ export function CashClosingManager({
               </label>
               <button
                 type="button"
-                className="rounded-full bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(15,23,42,0.18)] disabled:opacity-50"
+                className="pv-btn-account px-5 py-2.5 text-sm"
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('account')}
               >
@@ -517,7 +517,7 @@ export function CashClosingManager({
               </button>
               <button
                 type="button"
-                className="rounded-full bg-sky-700 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(3,105,161,0.22)] disabled:opacity-50"
+                className="pv-btn-cash px-5 py-2.5 text-sm"
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('cash')}
               >
