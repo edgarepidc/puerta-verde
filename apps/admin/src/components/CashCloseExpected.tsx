@@ -34,6 +34,7 @@ export function CashCloseExpected({
   const takenFromDrawer = accountExplainsShortage ? [...cashOuts, ...accountOuts] : cashOuts;
   const accountOnly = accountExplainsShortage ? [] : accountOuts;
   const hasActivity = takenFromDrawer.length > 0 || cashIns.length > 0 || accountOnly.length > 0;
+  if (linesOnly && !hasActivity) return null;
 
   return (
     <div className="space-y-1.5 text-sm">
@@ -79,7 +80,7 @@ export function CashCloseExpected({
       ) : linesOnly ? null : (
         <p className="font-medium text-slate-700">Esperado {formatMoney(expected)}</p>
       )}
-      {cashDiff == null ? (
+      {linesOnly ? null : cashDiff == null ? (
         <p className="text-slate-500">Cuenta el efectivo de la caja para poder cerrar.</p>
       ) : (
         <p className={`font-medium ${matches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}>
