@@ -6,6 +6,7 @@ import {
   buildMoneyLedger,
   isIncomeEntryType,
   isRecordedAfterCount,
+  positionResetsBalance,
   moneyLedgerRowYmd,
   parseIncomePocket,
   parseMoneyPocket,
@@ -64,20 +65,21 @@ export async function fetchMoneyPosition(
   to: string,
 ): Promise<MoneyPositionView> {
   const supabase = createAdminClient();
-  const [{ data: baselineRow }, { data: costRows }] = await Promise.all([
+  const [{ data: positionRows }, { data: costRows }] = await Promise.all([
     supabase
       .from('branch_money_positions')
       .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
       .eq('branch_id', branchId)
       .lte('as_of_date', to)
-      .order('as_of_date', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order('as_of_date', { ascending: false }),
     supabase
       .from('branch_operating_costs')
       .select('cost_type, period, amount, charge_day, paid_from, terms:branch_operating_cost_terms(start_date, end_date)')
       .eq('branch_id', branchId),
   ]);
+
+  const baselineRow =
+    (positionRows ?? []).find((row) => positionResetsBalance(row.as_of_date, row.notes)) ?? null;
 
   const baseline = baselineRow
     ? {
@@ -291,7 +293,7 @@ export async function fetchMoneyLedger(
     fetchMoneyPosition(branchId, dayBefore, dayBefore),
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount, created_at, updated_at')
+      .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
       .eq('branch_id', branchId)
       .gte('as_of_date', from)
       .lte('as_of_date', to)
@@ -392,7 +394,7 @@ export async function fetchMoneyLedger(
       account: Number(row.account_amount),
       countedCash: Number(row.cash_amount),
       countedAt: row.updated_at || row.created_at,
-      resetsBalance: true,
+      resetsBalance: positionResetsBalance(row.as_of_date, row.notes),
     });
   }
   for (const row of closingRows ?? []) {
