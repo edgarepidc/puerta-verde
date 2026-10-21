@@ -5,6 +5,7 @@ import {
   applyOperatingCostsToPockets,
   buildMoneyLedger,
   isIncomeEntryType,
+  isRecordedAfterCount,
   moneyLedgerRowYmd,
   parseIncomePocket,
   parseMoneyPocket,
@@ -66,10 +67,10 @@ export async function fetchMoneyPosition(
   const [{ data: baselineRow }, { data: costRows }] = await Promise.all([
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount, notes')
+      .select('as_of_date, cash_amount, account_amount, notes, created_at, updated_at')
       .eq('branch_id', branchId)
       .lte('as_of_date', to)
-      .order('as_of_date', { ascending: true })
+      .order('as_of_date', { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
@@ -86,6 +87,7 @@ export async function fetchMoneyPosition(
         notes: baselineRow.notes,
       }
     : null;
+  const countedAt = baselineRow?.updated_at || baselineRow?.created_at || null;
 
   const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
     costType: row.cost_type,
@@ -96,19 +98,21 @@ export async function fetchMoneyPosition(
     terms: row.terms ?? [],
   }));
 
-  const movementStart = baseline ? addMexicoDays(baseline.asOfDate, 1) : from;
+  const recordedStart = baseline ? baseline.asOfDate : from;
+  const costStart = baseline ? addMexicoDays(baseline.asOfDate, 1) : from;
   const flows = emptyFlows();
   const ticketFlows = emptyFlows();
   const inRange = (ymd: string) => ymd >= from && ymd <= to;
-  const affects = (ymd: string) => {
+  const affects = (ymd: string, recordedAt?: string | null) => {
     if (!baseline) return inRange(ymd);
-    return ymd > baseline.asOfDate && ymd <= to;
+    if (ymd > baseline.asOfDate && ymd <= to) return true;
+    return ymd === baseline.asOfDate && isRecordedAfterCount(recordedAt, countedAt);
   };
 
   let orderCount = 0;
 
-  if (movementStart <= to) {
-    const saleStart = mexicoYmdBoundsIso(movementStart).start;
+  if (recordedStart <= to) {
+    const saleStart = mexicoYmdBoundsIso(recordedStart).start;
     const saleEnd = mexicoYmdBoundsIso(to).end;
 
     const [orders, purchases, expenses, incomes, transferRows] = await Promise.all([
@@ -130,7 +134,7 @@ export async function fetchMoneyPosition(
           .from('purchases')
           .select('purchased_at, created_at, total_amount, paid_from')
           .eq('branch_id', branchId)
-          .gte('purchased_at', movementStart)
+          .gte('purchased_at', recordedStart)
           .lte('purchased_at', to)
           .range(rangeFrom, rangeTo),
       ),
@@ -139,7 +143,7 @@ export async function fetchMoneyPosition(
           .from('expenses')
           .select('expense_date, created_at, amount, paid_from')
           .eq('branch_id', branchId)
-          .gte('expense_date', movementStart)
+          .gte('expense_date', recordedStart)
           .lte('expense_date', to)
           .range(rangeFrom, rangeTo),
       ),
@@ -148,7 +152,7 @@ export async function fetchMoneyPosition(
           .from('income_entries')
           .select('entry_date, created_at, entry_type, amount, paid_from')
           .eq('branch_id', branchId)
-          .gte('entry_date', movementStart)
+          .gte('entry_date', recordedStart)
           .lte('entry_date', to)
           .range(rangeFrom, rangeTo),
       ),
@@ -164,7 +168,7 @@ export async function fetchMoneyPosition(
           .from('cash_withdrawals')
           .select('withdrawal_date, created_at, amount, destination')
           .eq('branch_id', branchId)
-          .gte('withdrawal_date', movementStart)
+          .gte('withdrawal_date', recordedStart)
           .lte('withdrawal_date', to)
           .range(rangeFrom, rangeTo),
       ),
@@ -172,7 +176,7 @@ export async function fetchMoneyPosition(
 
     for (const order of orders) {
       const ymd = moneyLedgerRowYmd(order.paid_at);
-      if (!affects(ymd)) continue;
+      if (!affects(ymd, order.created_at)) continue;
       const ticket = emptyFlows();
       addCollectedTicket(ticket, order);
       addSelectedPockets(flows, ticket, { cash: true, account: true });
@@ -182,7 +186,7 @@ export async function fetchMoneyPosition(
 
     for (const row of purchases) {
       const ymd = moneyLedgerRowYmd(row.purchased_at);
-      if (!affects(ymd)) continue;
+      if (!affects(ymd, row.created_at)) continue;
       const purchase = emptyFlows();
       addPocketOutflow(purchase, parseMoneyPocket(row.paid_from), Number(row.total_amount ?? 0));
       addSelectedPockets(flows, purchase, { cash: true, account: true });
@@ -190,7 +194,7 @@ export async function fetchMoneyPosition(
 
     for (const row of expenses) {
       const ymd = moneyLedgerRowYmd(row.expense_date);
-      if (!affects(ymd)) continue;
+      if (!affects(ymd, row.created_at)) continue;
       const expense = emptyFlows();
       addPocketOutflow(expense, parseMoneyPocket(row.paid_from), Number(row.amount ?? 0));
       addSelectedPockets(flows, expense, { cash: true, account: true });
@@ -198,7 +202,7 @@ export async function fetchMoneyPosition(
 
     for (const row of incomes) {
       const ymd = moneyLedgerRowYmd(row.entry_date);
-      if (!affects(ymd)) continue;
+      if (!affects(ymd, row.created_at)) continue;
       const income = emptyFlows();
       addPocketInflow(
         income,
@@ -210,7 +214,7 @@ export async function fetchMoneyPosition(
 
     for (const row of transferRows) {
       const ymd = moneyLedgerRowYmd(row.withdrawal_date);
-      if (!affects(ymd)) continue;
+      if (!affects(ymd, row.created_at)) continue;
       const transfer = emptyFlows();
       const amount = Number(row.amount ?? 0);
       if (parseMoneyPocket(row.destination, 'account') === 'cash') {
@@ -223,11 +227,11 @@ export async function fetchMoneyPosition(
       addSelectedPockets(flows, transfer, { cash: true, account: true });
     }
 
-    if (movementStart <= to) {
+    if (costStart <= to) {
       applyOperatingCostsToPockets(flows, costs, {
-        from: movementStart,
+        from: costStart,
         to,
-        dayBeforeFrom: addMexicoDays(movementStart, -1),
+        dayBeforeFrom: addMexicoDays(costStart, -1),
         orderCount,
         mode: 'outflow',
       });
@@ -275,7 +279,7 @@ export async function fetchMoneyLedger(
 
   const [
     openingView,
-    { data: baselineRow },
+    { data: positionRows },
     { data: closingRows },
     { data: costRows },
     tickets,
@@ -287,12 +291,11 @@ export async function fetchMoneyLedger(
     fetchMoneyPosition(branchId, dayBefore, dayBefore),
     supabase
       .from('branch_money_positions')
-      .select('as_of_date, cash_amount, account_amount')
+      .select('as_of_date, cash_amount, account_amount, created_at, updated_at')
       .eq('branch_id', branchId)
+      .gte('as_of_date', from)
       .lte('as_of_date', to)
-      .order('as_of_date', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+      .order('as_of_date', { ascending: true }),
     supabase
       .from('daily_cash_closings')
       .select('closing_date, counted_cash')
@@ -364,21 +367,49 @@ export async function fetchMoneyLedger(
     ),
   ]);
 
-  const baseline = baselineRow
+  const opening = openingView.snapshotAsOf
     ? {
-        asOfDate: baselineRow.as_of_date,
-        cash: Number(baselineRow.cash_amount),
-        account: Number(baselineRow.account_amount),
+        asOfDate: dayBefore,
+        cash: openingView.cash,
+        account: openingView.account,
       }
     : null;
-  const opening =
-    baseline && baseline.asOfDate <= dayBefore
-      ? {
-          asOfDate: dayBefore,
-          cash: openingView.cash,
-          account: openingView.account,
-        }
-      : baseline;
+  const counts = new Map<
+    string,
+    {
+      asOfDate: string;
+      cash: number;
+      account: number;
+      countedCash: number | null;
+      countedAt?: string;
+      resetsBalance: boolean;
+    }
+  >();
+  for (const row of positionRows ?? []) {
+    counts.set(row.as_of_date, {
+      asOfDate: row.as_of_date,
+      cash: Number(row.cash_amount),
+      account: Number(row.account_amount),
+      countedCash: Number(row.cash_amount),
+      countedAt: row.updated_at || row.created_at,
+      resetsBalance: true,
+    });
+  }
+  for (const row of closingRows ?? []) {
+    const countedCash = row.counted_cash == null ? null : Number(row.counted_cash);
+    const existing = counts.get(row.closing_date);
+    if (existing) {
+      if (countedCash != null) existing.countedCash = countedCash;
+      continue;
+    }
+    counts.set(row.closing_date, {
+      asOfDate: row.closing_date,
+      cash: countedCash ?? 0,
+      account: 0,
+      countedCash,
+      resetsBalance: false,
+    });
+  }
 
   const costs: OperatingCostPocketInput[] = (costRows ?? []).map((row) => ({
     name: row.name,
@@ -395,12 +426,7 @@ export async function fetchMoneyLedger(
     from,
     to,
     opening,
-    counts: (closingRows ?? []).map((row) => ({
-      asOfDate: row.closing_date,
-      cash: row.counted_cash == null ? 0 : Number(row.counted_cash),
-      account: 0,
-      countedCash: row.counted_cash == null ? null : Number(row.counted_cash),
-    })),
+    counts: [...counts.values()],
     tickets: tickets.map((row) => ({
       ymd: moneyLedgerRowYmd(row.paid_at),
       recordedAt: row.created_at,

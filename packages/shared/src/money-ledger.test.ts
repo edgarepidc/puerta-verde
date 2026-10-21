@@ -148,7 +148,7 @@ test('a saved close stays as history and the balance keeps the current tags', ()
     from: '2026-09-01',
     to: '2026-09-03',
     opening: { asOfDate: '2026-08-31', cash: 100, account: 1000 },
-    counts: [{ asOfDate: '2026-09-02', cash: 50, account: 800 }],
+    counts: [{ asOfDate: '2026-09-02', cash: 50, account: 800, resetsBalance: false }],
     tickets: [
       {
         ymd: '2026-09-02',
@@ -183,7 +183,7 @@ test('a saved close stays as history and the balance keeps the current tags', ()
   assert.equal(moneyDayHasActivity(counted), true);
 });
 
-test('a saved close does not pause rent or reset the account', () => {
+test('a saved saldo pauses rent until the next day and restarts the account', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-03',
@@ -203,9 +203,9 @@ test('a saved close does not pause rent or reset the account', () => {
     incomes: [],
     transfers: [],
   });
-  assert.equal(ledger.days[1]!.runningAccount, 1000);
+  assert.equal(ledger.days[1]!.runningAccount, 800);
   assert.equal(ledger.days[1]!.counted, true);
-  assert.equal(ledger.days[2]!.runningAccount, 1040);
+  assert.equal(ledger.days[2]!.runningAccount, 940);
 });
 
 test('audit lines name visit, expense and rent instead of lumping them', () => {
@@ -244,7 +244,7 @@ test('audit lines name visit, expense and rent instead of lumping them', () => {
   assert.equal(ledger.days[0]!.runningAccount, -4500);
 });
 
-test('a short cash close stays in the history and the book keeps the sales', () => {
+test('a short cash saldo shows the missing amount as Faltante de caja', () => {
   const ledger = buildMoneyLedger({
     from: '2026-09-01',
     to: '2026-09-01',
@@ -274,12 +274,12 @@ test('a short cash close stays in the history and the book keeps the sales', () 
   const day = ledger.days[0]!;
   assert.equal(day.counted, true);
   assert.equal(day.countedCash, 1050);
-  assert.equal(day.countAdjustCash, 0);
+  assert.equal(day.countAdjustCash, -50);
   assert.equal(day.countAdjustAccount, 0);
-  assert.equal(day.runningCash, 1100);
+  assert.equal(day.runningCash, 1050);
   assert.equal(day.runningAccount, 4500);
   const faltante = moneyDayAuditMovements(day).find((row) => row.label === 'Faltante de caja');
-  assert.equal(faltante, undefined);
+  assert.deepEqual(faltante, { label: 'Faltante de caja', cash: -50, account: 0 });
 });
 
 test('a sale retagged to TPV and a purchase retagged to cuenta move the account after the count', () => {
@@ -287,7 +287,7 @@ test('a sale retagged to TPV and a purchase retagged to cuenta move the account 
     from: '2026-10-12',
     to: '2026-10-12',
     opening: { asOfDate: '2026-10-11', cash: 2000, account: 9000 },
-    counts: [{ asOfDate: '2026-10-12', cash: 2500, account: 9000 }],
+    counts: [{ asOfDate: '2026-10-12', cash: 2500, account: 9000, resetsBalance: false }],
     tickets: [
       {
         ymd: '2026-10-12',
