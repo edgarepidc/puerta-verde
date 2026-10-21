@@ -66,25 +66,19 @@ function pocketAmount(value: number | null): string {
 function PocketHead({
   label,
   amount,
-  reviewing,
 }: {
   label: string;
   amount: number | null;
-  reviewing: boolean;
 }) {
   return (
     <div className="w-full text-right">
       <p
-        className={`text-[11px] font-semibold uppercase tracking-wide ${
-          reviewing ? 'text-emerald-800' : 'text-slate-500'
-        }`}
+        className="text-[11px] font-semibold uppercase tracking-wide text-slate-500"
       >
         {label}
       </p>
       <p
-        className={`text-sm font-bold tabular-nums ${
-          reviewing ? 'text-emerald-950' : 'text-slate-900'
-        }`}
+        className="text-sm font-bold tabular-nums text-slate-900"
       >
         {pocketAmount(amount)}
       </p>
@@ -102,9 +96,9 @@ function DayAudit({
   const movements = moneyDayAuditMovements(day);
 
   return (
-    <div className="border-t border-emerald-200/80 px-3 pb-3 pt-1">
+    <div className="border-t border-slate-200 px-3 pb-3 pt-1">
       <div className={DAY_GRID}>
-        <p className="py-1.5 text-sm text-emerald-900/80">ayer tenías</p>
+        <p className="py-1.5 text-sm text-slate-500">ayer tenías</p>
         <p className="py-1.5 text-right text-sm font-bold tabular-nums text-slate-900">
           {pocketAmount(yesterday.cash)}
         </p>
@@ -136,7 +130,7 @@ function DayAudit({
             </div>
           );
         })}
-        <div className="col-span-4 mt-1 border-t-2 border-emerald-200" />
+        <div className="col-span-4 mt-1 border-t-2 border-slate-200" />
         <p className="pt-3 text-sm font-semibold text-slate-900">Total al día de hoy</p>
         <p className="pt-3 text-right text-base font-bold tabular-nums text-slate-900">
           {pocketAmount(day.runningCash)}
@@ -174,6 +168,11 @@ export function MoneyDayLedger({
   if (!ledger) return null;
 
   const accountSales = ledger.totals.cardSales + ledger.totals.transferSales + ledger.totals.onlineSales;
+  const salesTotal =
+    ledger.totals.cashSales +
+    ledger.totals.cardSales +
+    ledger.totals.transferSales +
+    ledger.totals.onlineSales;
 
   return (
     <details
@@ -187,13 +186,22 @@ export function MoneyDayLedger({
         hint={`${formatMexicoSpokenDay(ledger.from)} – ${formatMexicoSpokenDay(ledger.to)}`}
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Efectivo" value={formatMoney(ledger.totals.cashSales)} hint="Ventas cobradas en caja" />
         <Stat label="TPV" value={formatMoney(ledger.totals.cardSales)} hint="Debería caer en la cuenta" />
         <Stat
           label="Transferencia"
           value={formatMoney(ledger.totals.transferSales)}
           hint="Cobros por transferencia"
+        />
+        <Stat
+          label="Total"
+          value={formatMoney(salesTotal)}
+          hint={
+            ledger.totals.onlineSales > 0
+              ? `Incluye en línea ${formatMoney(ledger.totals.onlineSales)}`
+              : 'Suma de las ventas'
+          }
         />
       </div>
 
@@ -214,7 +222,7 @@ export function MoneyDayLedger({
               <details
                 className={
                   reviewingThis
-                    ? 'group/day rounded-2xl border-2 border-emerald-500 bg-emerald-50/70 shadow-[0_0_0_4px_rgba(16,185,129,0.18)]'
+                    ? 'group/day rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_16px_rgba(21,128,61,0.14)]'
                     : 'group/day rounded-xl border border-slate-100 bg-white'
                 }
                 open={reviewingThis}
@@ -227,14 +235,14 @@ export function MoneyDayLedger({
                   }}
                 >
                   <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${reviewingThis ? 'text-emerald-950' : 'text-slate-900'}`}>
+                    <p className="text-sm font-semibold text-slate-900">
                       {formatMexicoSpokenDay(day.ymd)}
-                      <span className={`ml-1 font-normal ${reviewingThis ? 'text-emerald-800' : 'text-slate-500'}`}>
+                      <span className="ml-1 font-normal text-slate-500">
                         {formatMexicoWeekday(day.ymd)}
                       </span>
                       {reviewingThis ? (
-                        <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                          Revisando
+                        <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                          Viendo
                         </span>
                       ) : null}
                       {day.counted ? (
@@ -252,8 +260,8 @@ export function MoneyDayLedger({
                       {day.countedCash != null ? ` · Contado ${formatMoney(day.countedCash)}` : ''}
                     </p>
                   </div>
-                  <PocketHead label="Efectivo" amount={day.runningCash} reviewing={reviewingThis} />
-                  <PocketHead label="Cuenta" amount={day.runningAccount} reviewing={reviewingThis} />
+                  <PocketHead label="Efectivo" amount={day.runningCash} />
+                  <PocketHead label="Cuenta" amount={day.runningAccount} />
                   <svg
                     className="mt-1 h-4 w-4 shrink-0 justify-self-end text-slate-400 transition group-open/day:rotate-180"
                     viewBox="0 0 20 20"
