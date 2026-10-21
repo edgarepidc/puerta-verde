@@ -305,8 +305,7 @@ export function CashClosingManager({
         </p>
       ) : null}
 
-      {/* Day filter */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           type="button"
           className={isToday ? dayButtonOn : dayButtonOff}
@@ -498,18 +497,19 @@ export function CashClosingManager({
                   onChange={setWithdrawalAmount}
                 />
               </PillField>
-              <PillField label="Notas (opcional)" icon="📝" tone="slate" className="min-w-[10rem] flex-1">
+              <label className="block min-w-[12rem] flex-1">
+                <span className="text-sm text-slate-600">Notas</span>
                 <input
                   type="text"
-                  className={pillInputClass('slate')}
+                  className="pv-input mt-1 text-sm"
                   placeholder="Ej. depósito o central"
                   value={withdrawalNotes}
                   onChange={(e) => setWithdrawalNotes(e.target.value)}
                 />
-              </PillField>
+              </label>
               <button
                 type="button"
-                className={dayButtonOff}
+                className="rounded-full bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(15,23,42,0.18)] disabled:opacity-50"
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('account')}
               >
@@ -517,7 +517,7 @@ export function CashClosingManager({
               </button>
               <button
                 type="button"
-                className={dayButtonOff}
+                className="rounded-full bg-sky-700 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(3,105,161,0.22)] disabled:opacity-50"
                 disabled={savingWithdrawal || !withdrawalAmount}
                 onClick={() => void saveWithdrawal('cash')}
               >
