@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 
 import { PAYMENT_METHOD_LABELS, formatMoney, type PaymentMethod } from '@puertaverde/shared';
 
-import { ActionChip } from '@/components/ActionChip';
+const rankButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
+const rankButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800';
 
 export interface TrendPoint {
   date: string;
@@ -401,14 +403,14 @@ export function PeriodSalesCharts({
           </div>
           <div className="flex flex-wrap justify-end gap-1.5" role="group" aria-label="Ordenar productos">
             {PRODUCT_RANK_MODES.map((mode) => (
-              <ActionChip
+              <button
                 key={mode.id}
-                elevated={rankMode === mode.id}
-                tone={rankMode === mode.id ? 'emerald' : 'slate'}
+                type="button"
+                className={rankMode === mode.id ? rankButtonOn : rankButtonOff}
                 onClick={() => setRankMode(mode.id)}
               >
                 {mode.label}
-              </ActionChip>
+              </button>
             ))}
           </div>
         </div>

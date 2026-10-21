@@ -225,7 +225,7 @@ export function CashCloseFormula({
         {canEdit ? (
           <button
             type="button"
-            className="pv-btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
+            className="pv-btn-account px-5 py-2.5 text-sm"
             disabled={saving || closeBlocked}
             onClick={onSave}
           >

@@ -38,7 +38,7 @@ import {
   type ProductUnit,
 } from '@puertaverde/shared';
 
-import { ActionChip, ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
+import { ChevronDownIcon, FoldableSummary, NestedFoldChip } from '@/components/ActionChip';
 import { MoneyPocketField } from '@/components/MoneyPocketField';
 import {
   PeriodSalesCharts,
@@ -152,6 +152,13 @@ const OPERATING_COST_CATEGORY_BAR: Record<
   variable: { emoji: '🛍️', color: 'bg-orange-400' },
 };
 
+const menuButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
+const menuDanger =
+  'rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50';
+
 function CostCategoryField({
   value,
   onChange,
@@ -160,16 +167,16 @@ function CostCategoryField({
   onChange: (value: OperatingCostCategory) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {OPERATING_COST_CATEGORIES.map((category) => (
-        <ActionChip
+        <button
           key={category}
-          elevated={value === category}
-          tone={value === category ? 'emerald' : 'slate'}
+          type="button"
+          className={value === category ? menuButtonOn : menuButtonOff}
           onClick={() => onChange(category)}
         >
           {OPERATING_COST_CATEGORY_LABELS[category]}
-        </ActionChip>
+        </button>
       ))}
     </div>
   );
@@ -266,9 +273,8 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   custom: 'Personalizado',
 };
 
-const periodButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
-const periodButtonOff =
-  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const periodButtonOn = menuButtonOn;
+const periodButtonOff = menuButtonOff;
 
 function MetricCard({
   emoji,
@@ -1164,9 +1170,14 @@ export function ProfitabilityManager({
               onChange={(e) => setTo(e.target.value)}
             />
           </label>
-          <ActionChip emoji="📅" disabled={loadingPeriod} onClick={() => void loadPeriod(from, to)}>
+          <button
+            type="button"
+            className={menuAction}
+            disabled={loadingPeriod}
+            onClick={() => void loadPeriod(from, to)}
+          >
             Aplicar rango
-          </ActionChip>
+          </button>
         </div>
       ) : null}
 
@@ -1380,13 +1391,13 @@ export function ProfitabilityManager({
               })}
             </div>
             {inStockMargins.length > 12 ? (
-              <ActionChip
-                className="mt-4"
-                emoji="📋"
+              <button
+                type="button"
+                className={`${menuButtonOff} mt-4`}
                 onClick={() => setShowAllMargins((v) => !v)}
               >
                 {showAllMargins ? 'Ver menos' : `Ver todos (${inStockMargins.length})`}
-              </ActionChip>
+              </button>
             ) : null}
           </div>
         )}
@@ -1568,12 +1579,17 @@ export function ProfitabilityManager({
                             }
                           />
                           <div className="col-span-2 flex flex-wrap gap-2">
-                            <ActionChip emoji="💾" disabled={saving} onClick={() => void saveCostEdit()}>
+                            <button
+                              type="button"
+                              className={menuAction}
+                              disabled={saving}
+                              onClick={() => void saveCostEdit()}
+                            >
                               {saving ? 'Guardando…' : 'Guardar'}
-                            </ActionChip>
-                            <ActionChip elevated={false} onClick={() => setEditCost(null)}>
+                            </button>
+                            <button type="button" className={menuButtonOff} onClick={() => setEditCost(null)}>
                               Cancelar
-                            </ActionChip>
+                            </button>
                           </div>
                           </div>
                         </div>
@@ -1591,9 +1607,9 @@ export function ProfitabilityManager({
                             {formatMoney(Number(row.amount))}
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            <ActionChip
-                              elevated={false}
-                              emoji="✏️"
+                            <button
+                              type="button"
+                              className={menuButtonOff}
                               onClick={() =>
                                 setEditCost({
                                   id: row.id,
@@ -1608,22 +1624,13 @@ export function ProfitabilityManager({
                               }
                             >
                               Editar
-                            </ActionChip>
-                            <ActionChip
-                              elevated={false}
-                              emoji="📤"
-                              onClick={() => void toggleCost(row)}
-                            >
+                            </button>
+                            <button type="button" className={menuButtonOff} onClick={() => void toggleCost(row)}>
                               Quitar de la lista
-                            </ActionChip>
-                            <ActionChip
-                              elevated={false}
-                              tone="rose"
-                              emoji="🗑️"
-                              onClick={() => void removeCost(row.id)}
-                            >
+                            </button>
+                            <button type="button" className={menuDanger} onClick={() => void removeCost(row.id)}>
                               Eliminar
-                            </ActionChip>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -1706,12 +1713,17 @@ export function ProfitabilityManager({
                               />
                             </div>
                             <div className="col-span-2 flex flex-wrap gap-2">
-                              <ActionChip emoji="💾" disabled={saving} onClick={() => void saveVisitEdit()}>
+                              <button
+                                type="button"
+                                className={menuAction}
+                                disabled={saving}
+                                onClick={() => void saveVisitEdit()}
+                              >
                                 {saving ? 'Guardando…' : 'Guardar'}
-                              </ActionChip>
-                              <ActionChip elevated={false} onClick={() => setEditVisit(null)}>
+                              </button>
+                              <button type="button" className={menuButtonOff} onClick={() => setEditVisit(null)}>
                                 Cancelar
-                              </ActionChip>
+                              </button>
                             </div>
                           </div>
                         ) : (
@@ -1728,9 +1740,9 @@ export function ProfitabilityManager({
                               <p className="font-semibold tabular-nums text-slate-600">
                                 −{formatMoney(row.amount)}
                               </p>
-                              <ActionChip
-                                elevated={false}
-                                emoji="✏️"
+                              <button
+                                type="button"
+                                className={menuButtonOff}
                                 onClick={() =>
                                   setEditVisit({
                                     id: row.id,
@@ -1743,15 +1755,10 @@ export function ProfitabilityManager({
                                 }
                               >
                                 Editar
-                              </ActionChip>
-                              <ActionChip
-                                elevated={false}
-                                tone="rose"
-                                emoji="🗑️"
-                                onClick={() => void removeVisit(row.id)}
-                              >
+                              </button>
+                              <button type="button" className={menuDanger} onClick={() => void removeVisit(row.id)}>
                                 Eliminar
-                              </ActionChip>
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1784,13 +1791,9 @@ export function ProfitabilityManager({
                       <p className="text-base font-bold tabular-nums text-slate-700">
                         {formatMoney(Number(row.amount))}
                       </p>
-                      <ActionChip
-                        elevated={false}
-                        emoji="📥"
-                        onClick={() => void toggleCost(row)}
-                      >
+                      <button type="button" className={menuButtonOff} onClick={() => void toggleCost(row)}>
                         Volver a la lista
-                      </ActionChip>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -1833,9 +1836,9 @@ export function ProfitabilityManager({
                   onChange={(value) => setCostForm((f) => ({ ...f, paidFrom: value }))}
                 />
                 <div className="col-span-2 flex justify-end lg:col-span-1">
-                  <ActionChip emoji="🧾" disabled={saving} onClick={addCost}>
+                  <button type="button" className={menuAction} disabled={saving} onClick={addCost}>
                     Agregar costo
-                  </ActionChip>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1885,16 +1888,16 @@ export function ProfitabilityManager({
                         <div className="grid grid-cols-2 gap-2">
                           <div className="col-span-2 flex flex-wrap gap-2">
                             {(['contribution', 'operating'] as IncomeEntryType[]).map((key) => (
-                              <ActionChip
+                              <button
                                 key={key}
-                                elevated={editIncome.entryType === key}
-                                tone={editIncome.entryType === key ? 'emerald' : 'slate'}
+                                type="button"
+                                className={editIncome.entryType === key ? menuButtonOn : menuButtonOff}
                                 onClick={() =>
                                   setEditIncome((d) => (d ? { ...d, entryType: key } : d))
                                 }
                               >
                                 {INCOME_ENTRY_TYPE_LABELS[key]}
-                              </ActionChip>
+                              </button>
                             ))}
                           </div>
                           <input
@@ -1939,12 +1942,17 @@ export function ProfitabilityManager({
                             }
                           />
                           <div className="col-span-2 flex flex-wrap gap-2">
-                            <ActionChip emoji="💾" disabled={saving} onClick={() => void saveIncomeEdit()}>
+                            <button
+                              type="button"
+                              className={menuAction}
+                              disabled={saving}
+                              onClick={() => void saveIncomeEdit()}
+                            >
                               {saving ? 'Guardando…' : 'Guardar'}
-                            </ActionChip>
-                            <ActionChip elevated={false} onClick={() => setEditIncome(null)}>
+                            </button>
+                            <button type="button" className={menuButtonOff} onClick={() => setEditIncome(null)}>
                               Cancelar
-                            </ActionChip>
+                            </button>
                           </div>
                         </div>
                       ) : (
@@ -1961,9 +1969,9 @@ export function ProfitabilityManager({
                             <p className="font-semibold tabular-nums text-slate-800">
                               {formatMoney(row.amount)}
                             </p>
-                            <ActionChip
-                              elevated={false}
-                              emoji="✏️"
+                            <button
+                              type="button"
+                              className={menuButtonOff}
                               onClick={() =>
                                 setEditIncome({
                                   id: row.id,
@@ -1977,15 +1985,10 @@ export function ProfitabilityManager({
                               }
                             >
                               Editar
-                            </ActionChip>
-                            <ActionChip
-                              elevated={false}
-                              tone="rose"
-                              emoji="🗑️"
-                              onClick={() => void removeIncome(row.id)}
-                            >
+                            </button>
+                            <button type="button" className={menuDanger} onClick={() => void removeIncome(row.id)}>
                               Eliminar
-                            </ActionChip>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -1998,17 +2001,17 @@ export function ProfitabilityManager({
               <p className="text-xs text-slate-500">{INCOME_ENTRY_TYPE_HINTS[incomeType]}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(['contribution', 'operating'] as IncomeEntryType[]).map((key) => (
-                  <ActionChip
+                  <button
                     key={key}
-                    elevated={incomeType === key}
-                    tone={incomeType === key ? 'emerald' : 'slate'}
+                    type="button"
+                    className={incomeType === key ? menuButtonOn : menuButtonOff}
                     onClick={() => {
                       setIncomeType(key);
                       setIncomePaidFrom(defaultIncomePocket(key));
                     }}
                   >
                     {INCOME_ENTRY_TYPE_LABELS[key]}
-                  </ActionChip>
+                  </button>
                 ))}
               </div>
               <div className="mt-3 grid min-w-0 grid-cols-2 items-end gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_8.5rem_minmax(7.5rem,1fr)_auto]">
@@ -2038,9 +2041,9 @@ export function ProfitabilityManager({
                   onChange={setIncomePaidFrom}
                 />
                 <div className="col-span-2 flex justify-end lg:col-span-1">
-                  <ActionChip emoji="💰" disabled={saving} onClick={() => void addIncome()}>
+                  <button type="button" className={menuAction} disabled={saving} onClick={() => void addIncome()}>
                     Agregar
-                  </ActionChip>
+                  </button>
                 </div>
               </div>
               <input
