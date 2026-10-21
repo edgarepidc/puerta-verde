@@ -2,8 +2,6 @@
 
 import Link from 'next/link';
 
-import { ActionChip } from '@/components/ActionChip';
-
 export type AjustesCurrent =
   | 'sucursal'
   | 'equipo'
@@ -19,16 +17,15 @@ type NavItem = {
   id: Exclude<AjustesCurrent, 'whatsapp'>;
   label: string;
   href: string;
-  emoji: string;
   configTab?: ConfigTabId;
 };
 
 const ITEMS: NavItem[] = [
-  { id: 'sucursal', label: 'Tienda', href: '/configuracion?tab=sucursal', emoji: '🏪', configTab: 'sucursal' },
-  { id: 'equipo', label: 'Equipo', href: '/configuracion?tab=equipo', emoji: '👥', configTab: 'equipo' },
-  { id: 'promos', label: 'Promos', href: '/promociones', emoji: '🏷️' },
-  { id: 'clientes', label: 'Clientes', href: '/clientes', emoji: '🧑' },
-  { id: 'cuenta', label: 'Cuenta', href: '/configuracion?tab=suscripcion', configTab: 'suscripcion', emoji: '🔑' },
+  { id: 'sucursal', label: 'Tienda', href: '/configuracion?tab=sucursal', configTab: 'sucursal' },
+  { id: 'equipo', label: 'Equipo', href: '/configuracion?tab=equipo', configTab: 'equipo' },
+  { id: 'promos', label: 'Promos', href: '/promociones' },
+  { id: 'clientes', label: 'Clientes', href: '/clientes' },
+  { id: 'cuenta', label: 'Cuenta', href: '/configuracion?tab=suscripcion', configTab: 'suscripcion' },
 ];
 
 export function AjustesNav({
@@ -47,37 +44,35 @@ export function AjustesNav({
           id: 'plataforma' as const,
           label: 'Plataforma',
           href: '/configuracion?tab=plataforma',
-          emoji: '🛠️',
           configTab: 'plataforma' as const,
         },
       ]
     : ITEMS;
 
   const highlight = current === 'whatsapp' ? 'equipo' : current;
+  const navOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
+  const navOff =
+    'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800';
 
   return (
     <div className="flex flex-wrap justify-center gap-2">
       {items.map((item) => {
-        const active = item.id === highlight;
-        const chip = (
-          <ActionChip
-            as={onSelectConfigTab && item.configTab ? 'button' : 'span'}
-            emoji={item.emoji}
-            tone={active ? 'emerald' : 'slate'}
-            elevated={active}
-            onClick={
-              onSelectConfigTab && item.configTab
-                ? () => onSelectConfigTab(item.configTab!)
-                : undefined
-            }
-          >
-            {item.label}
-          </ActionChip>
-        );
-        if (onSelectConfigTab && item.configTab) return <span key={item.id}>{chip}</span>;
+        const className = item.id === highlight ? navOn : navOff;
+        if (onSelectConfigTab && item.configTab) {
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={className}
+              onClick={() => onSelectConfigTab(item.configTab!)}
+            >
+              {item.label}
+            </button>
+          );
+        }
         return (
-          <Link key={item.id} href={item.href} className="inline-flex">
-            {chip}
+          <Link key={item.id} href={item.href} className={className}>
+            {item.label}
           </Link>
         );
       })}

@@ -12,7 +12,11 @@ import {
   type StaffRole,
 } from '@puertaverde/shared';
 
-import { ActionChip, FoldableSummary } from '@/components/ActionChip';
+import { FoldableSummary } from '@/components/ActionChip';
+
+const menuButtonOff =
+  'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
+const menuAction = 'pv-btn-account px-5 py-2.5 text-sm';
 
 const EDITABLE_ROLES = STAFF_ROLES.filter((role) => role !== 'owner');
 
@@ -110,12 +114,22 @@ export function PermissionsManager({
         actions={
           canEdit ? (
             <>
-              <ActionChip elevated={false} emoji="↩️" disabled={saving} onClick={() => void restoreDefaults()}>
+              <button
+                type="button"
+                className={menuButtonOff}
+                disabled={saving}
+                onClick={() => void restoreDefaults()}
+              >
                 Restaurar
-              </ActionChip>
-              <ActionChip emoji="✅" disabled={saving || !dirty} onClick={() => void save()}>
+              </button>
+              <button
+                type="button"
+                className={menuAction}
+                disabled={saving || !dirty}
+                onClick={() => void save()}
+              >
                 {saving ? 'Guardando…' : 'Guardar'}
-              </ActionChip>
+              </button>
             </>
           ) : undefined
         }
