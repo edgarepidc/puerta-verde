@@ -53,12 +53,19 @@ function clearSnooze(date: string) {
   }
 }
 
+function reminderName(name: string) {
+  const first = name.trim().split(/\s+/)[0];
+  return first || 'Usuario';
+}
+
 export function PendingCashCloseGate({
   date,
   canClose,
+  userName = '',
 }: {
   date: string;
   canClose: boolean;
+  userName?: string;
 }) {
   const router = useRouter();
   const [day, setDay] = useState<PendingDay | null>(null);
@@ -205,8 +212,11 @@ export function PendingCashCloseGate({
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {spoken}
-          {weekday ? ` · ${weekday}` : ''}. Cuenta el efectivo. El conteo queda en el historial del
-          día. Caja y cuenta siguen las ventas y las compras.
+          {weekday ? ` · ${weekday}` : ''}.
+        </p>
+        <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          <span className="font-semibold">{reminderName(userName)}</span>, no olvides cerrar la caja.
+          El dinero debe cuadrar con lo que tenías más lo que se vendió en efectivo.
         </p>
 
         {loading ? <p className="mt-4 text-sm text-slate-500">Cargando el saldo de ayer…</p> : null}

@@ -90,7 +90,7 @@ export async function AdminShell({
       <div className="pv-ambient pv-ambient--admin" aria-hidden />
       <CashDayRefresh today={today} />
       {needsYesterdayClose ? (
-        <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} />
+        <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} userName={displayName} />
       ) : opening ? (
         <MorningOpenNotice
           today={today}
