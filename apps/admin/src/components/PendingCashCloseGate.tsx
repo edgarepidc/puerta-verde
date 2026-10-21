@@ -3,20 +3,24 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { cashPositionCloseError, formatMoney } from '@puertaverde/shared';
+import {
+  cashCloseValidationError,
+  type CashDrawerLine,
+} from '@puertaverde/shared';
 
 import { ActionChip } from '@/components/ActionChip';
-import { DecimalInput } from '@/components/DecimalInput';
+import { CashCloseFormula, resolveDrawerCount } from '@/components/CashCloseFormula';
 import { LogoutButton } from '@/components/LogoutButton';
-import { PillField, pillInputClass } from '@/components/PillField';
 import { formatMexicoSpokenDay, formatMexicoWeekday } from '@/lib/mexico-date';
 
 const SNOOZE_MS = 4 * 60 * 1000;
 
-type PendingSummary = {
+type PendingDay = {
   closingDate: string;
-  expectedCash: number;
-  expectedAccount: number;
+  totals: { cash: number };
+  closing: { notes: string | null } | null;
+  suggestedOpeningFloat?: number | null;
+  cashLines?: CashDrawerLine[];
 };
 
 function snoozeKey(date: string) {
@@ -57,9 +61,11 @@ export function PendingCashCloseGate({
   canClose: boolean;
 }) {
   const router = useRouter();
-  const [summary, setSummary] = useState<PendingSummary | null>(null);
+  const [day, setDay] = useState<PendingDay | null>(null);
   const [notes, setNotes] = useState('');
+  const [openingFloat, setOpeningFloat] = useState('');
   const [countedCash, setCountedCash] = useState('');
+  const [countEdited, setCountEdited] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +102,13 @@ export function PendingCashCloseGate({
           setClosed(true);
           return;
         }
-        setSummary(payload);
-        if (typeof payload.expectedCash === 'number' && countedCash === '') {
-          setCountedCash(String(payload.expectedCash));
-        }
+        setDay(payload);
+        setNotes(payload.closing?.notes ?? '');
+        setOpeningFloat(
+          payload.suggestedOpeningFloat != null ? String(payload.suggestedOpeningFloat) : '',
+        );
+        setCountedCash('');
+        setCountEdited(false);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Error');
       } finally {
@@ -110,8 +119,6 @@ export function PendingCashCloseGate({
     return () => {
       cancelled = true;
     };
-    // countedCash is only read so a typed count is not overwritten on reload.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, reloadToken]);
 
   const visible = ready && !closed && snoozeUntil <= Date.now();
@@ -132,11 +139,20 @@ export function PendingCashCloseGate({
   }
 
   async function closeYesterday() {
-    if (!canClose || !summary) return;
-    const validation = cashPositionCloseError({
-      countedCash: countedCash === '' ? '' : Number(countedCash),
-      expectedCash: summary.expectedCash,
+    if (!canClose || !day) return;
+    const drawer = resolveDrawerCount({
+      openingFloat,
+      cashSales: Number(day.totals.cash ?? 0),
+      cashLines: day.cashLines ?? [],
+      countedCash,
+      countEdited,
+    });
+    const validation = cashCloseValidationError({
+      countedCash: drawer.countValue === '' ? '' : Number(drawer.countValue),
+      openingFloat: openingFloat === '' ? '' : Number(openingFloat),
+      cashSales: drawer.sales,
       notes,
+      cashLines: drawer.lines,
     });
     if (validation) {
       setError(validation);
@@ -151,8 +167,8 @@ export function PendingCashCloseGate({
         body: JSON.stringify({
           date,
           notes,
-          countedCash: countedCash === '' ? null : Number(countedCash),
-          confirmDrawer: true,
+          openingFloat: openingFloat === '' ? null : Number(openingFloat),
+          countedCash: drawer.countValue === '' ? null : Number(drawer.countValue),
         }),
       });
       const payload = await response.json();
@@ -171,12 +187,6 @@ export function PendingCashCloseGate({
 
   const spoken = formatMexicoSpokenDay(date);
   const weekday = formatMexicoWeekday(date);
-  const countedNumber = countedCash === '' ? null : Number(countedCash);
-  const gap =
-    summary && countedNumber != null && Number.isFinite(countedNumber)
-      ? Math.round((countedNumber - summary.expectedCash) * 100) / 100
-      : null;
-  const off = gap != null && Math.abs(gap) > 0.009;
 
   return (
     <div
@@ -187,7 +197,7 @@ export function PendingCashCloseGate({
         role="dialog"
         aria-modal="true"
         aria-labelledby="pending-cash-close-title"
-        className="pv-glass-card w-full max-w-lg p-5 shadow-xl sm:p-6"
+        className="pv-glass-card w-full max-w-5xl p-5 shadow-xl sm:p-6"
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Antes de vender</p>
         <h2 id="pending-cash-close-title" className="mt-1 text-xl font-semibold text-slate-900">
@@ -195,69 +205,40 @@ export function PendingCashCloseGate({
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {spoken}
-          {weekday ? ` · ${weekday}` : ''}. Cuenta el efectivo y anota si no cuadra. Esto queda
-          como el historial del día. El total sigue las ventas y las compras con su forma de pago.
+          {weekday ? ` · ${weekday}` : ''}. Cuenta el efectivo. El conteo queda en el historial del
+          día. Caja y cuenta siguen las ventas y las compras.
         </p>
 
         {loading ? <p className="mt-4 text-sm text-slate-500">Cargando el saldo de ayer…</p> : null}
 
-        {summary ? (
-          <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
-              <dt className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-                Efectivo que debías tener
-              </dt>
-              <dd className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
-                {formatMoney(summary.expectedCash)}
-              </dd>
-              <dd className="text-xs text-slate-500">Cuenta los billetes</dd>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
-              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Cuenta que debías tener
-              </dt>
-              <dd className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">
-                {formatMoney(summary.expectedAccount)}
-              </dd>
-              <dd className="text-xs text-slate-500">No se cuenta. Revísala en el banco</dd>
-            </div>
-          </dl>
-        ) : null}
-
-        {canClose && summary ? (
-          <div className="mt-4 space-y-3">
-            <PillField label="Efectivo contado" icon="$" tone="emerald">
-              <DecimalInput
-                className={pillInputClass('emerald')}
-                value={countedCash}
-                onChange={setCountedCash}
-                groupThousands
-              />
-            </PillField>
-            {gap != null ? (
-              <p className={`text-sm font-medium ${off ? 'text-rose-700' : 'text-emerald-800'}`}>
-                {off
-                  ? gap < 0
-                    ? `Faltan ${formatMoney(Math.abs(gap))}. Anota por qué y cierra igual.`
-                    : `Sobran ${formatMoney(gap)}. Anota por qué y cierra igual.`
-                  : 'Cuadra. Al cerrar, ayer queda congelado.'}
-              </p>
-            ) : (
-              <p className="text-sm text-slate-500">Cuenta el efectivo de la caja para poder cerrar.</p>
-            )}
-            {off ? (
-              <PillField label="Por qué no cuadra" icon="📝" tone="sky">
-                <input
-                  type="text"
-                  className={pillInputClass('sky')}
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Ej. faltan $20 en caja chica"
-                />
-              </PillField>
-            ) : null}
+        {day ? (
+          <div className="mt-4">
+            <CashCloseFormula
+              date={day.closingDate || date}
+              openingFloat={openingFloat}
+              onOpeningFloat={setOpeningFloat}
+              cashSales={Number(day.totals.cash ?? 0)}
+              cashLines={day.cashLines ?? []}
+              countedCash={countedCash}
+              countEdited={countEdited}
+              onCountedCash={(value) => {
+                setCountEdited(true);
+                setCountedCash(value);
+              }}
+              notes={notes}
+              onNotes={setNotes}
+              canEdit={canClose}
+              saving={saving}
+              saveLabel="Cerrar el día"
+              savingLabel="Cerrando…"
+              onSave={() => void closeYesterday()}
+              error={error}
+              countInputId="pending-drawer-count"
+            />
           </div>
         ) : null}
+
+        {!day && error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
 
         {!canClose ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -266,34 +247,11 @@ export function PendingCashCloseGate({
           </p>
         ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <ActionChip tone="slate" onClick={snooze}>
             Hay un cliente en el mostrador
           </ActionChip>
-          {canClose && summary ? (
-            <ActionChip
-              size="lg"
-              emoji="💰"
-              tone="emerald"
-              disabled={
-                saving ||
-                loading ||
-                Boolean(
-                  cashPositionCloseError({
-                    countedCash: countedCash === '' ? '' : Number(countedCash),
-                    expectedCash: summary.expectedCash,
-                    notes,
-                  }),
-                )
-              }
-              onClick={() => void closeYesterday()}
-            >
-              {saving ? 'Cerrando…' : 'Cerrar ayer'}
-            </ActionChip>
-          ) : null}
-          {canClose && !summary && !loading ? (
+          {canClose && !day && !loading ? (
             <div className="flex flex-wrap gap-2">
               <LogoutButton />
               <ActionChip tone="slate" onClick={() => setReloadToken((n) => n + 1)}>

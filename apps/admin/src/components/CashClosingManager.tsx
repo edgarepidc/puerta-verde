@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 
 import {
   cashCloseValidationError,
-  expectedCashOnHand,
-  expectedCashOnHandForCount,
   formatMoney,
   todayMexicoYmd,
   type CashDrawerLine,
@@ -13,16 +11,11 @@ import {
 } from '@puertaverde/shared';
 
 import { FoldableSummary } from '@/components/ActionChip';
-import { CashCloseExpected } from '@/components/CashCloseExpected';
+import { CashCloseFormula, resolveDrawerCount } from '@/components/CashCloseFormula';
 import { DecimalInput } from '@/components/DecimalInput';
 import { MoneyDayLedger } from '@/components/MoneyDayLedger';
 import { PillField, pillInputClass } from '@/components/PillField';
-import {
-  formatMexicoSpokenDay,
-  formatMexicoWeekday,
-  mexicoCalendarMonthRange,
-  yesterdayMexicoYmd,
-} from '@/lib/mexico-date';
+import { mexicoCalendarMonthRange, yesterdayMexicoYmd } from '@/lib/mexico-date';
 
 interface ChannelTotals {
   cash: number;
@@ -54,32 +47,6 @@ interface CashSummary {
 const dayButtonOn = 'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white';
 const dayButtonOff =
   'rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50';
-const formulaCard = 'flex min-w-[12rem] flex-1 items-center gap-2.5 pv-glass-card px-3 py-2.5';
-const formulaLabel = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
-const formulaValue = 'text-lg font-bold tabular-nums text-slate-900';
-const formulaInput =
-  'w-full bg-transparent text-lg font-bold tabular-nums text-slate-900 outline-none disabled:cursor-not-allowed';
-const editableTotal =
-  'w-full rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-lg font-bold tabular-nums text-slate-900 outline-none focus:border-[#15803d] disabled:cursor-not-allowed disabled:bg-slate-50';
-const actionGlow = '!border-emerald-200 !shadow-[0_4px_16px_rgba(21,128,61,0.22)]';
-
-const CARD_MARK = {
-  blue: 'bg-sky-100',
-  amber: 'bg-amber-100',
-  green: 'bg-emerald-100',
-  slate: 'bg-slate-100',
-} as const;
-
-function CardMark({ emoji, tone }: { emoji: string; tone: keyof typeof CARD_MARK }) {
-  return (
-    <span
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${CARD_MARK[tone]}`}
-      aria-hidden
-    >
-      {emoji}
-    </span>
-  );
-}
 
 interface Withdrawal {
   id: string;
@@ -223,17 +190,14 @@ export function CashClosingManager({
   }, [selectedDate]);
 
   function resolveCount(edited = countEdited) {
-    const sales = Number(summary?.totals.cash ?? 0);
-    const lines = summary?.cashLines ?? [];
-    const floatNumber = openingFloat === '' ? 0 : Number(openingFloat);
-    const expected = expectedCashOnHand(Number.isFinite(floatNumber) ? floatNumber : 0, sales, lines);
-    const locked = Boolean(summary?.closing) || edited;
-    return {
-      expected,
-      sales,
-      lines,
-      countValue: locked ? countedCash : String(expected),
-    };
+    return resolveDrawerCount({
+      openingFloat,
+      cashSales: Number(summary?.totals.cash ?? 0),
+      cashLines: summary?.cashLines ?? [],
+      countedCash,
+      countEdited: edited,
+      locked: Boolean(summary?.closing),
+    });
   }
 
   async function closeDay() {
@@ -280,27 +244,6 @@ export function CashClosingManager({
       setClosing(false);
     }
   }
-
-  const drawer = resolveCount();
-  const countedNumber = drawer.countValue === '' ? null : Number(drawer.countValue);
-  const shownExpected = expectedCashOnHandForCount(
-    openingFloat === '' ? 0 : Number(openingFloat),
-    drawer.sales,
-    drawer.lines,
-    countedNumber,
-  );
-  const cashDiff =
-    countedNumber == null || !Number.isFinite(countedNumber) ? null : countedNumber - shownExpected;
-  const countMatches = cashDiff != null && Math.abs(cashDiff) < 0.009;
-  const closeBlocked = Boolean(
-    cashCloseValidationError({
-      countedCash: drawer.countValue === '' ? '' : Number(drawer.countValue),
-      openingFloat: openingFloat === '' ? '' : Number(openingFloat),
-      cashSales: drawer.sales,
-      notes,
-      cashLines: drawer.lines,
-    }),
-  );
 
   const toAccountTotal = withdrawals
     .filter((w) => w.destination !== 'cash')
@@ -358,120 +301,28 @@ export function CashClosingManager({
 
       {summary ? (
         <>
-      <div className="flex flex-wrap items-stretch gap-3">
-        <div className={formulaCard}>
-          <CardMark emoji="📅" tone="blue" />
-          <div className="min-w-0 flex-1">
-            <p className={formulaLabel}>Día</p>
-            <p className={`${formulaValue} leading-snug`}>
-              {formatMexicoSpokenDay(summary.closingDate)}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500">{formatMexicoWeekday(summary.closingDate)}</p>
-          </div>
-        </div>
-        <div className={formulaCard}>
-          <CardMark emoji="💵" tone="amber" />
-          <div className="min-w-0 flex-1">
-            <p className={formulaLabel}>Fondo inicial</p>
-            <div className="mt-0.5 flex items-baseline gap-1">
-              <span className="text-lg font-bold text-slate-900">$</span>
-              <DecimalInput
-                className={formulaInput}
-                value={openingFloat}
-                onChange={setOpeningFloat}
-                disabled={!canEditClose}
-                groupThousands
-              />
-            </div>
-          </div>
-        </div>
-        <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
-          +
-        </span>
-        <div className={formulaCard}>
-          <CardMark emoji="🛒" tone="green" />
-          <div className="min-w-0 flex-1">
-            <p className={formulaLabel}>Venta en efectivo</p>
-            <p className={formulaValue}>{formatMoney(drawer.sales)}</p>
-          </div>
-        </div>
-        <span className="self-center px-1 text-2xl font-medium text-slate-400" aria-hidden>
-          =
-        </span>
-        <div className={`${formulaCard} min-w-[18rem] flex-[1.35] ${canEditClose ? actionGlow : ''}`}>
-          <CardMark emoji="🧮" tone="slate" />
-          <div className="min-w-0 flex-1">
-            <label className={formulaLabel} htmlFor="drawer-count">
-              Debería haber
-            </label>
-            <div className="mt-0.5 flex items-baseline gap-1">
-              <span className="text-lg font-bold text-slate-900">$</span>
-              <DecimalInput
-                id="drawer-count"
-                className={editableTotal}
-                value={drawer.countValue}
-                onChange={(value) => {
-                  setCountEdited(true);
-                  setCountedCash(value);
-                }}
-                disabled={!canEditClose}
-                groupThousands
-              />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between gap-3">
-              <p className="text-xs text-slate-500">Esperado {formatMoney(shownExpected)}</p>
-              {cashDiff == null ? (
-                <p className="text-right text-xs text-slate-500">Cuenta el efectivo</p>
-              ) : (
-                <p
-                  className={`text-right text-xs font-semibold ${countMatches || cashDiff > 0 ? 'text-emerald-800' : 'text-rose-700'}`}
-                >
-                  {countMatches ? 'Cuadra' : `Diferencia ${formatMoney(cashDiff)}`}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <CashCloseExpected
-        openingFloat={openingFloat === '' ? 0 : Number(openingFloat)}
-        cashSales={drawer.sales}
-        cashLines={drawer.lines}
-        countedCash={drawer.countValue === '' ? null : Number(drawer.countValue)}
-        linesOnly
+      <CashCloseFormula
+        date={summary.closingDate}
+        openingFloat={openingFloat}
+        onOpeningFloat={setOpeningFloat}
+        cashSales={Number(summary.totals.cash ?? 0)}
+        cashLines={summary.cashLines ?? []}
+        countedCash={countedCash}
+        countEdited={countEdited}
+        onCountedCash={(value) => {
+          setCountEdited(true);
+          setCountedCash(value);
+        }}
+        notes={notes}
+        onNotes={setNotes}
+        canEdit={canEditClose}
+        saving={closing}
+        saveLabel={summary.closing ? 'Guardar cambio' : 'Cerrar el día'}
+        savingLabel={summary.closing ? 'Guardando…' : 'Cerrando…'}
+        onSave={closeDay}
+        error={error}
+        locked={Boolean(summary.closing)}
       />
-
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="block min-w-[16rem] flex-1">
-          <span className="text-sm text-slate-600">Notas</span>
-          <input
-            type="text"
-            className="pv-input mt-1 text-sm disabled:bg-slate-50"
-            value={notes}
-            disabled={!canEditClose}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Si no cuadra, anota por qué"
-          />
-        </label>
-        {canEditClose ? (
-          <button
-            type="button"
-            className="pv-btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
-            disabled={closing || closeBlocked}
-            onClick={closeDay}
-          >
-            {summary.closing
-              ? closing
-                ? 'Guardando…'
-                : 'Guardar cambio'
-              : closing
-                ? 'Cerrando…'
-                : 'Cerrar el día'}
-          </button>
-        ) : null}
-      </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {canEditClose && !summary.closing ? (
         <p className="text-sm text-slate-500">
           El conteo queda en el historial del día. Caja y cuenta siguen las ventas y las compras.
