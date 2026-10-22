@@ -9,7 +9,7 @@ import { CashDayRefresh } from '@/components/CashDayRefresh';
 import { MorningOpenNotice } from '@/components/MorningOpenNotice';
 import { PendingCashCloseGate } from '@/components/PendingCashCloseGate';
 import { getStaffSession, loadPermissionMatrix, staffHasPermission } from '@/lib/auth';
-import { fetchMoneyPosition } from '@/lib/money-position';
+import { loadCashDay } from '@/lib/cash-day';
 import { mexicoDayGreeting, todayMexicoYmd, yesterdayMexicoYmd } from '@/lib/mexico-date';
 import { listBranchesForUser } from '@/lib/tenant';
 import { createAdminClient } from '@puertaverde/supabase/admin';
@@ -72,9 +72,13 @@ export async function AdminShell({
   ]);
   const needsYesterdayClose = !pendingClosing.error && !pendingClosing.data;
   const canCloseCaja = staffHasPermission(staff, 'cash.closing', permissionMatrix);
-  const opening = needsYesterdayClose
+  const yesterdayDay = needsYesterdayClose
     ? null
-    : await fetchMoneyPosition(staff.branchId, yesterday, yesterday).catch(() => null);
+    : await loadCashDay(staff.branchId, yesterday).catch(() => null);
+  const yesterdayClosing = yesterdayDay?.closing as
+    | { opening_float?: number | null; counted_cash?: number | null; notes?: string | null }
+    | null
+    | undefined;
 
   const org = orgResult.data;
   const subscriptionOk = org
@@ -91,12 +95,23 @@ export async function AdminShell({
       <CashDayRefresh today={today} />
       {needsYesterdayClose ? (
         <PendingCashCloseGate date={yesterday} canClose={canCloseCaja} userName={displayName} />
-      ) : opening ? (
+      ) : yesterdayDay && yesterdayClosing ? (
         <MorningOpenNotice
           today={today}
           yesterday={yesterday}
-          cash={opening.cash}
-          account={opening.account}
+          openingFloat={
+            yesterdayClosing.opening_float != null
+              ? String(yesterdayClosing.opening_float)
+              : yesterdayDay.suggestedOpeningFloat != null
+                ? String(yesterdayDay.suggestedOpeningFloat)
+                : ''
+          }
+          countedCash={
+            yesterdayClosing.counted_cash != null ? String(yesterdayClosing.counted_cash) : ''
+          }
+          cashSales={Number(yesterdayDay.totals.cash ?? 0)}
+          cashLines={yesterdayDay.cashLines}
+          notes={yesterdayClosing.notes ?? ''}
         />
       ) : null}
       <main className="relative flex min-h-screen flex-col">
