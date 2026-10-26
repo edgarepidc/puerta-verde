@@ -106,6 +106,10 @@ export interface OperatingCostInput {
   category?: OperatingCostCategory;
   /** Calendar day (1–31) when the full amount leaves caja/cuenta. */
   chargeDay?: number;
+  /** Full date of the charge. The day of this date is the monthly charge day. */
+  chargeDate?: string;
+  /** Monthly repeats that day. Once charges only on chargeDate. */
+  recurrence?: OperatingCostRecurrence;
   /** First day the cost should apply (the start of the Números period being viewed). */
   effectiveFrom?: string;
 }
@@ -155,6 +159,39 @@ export function chargeDateForMonth(year: number, month: number, chargeDay: numbe
 
 export function formatChargeDayLabel(chargeDay: number): string {
   return `Se suma el día ${normalizeChargeDay(chargeDay)}`;
+}
+
+export type OperatingCostRecurrence = 'monthly' | 'once';
+
+export function normalizeOperatingCostRecurrence(value: unknown): OperatingCostRecurrence {
+  return value === 'once' ? 'once' : 'monthly';
+}
+
+/** A real calendar date, or null when the text is not one. */
+export function parseChargeDate(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return value;
+}
+
+/** Recurrente keeps an open term. Único starts and ends on the same date. */
+export function chargeSchedule(
+  chargeDate: string,
+  recurrence: OperatingCostRecurrence,
+): { chargeDay: number; startDate: string; endDate: string | null } {
+  return {
+    chargeDay: Number(chargeDate.slice(8, 10)),
+    startDate: chargeDate,
+    endDate: recurrence === 'once' ? chargeDate : null,
+  };
 }
 
 export interface OperatingCostPocketInput {
