@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 
 import {
+  chargeSchedule,
   costTypeFromCategory,
   inferOperatingCostCategory,
-  normalizeChargeDay,
+  normalizeOperatingCostRecurrence,
+  parseChargeDate,
   parseOperatingCostCategory,
   validateOperatingCostInput,
   type OperatingCostInput,
@@ -73,6 +75,10 @@ export async function POST(request: Request) {
     );
     const costType = costTypeFromCategory(category);
 
+    const recurrence = normalizeOperatingCostRecurrence(body.recurrence);
+    const chargeDate = parseChargeDate(body.chargeDate) ?? todayMexicoYmd();
+    const schedule = chargeSchedule(chargeDate, recurrence);
+
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('branch_operating_costs')
@@ -86,7 +92,8 @@ export async function POST(request: Request) {
         notes: body.notes?.trim() || null,
         is_active: true,
         paid_from: body.paidFrom === 'cash' ? 'cash' : 'account',
-        charge_day: normalizeChargeDay(body.chargeDay),
+        charge_day: schedule.chargeDay,
+        recurrence,
       })
       .select('id')
       .single();
@@ -95,11 +102,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error?.message ?? 'No se pudo crear' }, { status: 400 });
     }
 
-    const startDate = body.effectiveFrom?.trim() || todayMexicoYmd();
     const { error: termError } = await supabase.from('branch_operating_cost_terms').insert({
       cost_id: data.id,
-      start_date: startDate,
-      end_date: null,
+      start_date: schedule.startDate,
+      end_date: schedule.endDate,
     });
     if (termError) {
       await supabase.from('branch_operating_costs').delete().eq('id', data.id);

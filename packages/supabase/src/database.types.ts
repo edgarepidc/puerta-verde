@@ -509,6 +509,7 @@ export interface Database {
           is_active: boolean;
           paid_from: 'cash' | 'account';
           charge_day: number;
+          recurrence: 'monthly' | 'once';
           category: 'rent' | 'payroll' | 'fixed' | 'variable';
           created_at: string;
         };

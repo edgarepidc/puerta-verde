@@ -6,6 +6,7 @@ import {
   OPERATING_COST_CATEGORIES,
   OPERATING_COST_CATEGORY_HINTS,
   OPERATING_COST_CATEGORY_LABELS,
+  chargeDateForMonth,
   formatChargeDayLabel,
   formatDecimal,
   formatMoney,
@@ -33,6 +34,7 @@ import {
   type OperatingCostCategory,
   type OperatingCostInput,
   type OperatingCostPeriod,
+  type OperatingCostRecurrence,
   type OperatingCostTerm,
   type OperatingCostType,
   type ProductUnit,
@@ -53,6 +55,7 @@ import {
   addMexicoDays,
   currentMexicoMonthRange,
   previousMexicoMonthRange,
+  formatMexicoSpokenDay,
   todayMexicoYmd,
 } from '@/lib/mexico-date';
 
@@ -81,6 +84,7 @@ interface CostRow {
   is_active: boolean;
   paid_from?: MoneyPocket | null;
   charge_day?: number | null;
+  recurrence?: OperatingCostRecurrence | null;
   terms?: OperatingCostTerm[];
 }
 
@@ -141,7 +145,19 @@ const emptyCost: OperatingCostInput = {
   isActive: true,
   paidFrom: 'account',
   chargeDay: 1,
+  chargeDate: '',
+  recurrence: 'monthly',
 };
+
+function freshCostForm(): OperatingCostInput {
+  const chargeDate = todayMexicoYmd();
+  return {
+    ...emptyCost,
+    chargeDate,
+    chargeDay: Number(chargeDate.slice(8, 10)),
+    recurrence: 'monthly',
+  };
+}
 
 const OPERATING_COST_CATEGORY_BAR: Record<
   OperatingCostCategory,
@@ -215,29 +231,13 @@ function monthParts(ymd: string): { year: number; month: number } {
   return { year, month };
 }
 
-function daysInViewedMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function ChargeDayField({
+function ChargeDateField({
   value,
   onChange,
-  monthYmd,
 }: {
-  value: number;
-  onChange: (day: number) => void;
-  monthYmd: string;
+  value: string;
+  onChange: (ymd: string) => void;
 }) {
-  const { year, month } = monthParts(monthYmd);
-  const dayCount = daysInViewedMonth(year, month);
-  const selected = Math.min(normalizeChargeDay(value), dayCount);
-  const monthKey = pad2(month);
-  const ymd = `${year}-${monthKey}-${pad2(selected)}`;
-
   return (
     <label className="block w-[9.75rem] shrink-0 text-sm">
       <span className="text-slate-600">Se suma el día</span>
@@ -245,16 +245,65 @@ function ChargeDayField({
         type="date"
         className="pv-input mt-1 block text-sm"
         aria-label="Se suma el día"
-        min={`${year}-${monthKey}-01`}
-        max={`${year}-${monthKey}-${pad2(dayCount)}`}
-        value={ymd}
+        value={value}
         onChange={(event) => {
-          const day = Number(event.target.value.slice(8, 10));
-          if (Number.isInteger(day) && day >= 1 && day <= 31) onChange(day);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) onChange(event.target.value);
         }}
       />
     </label>
   );
+}
+
+function RecurrenceField({
+  value,
+  onChange,
+}: {
+  value: OperatingCostRecurrence;
+  onChange: (value: OperatingCostRecurrence) => void;
+}) {
+  return (
+    <div className="block shrink-0 text-sm">
+      <span className="text-slate-600">Cargo</span>
+      <div className="mt-1 flex gap-2">
+        <button
+          type="button"
+          className={value === 'monthly' ? menuButtonOn : menuButtonOff}
+          onClick={() => onChange('monthly')}
+        >
+          Recurrente
+        </button>
+        <button
+          type="button"
+          className={value === 'once' ? menuButtonOn : menuButtonOff}
+          onClick={() => onChange('once')}
+        >
+          Único
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function onceChargeDate(terms: OperatingCostTerm[] | undefined): string | null {
+  const match = (terms ?? []).find((term) => term.start_date && term.start_date === term.end_date);
+  return match?.start_date ?? null;
+}
+
+function chargeDateForRow(row: CostRow, monthYmd: string): string {
+  if (row.recurrence === 'once') {
+    const unique = onceChargeDate(row.terms);
+    if (unique) return unique;
+  }
+  const { year, month } = monthParts(monthYmd);
+  return chargeDateForMonth(year, month, normalizeChargeDay(row.charge_day));
+}
+
+function costScheduleLabel(row: CostRow, chargeDay: number): string {
+  if (row.recurrence === 'once') {
+    const unique = onceChargeDate(row.terms);
+    return `Único · ${unique ? formatMexicoSpokenDay(unique) : formatChargeDayLabel(chargeDay)}`;
+  }
+  return `Recurrente · ${formatChargeDayLabel(chargeDay)}`;
 }
 
 type BadgeTone = 'green' | 'amber' | 'leaf' | 'blue' | 'slate' | 'orange' | 'indigo' | 'profit' | 'loss';
@@ -617,7 +666,7 @@ export function ProfitabilityManager({
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [preset, setPreset] = useState<PeriodPreset>(() => detectPreset(initialFrom, initialTo));
-  const [costForm, setCostForm] = useState(emptyCost);
+  const [costForm, setCostForm] = useState(freshCostForm);
   const [costAmountText, setCostAmountText] = useState('');
   const [incomeType, setIncomeType] = useState<IncomeEntryType>('contribution');
   const [incomeConcept, setIncomeConcept] = useState('');
@@ -666,7 +715,8 @@ export function ProfitabilityManager({
     category: OperatingCostCategory;
     period: OperatingCostPeriod;
     paidFrom: MoneyPocket;
-    chargeDay: number;
+    chargeDate: string;
+    recurrence: OperatingCostRecurrence;
   } | null>(null);
 
   const today = todayMexicoYmd();
@@ -862,12 +912,13 @@ export function ProfitabilityManager({
           amount: parseDecimal(costAmountText),
           costType: costTypeFromCategory(parseOperatingCostCategory(costForm.category, 'payroll')),
           category: parseOperatingCostCategory(costForm.category, 'payroll'),
-          effectiveFrom: from,
+          chargeDate: costForm.chargeDate,
+          recurrence: costForm.recurrence,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'No se pudo guardar');
-      setCostForm(emptyCost);
+      setCostForm(freshCostForm());
       setCostAmountText('');
       setOpenGastosUtilidad(true);
       setOpenGastosLista(true);
@@ -1018,7 +1069,8 @@ export function ProfitabilityManager({
           category: editCost.category,
           period: editCost.period,
           paidFrom: editCost.paidFrom,
-          chargeDay: editCost.chargeDay,
+          chargeDate: editCost.chargeDate,
+          recurrence: editCost.recurrence,
         }),
       });
       const result = await response.json();
@@ -1500,7 +1552,8 @@ export function ProfitabilityManager({
           </summary>
           <div className="border-t border-slate-100">
             <p className="px-4 pt-3 text-sm text-slate-500">
-              Cada gasto del local se suma el día que eliges, completo. La visita (gasolina,
+              La fecha arranca en el día de hoy. Recurrente se cobra ese día cada mes, como
+              Totalplay. Único se cobra solo esa fecha, como un ajuste. La visita (gasolina,
               diablero, caseta) entra en Gastos variables. Quitar de la lista lo oculta de este mes
               en adelante; en los meses anteriores se queda.
             </p>
@@ -1575,12 +1628,17 @@ export function ProfitabilityManager({
                               }
                             />
                           </PillField>
-                          <ChargeDayField
-                            value={editCost.chargeDay}
-                            onChange={(day) =>
-                              setEditCost((d) => (d ? { ...d, chargeDay: day } : d))
+                          <ChargeDateField
+                            value={editCost.chargeDate}
+                            onChange={(chargeDate) =>
+                              setEditCost((d) => (d ? { ...d, chargeDate } : d))
                             }
-                            monthYmd={from}
+                          />
+                          <RecurrenceField
+                            value={editCost.recurrence}
+                            onChange={(recurrence) =>
+                              setEditCost((d) => (d ? { ...d, recurrence } : d))
+                            }
                           />
                           <MoneyPocketField
                             className="w-[9.75rem] shrink-0"
@@ -1608,7 +1666,7 @@ export function ProfitabilityManager({
                           <div className="min-w-0">
                             <p className="font-medium text-slate-900">{row.name}</p>
                             <p className="text-sm text-slate-500">
-                              {formatChargeDayLabel(chargeDay)} ·{' '}
+                              {costScheduleLabel(row, chargeDay)} ·{' '}
                               {MONEY_POCKET_LABELS[parseMoneyPocket(row.paid_from, 'account')]}
                               {charged > 0 ? ' · ya contó aquí' : ' · todavía no se suma'}
                             </p>
@@ -1629,7 +1687,8 @@ export function ProfitabilityManager({
                                   category: costCategoryOf(row),
                                   period: row.period,
                                   paidFrom: parseMoneyPocket(row.paid_from, 'account'),
-                                  chargeDay,
+                                  chargeDate: chargeDateForRow(row, from),
+                                  recurrence: row.recurrence === 'once' ? 'once' : 'monthly',
                                 })
                               }
                             >
@@ -1850,10 +1909,13 @@ export function ProfitabilityManager({
                     onChange={setCostAmountText}
                   />
                 </PillField>
-                <ChargeDayField
-                  value={costForm.chargeDay ?? 1}
-                  onChange={(day) => setCostForm((f) => ({ ...f, chargeDay: day }))}
-                  monthYmd={from}
+                <ChargeDateField
+                  value={costForm.chargeDate || today}
+                  onChange={(chargeDate) => setCostForm((f) => ({ ...f, chargeDate }))}
+                />
+                <RecurrenceField
+                  value={costForm.recurrence ?? 'monthly'}
+                  onChange={(recurrence) => setCostForm((f) => ({ ...f, recurrence }))}
                 />
                 <MoneyPocketField
                   className="w-[9.75rem] shrink-0"

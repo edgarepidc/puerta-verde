@@ -3,15 +3,74 @@ import { NextResponse } from 'next/server';
 import {
   OPERATING_COST_PERIODS,
   OPERATING_COST_TYPES,
+  chargeSchedule,
   costAppliesToRange,
   costTypeFromCategory,
   inferOperatingCostCategory,
   isOperatingCostCategory,
   normalizeChargeDay,
+  normalizeOperatingCostRecurrence,
+  parseChargeDate,
   type OperatingCostInput,
+  type OperatingCostRecurrence,
   type OperatingCostTerm,
 } from '@puertaverde/shared';
 import { createAdminClient } from '@puertaverde/supabase/admin';
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function writeChargeTerms(
+  supabase: AdminClient,
+  costId: string,
+  chargeDate: string,
+  recurrence: OperatingCostRecurrence,
+) {
+  const schedule = chargeSchedule(chargeDate, recurrence);
+  if (recurrence === 'once') {
+    const { error: deleteError } = await supabase
+      .from('branch_operating_cost_terms')
+      .delete()
+      .eq('cost_id', costId);
+    if (deleteError) return deleteError.message;
+    const { error: insertError } = await supabase.from('branch_operating_cost_terms').insert({
+      cost_id: costId,
+      start_date: schedule.startDate,
+      end_date: schedule.endDate,
+    });
+    return insertError?.message ?? null;
+  }
+
+  const { data: terms, error: termsError } = await supabase
+    .from('branch_operating_cost_terms')
+    .select('id, start_date, end_date')
+    .eq('cost_id', costId);
+  if (termsError) return termsError.message;
+
+  for (const term of terms ?? []) {
+    if (term.end_date == null || term.start_date !== term.end_date) continue;
+    const { error } = await supabase.from('branch_operating_cost_terms').delete().eq('id', term.id);
+    if (error) return error.message;
+  }
+
+  const open = (terms ?? []).find((term) => term.end_date == null);
+  if (open) {
+    if (open.start_date > schedule.startDate) {
+      const { error } = await supabase
+        .from('branch_operating_cost_terms')
+        .update({ start_date: schedule.startDate })
+        .eq('id', open.id);
+      if (error) return error.message;
+    }
+    return null;
+  }
+
+  const { error: insertError } = await supabase.from('branch_operating_cost_terms').insert({
+    cost_id: costId,
+    start_date: schedule.startDate,
+    end_date: null,
+  });
+  return insertError?.message ?? null;
+}
 
 import { requireStaffApi, requireStaffPermission } from '@/lib/auth';
 import { addMexicoDays, isValidYmd } from '@/lib/mexico-date';
@@ -48,6 +107,7 @@ export async function PATCH(
       is_active: boolean;
       paid_from: 'cash' | 'account';
       charge_day: number;
+      recurrence: OperatingCostRecurrence;
     }> = {};
     if (body.name?.trim()) updates.name = body.name.trim();
     if (isOperatingCostCategory(body.category)) {
@@ -73,7 +133,15 @@ export async function PATCH(
     if (body.paidFrom === 'cash' || body.paidFrom === 'account') {
       updates.paid_from = body.paidFrom;
     }
-    if (body.chargeDay != null) {
+    const chargeDate = parseChargeDate(body.chargeDate);
+    const recurrence =
+      body.recurrence == null && !chargeDate
+        ? null
+        : normalizeOperatingCostRecurrence(body.recurrence);
+    if (chargeDate && recurrence) {
+      updates.charge_day = chargeSchedule(chargeDate, recurrence).chargeDay;
+      updates.recurrence = recurrence;
+    } else if (body.chargeDay != null) {
       const chargeDay = normalizeChargeDay(body.chargeDay, 0);
       if (chargeDay === 0) {
         return NextResponse.json({ error: 'El día tiene que ser del 1 al 31.' }, { status: 400 });
@@ -169,6 +237,13 @@ export async function PATCH(
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+    }
+
+    if (chargeDate && recurrence) {
+      const termError = await writeChargeTerms(supabase, id, chargeDate, recurrence);
+      if (termError) {
+        return NextResponse.json({ error: termError }, { status: 400 });
       }
     }
 

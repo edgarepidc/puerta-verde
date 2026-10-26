@@ -379,3 +379,21 @@ test('operatingCostsChargedOnYmd lists cash payroll on its charge day', () => {
   ]);
   assert.equal(operatingCostsChargedOnYmd([cost], '2026-09-29').length, 0);
 });
+
+test('a unique charge counts on its date and a recurrent one repeats', () => {
+  const once = {
+    costType: 'fixed' as const,
+    period: 'monthly' as const,
+    amount: 1094,
+    chargeDay: 26,
+    terms: [{ start_date: '2026-10-26', end_date: '2026-10-26' }],
+  };
+  assert.equal(operatingCostAmountForRange(once, '2026-10-01', '2026-10-31'), 1094);
+  assert.equal(operatingCostAmountForRange(once, '2026-11-01', '2026-11-30'), 0);
+
+  const monthly = {
+    ...once,
+    terms: [{ start_date: '2026-10-26', end_date: null }],
+  };
+  assert.equal(operatingCostAmountForRange(monthly, '2026-11-01', '2026-11-30'), 1094);
+});
